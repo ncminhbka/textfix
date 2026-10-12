@@ -1,0 +1,443 @@
+{
+ "note": "Ca thử FLUX.2 klein 4B base (scripts/base_test.py). gen: vẽ lại đúng prompt + seed của nháp distill đã có. erase: xoá lại các nháp distill mà bản distill xoá hỏng (xem tay 12/10/2026) + vài ca đối chứng.",
+ "gen": [
+  {
+   "key": "dev3_p01_v0",
+   "why": "prompt dài thật (prompt_test.txt)",
+   "run_id": "run_20261009_094914_b593",
+   "v": 0,
+   "seed": 4001,
+   "W": 896,
+   "H": 1120,
+   "prompt_en": "A ultra-realistic, high-detail vertical fitness poster layout featuring a premium gym service, set against a dark, moody background of a luxurious gym interior with dim, cinematic lighting and red accent glows. The composition is split vertically: the top 40% features a large, bold headline in a condensed sans-serif font reading \"Khách hàng nói gì sau 90 ngày thay đổi?\" in bright white, positioned at the top center. Below the headline, the name \"Private Coaching Transformation\" appears in a sleek, metallic red font. In the middle section, a dynamic before/after comparison of a muscular male client is shown, highlighting muscle gain and body shaping, with realistic skin textures and dramatic rim lighting. To the right of the image, a golden 5-star rating icon is displayed. The bottom section contains a clean, semi-transparent black card overlay. Inside, the feedback description \"97% khách hàng hài lòng với kết quả tăng cơ, cải thiện vóc dáng và sức khỏe chỉ sau 3 tháng tập luyện cùng PT riêng\" is written in a clean white sans-serif. Below that, a bold red badge announces the offer \"Giảm 20% gói PT tháng đầu cho khách hàng mới\". Underneath, a list of features is presented in small, white text: \"PT 1:1 riêng tư, giáo án cá nhân hóa, theo dõi dinh dưỡng và form tập chi tiết\". The overall mood is intense, professional, and inspiring, with a high-contrast black and red color palette, sharp focus on the text and the client's physique, and a sophisticated, modern aesthetic suitable for social media advertising."
+  },
+  {
+   "key": "dev3_p01_v1",
+   "why": "prompt dài thật (prompt_test.txt)",
+   "run_id": "run_20261009_094914_b593",
+   "v": 1,
+   "seed": 13974,
+   "W": 896,
+   "H": 1120,
+   "prompt_en": "A vertical, high-contrast fitness poster featuring a premium personal coaching service. The layout is split into two equal vertical halves. The left half is a deep, solid matte black background with text elements. At the top of the left side, the headline \"Khách hàng nói gì sau 90 ngày thay đổi?\" is displayed in large, bold white sans-serif letters. Below it, \"Private Coaching Transformation\" appears in a vibrant red font. In the middle of the left side, a golden 5-star rating is shown. Below the stars, the text \"97% khách hàng hài lòng với kết quả tăng cơ, cải thiện vóc dáng và sức khỏe chỉ sau 3 tháng tập luyện cùng PT riêng\" is written in a smaller, clean white font. At the bottom of the left side, a red rectangular button contains the offer \"Giảm 20% gói PT tháng đầu cho khách hàng mới\" in white. The right half of the poster is a full-bleed, ultra-realistic photograph of a muscular man standing in a dark, luxurious gym with cinematic red lighting, showcasing a before/after transformation through lighting and pose. The features \"PT 1:1 riêng tư, giáo án cá nhân hóa, theo dõi dinh dưỡng và form tập chi tiết\" are listed in small white text at the very bottom right, aligned with the right edge. The overall style is modern, sleek, and premium, with a strong black and red aesthetic."
+  },
+  {
+   "key": "dev3_p02_v0",
+   "why": "prompt dài thật (prompt_test.txt)",
+   "run_id": "run_20261009_094914_0319",
+   "v": 0,
+   "seed": 4002,
+   "W": 1024,
+   "H": 1024,
+   "prompt_en": "A vertical high-end pet spa poster featuring a square split-composition image of a fluffy Poodle dog. The left half shows the dog with dull, tangled hair labeled with a subtle graphic icon, while the right half shows the same dog looking clean, glossy, and radiant, illustrating a dramatic 'before and after' transformation. Above the image, a large bold rounded sans-serif headline in dark charcoal reads \"Boss lột xác thế nào sau 2 giờ tại Spa?\". Below the headline, a subheadline in a lighter weight reads \"Premium Pet Grooming & Spa\". To the right of the dog image, a 5-star rating graphic glows in gold. Below the main image, a body text block in a clean sans-serif states \"100% các bé cún/mèo trở nên thơm tho, bồng bềnh và thư giãn hoàn toàn sau combo spa 7 bước\". Further down, a list of features is presented in elegant bullet points: \"Sử dụng sữa tắm hữu cơ, cắt tỉa chuẩn form Hàn Quốc, không gian không lồng kính giúp giảm stress\". At the bottom, a vibrant pink call-to-action badge highlights the offer \"Tặng gói ngâm sục Ozon trị giá 200k cho lần đầu trải nghiệm\". The background is a soft, airy pastel gradient of pink and mint green, evoking a clean, premium spa environment. Studio lighting is bright and soft, creating a professional and inviting atmosphere. The typography is friendly, rounded, and modern."
+  },
+  {
+   "key": "dev3_p02_v1",
+   "why": "prompt dài thật (prompt_test.txt)",
+   "run_id": "run_20261009_094914_0319",
+   "v": 1,
+   "seed": 13975,
+   "W": 1024,
+   "H": 1024,
+   "prompt_en": "A vertical poster with a large central circular cut-out image of a Poodle dog, split vertically. The left side of the circle shows the dog with a messy coat, and the right side shows the dog clean and shiny, representing a transformation. At the top, a bold rounded headline reads \"Boss lột xác thế nào sau 2 giờ tại Spa?\". Below the circle, a subheadline says \"Premium Pet Grooming & Spa\". To the left of the circle, a 5-star rating graphic is placed. To the right, a list of features reads \"Sử dụng sữa tắm hữu cơ, cắt tỉa chuẩn form Hàn Quốc, không gian không lồng kính giúp giảm stress\". At the bottom, a body text states \"100% các bé cún/mèo trở nên thơm tho, bồng bềnh và thư giãn hoàn toàn sau combo spa 7 bước\". A prominent pink pill-shaped badge at the very bottom displays \"Tặng gói ngâm sục Ozon trị giá 200k cho lần đầu trải nghiệm\". The background is a pastel pink and mint green gradient with soft studio lighting, emphasizing a cute and premium pet care aesthetic."
+  },
+  {
+   "key": "dev3_p03_v0",
+   "why": "prompt dài thật (prompt_test.txt)",
+   "run_id": "run_20261009_094914_8669",
+   "v": 0,
+   "seed": 4003,
+   "W": 896,
+   "H": 1120,
+   "prompt_en": "A vertical photorealistic advertising poster for 'Cloud Retreat Glamping', a luxury glamping resort. The composition is set on a tall portrait canvas. The main visual occupies the upper two-thirds, depicting a glowing modern dome tent nestled among tall pine trees during a dramatic golden hour sunset. Cinematic lighting with warm orange highlights and deep mossy green shadows creates a luxurious, healing atmosphere. In the foreground, a romantic couple is shown in a candid, warm moment, clinking glasses of red wine, symbolizing relaxation and recharging. The bottom third features a calm, solid background area with a subtle mossy green texture for high-contrast text readability. At the very top center, the headline \"Trải nghiệm chữa lành giữa thiên nhiên tuyệt mỹ\" is written in an elegant, thin serif font in a soft white color. Below the main image, on the left, the service name \"Cloud Retreat Glamping\" appears in a bold, condensed sans-serif typeface in a bright gold tone. Next to it, a subtle 5-star rating graphic is visible. In the center of the lower section, the description \"98% khách hàng đánh giá đây là điểm đến lý tưởng để tái tạo năng lượng, rời xa khói bụi thành phố dịp cuối tuần\" is set in a clean, readable sans-serif font in white. Below that, a list of highlights is presented in a smaller, lighter font: \"Lều Dome view săn mây 360 độ, BBQ riêng tư tại lều, rạp chiếu phim ngoài trời và lửa trại ấm cúng\". At the bottom right, a prominent offer badge with a bright orange background and white text reads \"Giảm 30% khi đặt phòng sớm trước 14 ngày\". The overall mood is serene, premium, and inviting, with high detail and professional typography layout."
+  },
+  {
+   "key": "dev3_p03_v1",
+   "why": "prompt dài thật (prompt_test.txt)",
+   "run_id": "run_20261009_094914_8669",
+   "v": 1,
+   "seed": 13976,
+   "W": 896,
+   "H": 1120,
+   "prompt_en": "A vertical photorealistic advertising poster for 'Cloud Retreat Glamping', a luxury glamping resort. The composition is set on a tall portrait canvas. The main visual occupies the upper two-thirds, depicting a glowing modern dome tent nestled among tall pine trees during a dramatic golden hour sunset. Cinematic lighting with warm orange highlights and deep mossy green shadows creates a luxurious, healing atmosphere. In the foreground, a romantic couple is shown in a candid, warm moment, clinking glasses of red wine, symbolizing relaxation and recharging. The bottom third features a calm, solid background area with a subtle mossy green texture for high-contrast text readability. At the very top center, the headline \"Trải nghiệm chữa lành giữa thiên nhiên tuyệt mỹ\" is written in an elegant, thin serif font in a soft white color. Below the main image, on the left, the service name \"Cloud Retreat Glamping\" appears in a bold, condensed sans-serif typeface in a bright gold tone. Next to it, a subtle 5-star rating graphic is visible. In the center of the lower section, the description \"98% khách hàng đánh giá đây là điểm đến lý tưởng để tái tạo năng lượng, rời xa khói bụi thành phố dịp cuối tuần\" is set in a clean, readable sans-serif font in white. Below that, a list of highlights is presented in a smaller, lighter font: \"Lều Dome view săn mây 360 độ, BBQ riêng tư tại lều, rạp chiếu phim ngoài trời và lửa trại ấm cúng\". At the bottom right, a prominent offer badge with a bright orange background and white text reads \"Giảm 30% khi đặt phòng sớm trước 14 ngày\". The overall mood is serene, premium, and inviting, with high detail and professional typography layout."
+  },
+  {
+   "key": "dev3_p04_v0",
+   "why": "prompt dài thật (prompt_test.txt)",
+   "run_id": "run_20261009_094914_2d28",
+   "v": 0,
+   "seed": 4004,
+   "W": 1344,
+   "H": 768,
+   "prompt_en": "A wide horizontal landscape web banner poster for a smart furniture product feedback advertisement. The visual style is European minimalist, luxurious, and ultra-realistic. The scene depicts a penthouse living room at night with a city view through floor-to-ceiling windows, using a color palette of genuine cowhide brown and power grey. Softbox lighting creates a gentle, premium atmosphere. On the right side, an ultra-realistic image of a man is lying back in a relaxed posture, eyes closed, enjoying comfort in the 'Sofa Chỉnh Điện Smart Zen'. The sofa features a high-quality cowhide texture and a 170-degree zero-gravity recline. On the left side, the layout features clean, modern typography on a calm area. At the top left, the headline \"Định nghĩa lại sự thư giãn tại phòng khách\" in a bold, elegant sans-serif. Below it, the product name \"Sofa Chỉnh Điện Smart Zen\" in a slightly smaller, refined font. A body text section reads: \"Khách hàng hoàn toàn bị chinh phục bởi độ êm ái và tính năng massage tích hợp, biến phòng khách thành rạp phim tại gia\". Below that, a highlighted feature list: \"Da bò Ý thật 100%, ngả lưng không trọng lực 170 độ, tích hợp sạc không dây và loa bluetooth\". At the bottom left, an offer badge: \"Tặng bàn trà mặt đá cao cấp khi chốt đơn trong tháng\". At the bottom right, a 5-star rating display with the text \"5 sao\". No other text is visible."
+  },
+  {
+   "key": "dev3_p04_v1",
+   "why": "prompt dài thật (prompt_test.txt)",
+   "run_id": "run_20261009_094914_2d28",
+   "v": 1,
+   "seed": 13977,
+   "W": 1344,
+   "H": 768,
+   "prompt_en": "A wide horizontal landscape web banner poster for a smart furniture product feedback advertisement, centered hero layout. The visual style is European minimalist, luxurious, and ultra-realistic. The scene is a penthouse living room at night with a city view, using a color palette of genuine cowhide brown and power grey. Softbox lighting creates a gentle, premium atmosphere. In the center, an ultra-realistic image of a man is lying back in a relaxed posture, eyes closed, enjoying comfort in the 'Sofa Chỉnh Điện Smart Zen'. The sofa features a high-quality cowhide texture and a 170-degree zero-gravity recline. At the top center, the headline \"Định nghĩa lại sự thư giãn tại phòng khách\" in a bold, elegant sans-serif. Below the image, the product name \"Sofa Chỉnh Điện Smart Zen\". Below that, the body text: \"Khách hàng hoàn toàn bị chinh phục bởi độ êm ái và tính năng massage tích hợp, biến phòng khách thành rạp phim tại gia\". Below that, the feature list: \"Da bò Ý thật 100%, ngả lưng không trọng lực 170 độ, tích hợp sạc không dây và loa bluetooth\". At the bottom center, the offer: \"Tặng bàn trà mặt đá cao cấp khi chốt đơn trong tháng\". At the bottom left, a 5-star rating display with the text \"5 sao\". No other text is visible."
+  },
+  {
+   "key": "dev3_p05_v0",
+   "why": "prompt dài thật (prompt_test.txt)",
+   "run_id": "run_20261009_094914_a717",
+   "v": 0,
+   "seed": 4005,
+   "W": 768,
+   "H": 1344,
+   "prompt_en": "A vertical tall poster design for a health drink, hyper-realistic, professional layout, vibrant and fresh mood. The background features a lush arrangement of fresh tropical fruits (mango, guava, passion fruit), vibrant green mint leaves, and dynamic splashing water effects creating a sense of freshness and energy. The color palette is dominated by fresh green and peach-orange tones. Main subject: A young, radiant woman wearing stylish athletic wear, holding a bottle of Kombucha, smiling confidently at the camera. To the right of her, a distinct rectangular inset displays a realistic 'before/after' comparison showing a smaller, defined waistline. Top center: Five bright golden stars. Text layout: At the top, the headline \"Vòng eo thon gọn, cơ thể nhẹ tênh chỉ sau 14 ngày\" in bold, dynamic sans-serif font. Below that, the product name \"Detox Kombucha Premium\" in a clean, modern typeface. A descriptive block of text reads \"Hơn 5000 chị em đã lấy lại vóc dáng tự tin, cải thiện tiêu hóa và da sáng mịn màng với liệu trình Kombucha tươi\". A highlighted list section features \"Lên men tự nhiên 30 ngày, 0 đường tinh luyện, bổ sung 1 tỷ lợi khuẩn Probiotics, vị trái cây nhiệt đới dễ uống\". At the bottom, a promotional banner displays \"Mua liệu trình 14 ngày tặng ngay bình giữ nhiệt cao cấp\". Natural, bright lighting illuminates the scene, creating soft shadows and enhancing the texture of the water splash and skin."
+  },
+  {
+   "key": "dev3_p06_v0",
+   "why": "prompt dài thật (prompt_test.txt)",
+   "run_id": "run_20261009_094914_ac6d",
+   "v": 0,
+   "seed": 4006,
+   "W": 896,
+   "H": 1120,
+   "prompt_en": "A high-resolution portrait-oriented poster design for an elite language course, featuring a photorealistic 3D scene with a professional international office background. The main subject is a confident Vietnamese professional in a sharp navy blue suit shaking hands with a Western business partner, both smiling warmly, bathed in crisp studio lighting that highlights the premium nature of the service. The background is a softly blurred modern office space with glass walls and subtle gold accents, creating a mood of success and global connectivity. At the top center, the headline \"Đập tan rào cản tiếng Anh, tự tin thăng tiến\" is written in a bold, large sans-serif font in gold color. Below the headline, slightly offset to the left, the service name \"Khóa học Giao Tiếp Phản Xạ Độc Quyền\" appears in a clean, white sans-serif typeface. In the lower middle section, the body text \"Hàng ngàn dân công sở đã tự tin thuyết trình và đàm phán trực tiếp với đối tác nước ngoài chỉ sau 3 tháng thực chiến\" is presented in a smaller, readable white font on a semi-transparent dark blue banner. To the right, a stylized card lists the highlights \"Học 1 kèm 1 với giáo viên bản xứ, lộ trình cá nhân hóa theo ngành nghề, phương pháp ám thị ngôn ngữ không ghi chép\" in neat bullet points. At the bottom, the offer \"Tặng buổi test năng lực chuẩn Cambridge và voucher 1 triệu đồng\" is highlighted in a vibrant yellow box with black text for contrast. A prominent 5-star rating icon is placed near the top right corner, glowing slightly. The color palette is dominated by deep navy blue and gold, ensuring a professional and trustworthy aesthetic."
+  },
+  {
+   "key": "dev3_p07_v0",
+   "why": "prompt dài thật (prompt_test.txt)",
+   "run_id": "run_20261009_094914_e0d4",
+   "v": 0,
+   "seed": 4007,
+   "W": 1024,
+   "H": 1024,
+   "prompt_en": "A vertical promotional poster for a household cleaning service featuring a split-screen composition on a clean square canvas. The left half depicts a chaotic, dusty living room with cluttered surfaces and dim, grey lighting, while the right half shows a pristine, sparkling clean space with polished floors and bright, airy illumination. In the foreground on the right, a professional cleaner wearing a neat cyan and white uniform smiles while operating a modern steam cleaner. The background is dominated by a soft cyan and white gradient. The headline \"Trả lại không gian sống sạch bong, thơm mát\" is placed at the top center in a large, bold sans-serif font in dark blue. Below it, the service name \"Deep Cleaning Home Service\" appears in a medium-sized sans-serif font. The body text \"Khách hàng ngỡ ngàng khi nhận lại căn nhà sạch không tì vết, diệt khuẩn 99% mọi ngóc ngách khó nhằn nhất\" is positioned in the middle section in a smaller, readable font. A feature list card contains the text \"Đội ngũ nhân viên được đào tạo chuẩn khách sạn 5 sao, sử dụng hóa chất sinh học an toàn cho trẻ nhỏ, có bảo hành dịch vụ\". A promotional badge in the bottom right corner displays \"Giảm ngay 20% cho khách hàng đặt lịch dọn dẹp tổng thể cuối tuần\" in a vibrant cyan pill shape. A row of five gold stars representing a review is visible near the bottom left. The lighting is crisp and high-key, emphasizing cleanliness and trust."
+  },
+  {
+   "key": "dev3_p08_v0",
+   "why": "prompt dài thật (prompt_test.txt)",
+   "run_id": "run_20261009_094914_1e4c",
+   "v": 0,
+   "seed": 4008,
+   "W": 896,
+   "H": 1120,
+   "prompt_en": "A professional fintech advertisement poster on a portrait (slightly tall) canvas, featuring a modern, minimal, and high-tech aesthetic. The background is a deep navy blue gradient fading into a slightly lighter dark blue, with blurred, abstract green financial growth charts and upward-trending lines floating subtly in the background. A soft, neon green glow illuminates the scene from behind the main subjects. In the center-right of the composition, a hyper-realistic 3D mockup of an iPhone displays a sleek financial app interface with clear data visualization. To the left of the iPhone, a young, successful Asian man stands in a confident pose, smiling professionally. He wears modern, smart-casual attire. His skin is smooth, lighting is dramatic but soft, highlighting his features. In the top left corner, a small, bright 5-star rating badge from App Store is displayed. The text is arranged in a clean, structured layout with digital, sans-serif typography in white and neon green. At the top center, the headline \"Quản lý chi tiêu thông minh, tiền đẻ ra tiền\" is written in a bold, large font. Below the headline, the product name \"WealthMaster App\" appears in a slightly smaller, tech-style font. In the middle section, the body text \"Người dùng đã tiết kiệm được 30% thu nhập mỗi tháng nhờ hệ thống cảnh báo chi tiêu và AI phân tích danh mục đầu tư tự động\" is placed in a clean, readable sans-serif. Below the body text, a list of highlights is presented with small icons: \"Đồng bộ giao dịch tự động từ 50+ ngân hàng\", \"lập ngân sách bằng AI\", \"bảo mật chuẩn quân đội\", and \"giao diện trực quan\". At the bottom center, a prominent button-like graphic contains the offer text \"Miễn phí nâng cấp tài khoản Premium 6 tháng khi tải app hôm nay\". The composition is balanced, with the iPhone and person anchoring the right side and the text blocks filling the left and center spaces. Lighting is high-key with neon accents, creating a premium, trustworthy feel."
+  },
+  {
+   "key": "dev3_p09_v0",
+   "why": "prompt dài thật (prompt_test.txt)",
+   "run_id": "run_20261009_094914_efc7",
+   "v": 0,
+   "seed": 4009,
+   "W": 1024,
+   "H": 1024,
+   "prompt_en": "A high-end, ultra-realistic food photography poster with a warm, premium kitchen aesthetic. The background features a blurred, modern kitchen with soft ambient lighting, creating a cozy and inviting atmosphere. In the foreground, a sleek, matte black steam frying device named \"Nồi Chiên Hơi Nước ChefPro 15L\" is prominently displayed. Inside the transparent glass chamber of the device, a whole roasted chicken with a golden-brown, glistening skin is shown with wisps of white steam rising, emphasizing freshness and heat. The lighting highlights the texture of the chicken and the glossy finish of the device, using a palette of deep black and vibrant orange-gold. At the top, a bold, warm sans-serif headline reads \"Món nướng ngoài giòn trong mọng nước, mẹ nhàn tênh\". Below the device, a clean subheadline displays the product name \"Nồi Chiên Hơi Nước ChefPro 15L\". In the center right, a body text block reads \"Các bà nội trợ cực kỳ hài lòng vì đồ ăn không bị khô khốc như nồi cũ, giữ trọn vẹn dinh dưỡng và dễ dàng vệ sinh nhờ chế độ tự làm sạch\". A highlighted feature list in a semi-transparent card reads \"Công nghệ kết hợp chiên không dầu và hấp siêu nhiệt, dung tích lớn quay gà nguyên con, màn hình cảm ứng 12 chế độ, lòng nồi chống dính ceramic\". A promotional offer badge in the bottom corner states \"Tặng bộ phụ kiện 5 món và sách công thức độc quyền\". Five golden stars are placed near the top left corner to indicate a 5-star review. The composition is balanced, with the text placed on calm, darker areas of the background to ensure readability without obscuring the main subject."
+  },
+  {
+   "key": "dev3_p10_v0",
+   "why": "prompt dài thật (prompt_test.txt)",
+   "run_id": "run_20261009_094914_8c94",
+   "v": 0,
+   "seed": 4010,
+   "W": 896,
+   "H": 1120,
+   "prompt_en": "A vertical, high-end wedding studio advertisement poster featuring a cinematic, luxury aesthetic. The visual focus is a beautiful Vietnamese bride and groom sharing a passionate, intimate kiss in the center, backlit by the warm, golden light of a sunrise over a calm sea. The lighting creates a soft, glowing rim light around their silhouettes, emphasizing the romantic and emotional atmosphere. The color palette is dominated by soft whites, warm beiges, and golden hour tones. The background features a blurred, serene seaside horizon with subtle classical architectural elements to enhance the premium feel. The typography is elegant, using flowing, soft calligraphy and serif fonts. At the top center, the headline \"Lưu giữ khoảnh khắc thanh xuân rực rỡ nhất\" is written in a large, artistic script. Below the image, the service name \"Gói Chụp Ảnh Cưới Cinematic Love\" appears in a refined, capitalized serif font. In the middle section, a description block reads \"Cô dâu chú rể vỡ òa hạnh phúc khi nhận album cưới mang đậm chất điện ảnh, tự nhiên và ngập tràn cảm xúc\" in a clean, legible sans-serif. A feature list highlights: \"Bao gồm 3 váy cưới thiết kế cao cấp\", \"makeup artist chuyên nghiệp đi kèm\", \"concept cá nhân hóa theo câu chuyện tình yêu\", and \"không phát sinh chi phí\" in a structured, elegant format. A promotional badge near the bottom reads \"Tặng ngay 1 ảnh cổng tráng gương pha lê và clip hậu trường trị giá 3 triệu\". At the very bottom, a 5-star rating is displayed with the text \"5 sao\". The overall mood is luxurious, emotional, and professional, with a clear focus on the text and the romantic couple."
+  },
+  {
+   "key": "dev3_p11_v0",
+   "why": "prompt dài thật (prompt_test.txt)",
+   "run_id": "run_20261009_094914_cb04",
+   "v": 0,
+   "seed": 4011,
+   "W": 768,
+   "H": 1344,
+   "prompt_en": "A vertical poster design for a premium sleep product feedback, featuring a high-quality 3D cutaway illustration of a mattress named \"Nệm Lò Xo Túi Độc Lập CloudSleep\" on the left side, revealing a detailed internal structure with a 5-zone independent pocket spring system and a thick layer of 100% natural rubber. A young woman with peaceful, relaxed facial features is curled up sleeping soundly on the pristine white bedding, positioned next to the cutaway. The background is a dimly lit, luxurious 5-star hotel bedroom environment bathed in deep midnight blue tones, with soft, diffuse light coming from a bedside lamp, creating a calm and silent atmosphere. At the top, a bold, elegant sans-serif headline reads \"Tạm biệt đau lưng, ngủ sâu giấc đến sáng\". Below the headline, a subheadline displays \"Nệm Lò Xo Túi Độc Lập CloudSleep\". A body text section contains \"99% khách hàng phản hồi không còn tình trạng đau mỏi vai gáy, nệm nâng đỡ cơ thể hoàn hảo và không làm ảnh hưởng người nằm cạnh\". A list of highlights appears as clean bullet points: \"Hệ thống lò xo túi độc lập 5 vùng\", \"lớp bề mặt cao su thiên nhiên 100%\", \"áo nệm tản nhiệt mát lạnh\", \"bảo hành xẹp lún 15 năm\". An offer section highlights \"Trải nghiệm miễn phí 100 đêm, tặng kèm 2 gối lông vũ cao su non\". A visual element of five golden stars is placed near the review text. The composition is clean, professional, and photorealistic, with smooth typography that evokes tranquility."
+  },
+  {
+   "key": "dev2_d20_v0",
+   "why": "đếm số lượng / nhiều dòng",
+   "run_id": "run_20261009_064107_5138",
+   "v": 0,
+   "seed": 2020,
+   "W": 1024,
+   "H": 1024,
+   "prompt_en": "A professional vertical poster design for a spa brand, featuring a clean, minimalist aesthetic with a soft lavender and white color palette. The background is a calm, textured off-white paper or smooth matte finish with subtle, elegant botanical line-art illustrations of lavender stems in the corners, ensuring the background remains calm enough for text readability. At the top center, the headline \"QUY TRÌNH SPA 8 BƯỚC\" is displayed in a bold, modern sans-serif font, dark purple, large and prominent. Below the headline, centered, is the subheadline \"Lavender Spa\" in a slightly smaller, elegant serif font, medium purple. The main body of the poster features a vertical, evenly spaced list of 8 steps, each presented as a distinct, rounded rectangular card or pill shape with a light lavender background and dark text. The list items are arranged from top to bottom in the center column: \"Tẩy trang\", \"Rửa mặt\", \"Tẩy da chết\", \"Xông hơi\", \"Hút mụn\", \"Đắp mặt nạ\", \"Massage\", \"Thoa kem dưỡng\". Each item is in a clear, readable sans-serif font. The lighting is soft, diffused, and even, highlighting the clean layout without harsh shadows. At the bottom center, the contact information \"0901 234 567\" is displayed in a small, neat sans-serif font, dark gray. The composition is balanced, symmetrical, and professional, evoking a sense of relaxation, hygiene, and precision. No other text or graphics are present."
+  },
+  {
+   "key": "dev2_d20_v1",
+   "why": "đếm số lượng / nhiều dòng",
+   "run_id": "run_20261009_064107_5138",
+   "v": 1,
+   "seed": 11993,
+   "W": 1024,
+   "H": 1024,
+   "prompt_en": "A professional vertical poster design for a spa brand, featuring a sophisticated dark aesthetic with a deep charcoal background and soft lavender accents. The background is a smooth, dark matte surface with a subtle, faint texture, providing high contrast for the text. At the top center, the headline \"QUY TRÌNH SPA 8 BƯỚC\" is displayed in a bold, condensed sans-serif font, bright lavender, large and prominent. Below the headline, centered, is the subheadline \"Lavender Spa\" in a slightly smaller, elegant serif font, light gray. The main body of the poster features a vertical, evenly spaced list of 8 steps, each presented as a distinct, horizontal line of text with a small, glowing lavender dot to the left, arranged from top to bottom in the center column. The list items are: \"Tẩy trang\", \"Rửa mặt\", \"Tẩy da chết\", \"Xông hơi\", \"Hút mụn\", \"Đắp mặt nạ\", \"Massage\", \"Thoa kem dưỡng\". Each item is in a clear, readable sans-serif font, white color. The lighting is dramatic but soft, with a subtle glow around the text elements, creating a premium, nighttime spa atmosphere. At the bottom center, the contact information \"0901 234 567\" is displayed in a small, neat sans-serif font, light gray. The composition is balanced, centered, and professional, evoking a sense of luxury and tranquility. No other text or graphics are present."
+  },
+  {
+   "key": "dev2_d05_v0",
+   "why": "đếm số lượng / nhiều dòng",
+   "run_id": "run_20261009_064106_2963",
+   "v": 0,
+   "seed": 2005,
+   "W": 768,
+   "H": 1344,
+   "prompt_en": "A vertical poster featuring a warm wooden background texture with visible grain, creating a rustic and appetizing atmosphere for a Vietnamese Bún Bò restaurant. At the very top, a realistic, high-resolution photograph of a steaming bowl of Bún Bò Huế with glossy broth, fresh herbs, and slices of beef. Below the image, a centered bold condensed sans-serif headline in dark brown reads \"BÚN BÒ HUẾ O XUÂN\". In the middle section, a clean, flat graphic list of menu items and prices is displayed on a semi-transparent white card to ensure legibility against the wood texture. The list items are rendered in a neat sans-serif font: \"Bún bò tái\" aligned with \"40.000đ\" on the right, \"Bún bò nạm\" aligned with \"45.000đ\", \"Bún bò giò heo\" aligned with \"50.000đ\", \"Bún bò đặc biệt\" aligned with \"60.000đ\", \"Thêm chả cua\" aligned with \"10.000đ\", \"Thêm huyết\" aligned with \"5.000đ\", \"Trà đá\" aligned with \"3.000đ\", and \"Nước sâm\" aligned with \"10.000đ\". At the bottom center, a footer text in a smaller, elegant serif font reads \"Mở cửa 6:00 - 13:00\". The lighting is warm and diffused, highlighting the texture of the wood and the freshness of the food, with a professional, clean layout."
+  },
+  {
+   "key": "dev2_d12_v0",
+   "why": "đếm số lượng / nhiều dòng",
+   "run_id": "run_20261009_064106_7252",
+   "v": 0,
+   "seed": 2012,
+   "W": 896,
+   "H": 1120,
+   "prompt_en": "A festive, vibrant promotional poster for an air fryer sale, dominated by the brand color #d81e5b (hot pink/magenta). The composition is clean and professional with a dynamic layout. In the center, a high-gloss, modern black air fryer is displayed at a slight angle, illuminated by bright studio lighting that creates sharp specular highlights on its metallic surface and casts soft shadows on a glossy white floor. The background features a subtle, abstract geometric pattern in lighter shades of #d81e5b and white, evoking a sense of movement and energy without clutter. At the top center, the headline \"SIÊU SALE 11.11\" is rendered in a massive, bold, condensed sans-serif typeface in white with a thick #d81e5b outline, commanding attention. Below the headline, slightly overlapping the top edge of the air fryer, a large, pill-shaped badge in solid #d81e5b contains the text \"Giảm đến 55%\" in bold, white sans-serif font. To the left of the air fryer, a vertical list of text in a medium-weight sans-serif font reads \"Toàn bộ nồi chiên không dầu\" in dark grey. Below this list, a clean white card with a thin #d81e5b border displays the date range \"09/11\" on the left and \"12/11/2026\" on the right, separated by a small arrow icon, both in bold #d81e5b text. At the bottom of the poster, a horizontal footer bar in solid #d81e5b spans the width. Inside this footer, on the left, the store name \"Điện máy Phúc An\" appears in bold white sans-serif. In the center, the phone number \"1800 6789\" is displayed in white. On the right, the address \"88 Lê Văn Sỹ, Quận 3, TP.HCM\" and the website link \"phucan.vn\" are stacked in smaller, regular white sans-serif font. The overall mood is celebratory, urgent, and high-contrast, utilizing the vibrant #d81e5b to drive visual impact against the clean white and black elements."
+  },
+  {
+   "key": "dev2_d19_v0",
+   "why": "đếm số lượng / nhiều dòng",
+   "run_id": "run_20261009_064107_6983",
+   "v": 0,
+   "seed": 2019,
+   "W": 768,
+   "H": 1344,
+   "prompt_en": "A professional, clean poster design illustrating a 5-step return and exchange process for a retail store. The layout is organized into five distinct horizontal bands, each representing a step in the workflow, with a light beige background and subtle wood grain texture to match the 'Mộc Store' brand identity. Each band contains a minimalist flat vector icon on the left (camera, chat bubble, QR code, shipping box, new product box) and the corresponding text description on the right in a clear, modern sans-serif font. The text is aligned left within each band, with ample white space to ensure readability. The overall mood is trustworthy and efficient, with soft natural lighting and warm earthy tones (brown, beige, cream) dominating the palette. At the top center, a bold headline reads \"ĐỔI TRẢ HÀNG DỄ DÀNG\" in a large, condensed sans-serif typeface, colored in dark brown. Below the headline, a smaller subheadline reads \"Mộc Store\" in a lighter, elegant serif font. The five steps are vertically stacked, each separated by thin dividing lines. Step 1 text: \"Chụp ảnh sản phẩm lỗi\". Step 2 text: \"Nhắn tin fanpage kèm mã đơn\". Step 3 text: \"Nhận mã đổi trả\". Step 4 text: \"Gửi hàng qua bưu cục gần nhất\". Step 5 text: \"Nhận hàng mới sau 3 ngày\". At the bottom center, a footer text reads \"fb.com/mocstore\" in a small, legible sans-serif font. The composition is balanced, with no clutter, focusing on the ease of the process."
+  },
+  {
+   "key": "dev3_g02_v0",
+   "why": "chữ khó có dấu",
+   "run_id": "run_20261009_094914_a574",
+   "v": 0,
+   "seed": 3002,
+   "W": 1024,
+   "H": 1024,
+   "prompt_en": "A vintage round emblem logo design centered on a square canvas, featuring a textured kraft paper background in warm brown tones. In the center of the circular seal, a detailed, realistic illustration of a golden-brown baguette with visible flour dusting and a glossy, baked crust, positioned horizontally. Above the central baguette, the text \"TIỆM BÁNH NHÀ GẠO\" curves along the upper inner edge of the circle in a bold, classic serif typeface, dark brown color. Below the central baguette, the text \"TỪ 2015\" curves along the lower inner edge in the same serif style. The entire seal is enclosed by a double thin border line, giving it an authentic, traditional bakery stamp appearance. The lighting is soft and diffused, emphasizing the texture of the paper and the sheen of the bread, creating a cozy, nostalgic, and artisanal mood. High resolution, crisp typography, clean vector-style edges for the text and borders."
+  },
+  {
+   "key": "dev3_g03_v0",
+   "why": "chữ khó có dấu",
+   "run_id": "run_20261009_094914_97f6",
+   "v": 0,
+   "seed": 3003,
+   "W": 896,
+   "H": 1120,
+   "prompt_en": "A vertical portrait poster layout celebrating the grand opening of a bubble tea shop, designed with a bright, festive, and clean aesthetic. The background features a stylized, charming storefront facade of a bubble tea shop with large glass windows, pastel pink and mint green tones, and decorative neon lighting. At the very top center, the headline \"KHAI TRƯƠNG\" is displayed in large, bold, rounded sans-serif letters that curve in an upward arc like a rainbow, filled with a gradient of vibrant pink to yellow. Directly below the curved headline, centered on the canvas, is the store name \"Trà Sữa Mây\" in a stylish, modern, medium-weight serif font, colored in a deep warm brown. Beneath the store name, occupying the lower middle section, is the promotional text \"Mua 1 tặng 1 ngày 20/11\" in a clear, bold sans-serif font, enclosed within a soft white rounded rectangular card with a subtle drop shadow to ensure readability. Flanking the bottom corners of the poster are several glossy, inflated balloons in shades of pink, blue, and yellow, tied with ribbons, adding a celebratory atmosphere. The lighting is bright and natural, highlighting the textures of the balloons and the clean surfaces of the poster. The composition is balanced, with the text elements clearly separated from the main visual elements, ensuring high legibility and a professional, inviting look for a Vietnamese bubble tea shop."
+  },
+  {
+   "key": "dev3_g04_v0",
+   "why": "chữ khó có dấu",
+   "run_id": "run_20261009_094914_4af9",
+   "v": 0,
+   "seed": 3004,
+   "W": 896,
+   "H": 1120,
+   "prompt_en": "A vertical poster design featuring a single, glossy chocolate-glazed donut floating in the upper center. The background is a smooth, solid warm golden-yellow gradient that provides high contrast for the typography. A large, bold Vietnamese headline \"NGON KHÓ CƯỠNG\" is positioned immediately beneath the donut, rendered in a thick, playful sans-serif font with a downward curving arc that mimics a smile, colored in deep chocolate brown. In the top left corner, the store name \"Donut Hạnh Phúc\" appears in a clean, elegant serif font, smaller in scale. At the bottom center, a price badge \"Chỉ 15K / chiếc\" is displayed inside a white pill-shaped card with bold red text. The lighting is soft and diffuse, highlighting the texture of the chocolate glaze, with a subtle drop shadow beneath the donut to create depth. The composition is balanced, with the curved text guiding the eye toward the bottom price, set against a clean, uncluttered background."
+  },
+  {
+   "key": "dev3_g14_v0",
+   "why": "chữ khó có dấu",
+   "run_id": "run_20261009_094914_bf40",
+   "v": 0,
+   "seed": 3014,
+   "W": 896,
+   "H": 1120,
+   "prompt_en": "A luxury vertical poster featuring a premium handbag collection, with a serene and elegant mood. The background is a soft cream and beige gradient, subtly textured, with a few realistic maple leaves gently falling and resting around the composition. In the center, a single high-end leather handbag is displayed, illuminated by soft natural light from the left, casting delicate shadows. Above the handbag, a delicate handwritten text \"Ưu đãi\" is placed in a small, elegant cursive font, in dark gold. Below \"Ưu đãi\", a massive, bold, uppercase sans-serif text \"MÙA THU\" dominates the center of the poster, in a rich, deep brown color, with a slight 3D embossed effect. Beneath \"MÙA THU\", a clear, concise sans-serif text \"Giảm 25% toàn bộ túi da\" is aligned in a smaller, clean font, in dark brown. The layout is perfectly balanced, with the text elements centered and the handbag acting as the focal point. The overall aesthetic is sophisticated, refined, and autumnal."
+  }
+ ],
+ "erase": [
+  {
+   "key": "dev2_d09_v0",
+   "why": "sót chữ",
+   "run_id": "run_20261009_064106_00e5",
+   "v": 0,
+   "seed": 2009
+  },
+  {
+   "key": "dev2_d19_v0",
+   "why": "sót chữ",
+   "run_id": "run_20261009_064107_6983",
+   "v": 0,
+   "seed": 2019
+  },
+  {
+   "key": "dev2_d22_v0",
+   "why": "sót chữ",
+   "run_id": "run_20261009_064107_a505",
+   "v": 0,
+   "seed": 2022
+  },
+  {
+   "key": "dev2_d27_v1",
+   "why": "sót chữ",
+   "run_id": "run_20261009_064107_d188",
+   "v": 1,
+   "seed": 12000
+  },
+  {
+   "key": "dev3_g04_v0",
+   "why": "sót chữ",
+   "run_id": "run_20261009_094914_4af9",
+   "v": 0,
+   "seed": 3004
+  },
+  {
+   "key": "dev3_g06_v0",
+   "why": "sót chữ",
+   "run_id": "run_20261009_094914_cb99",
+   "v": 0,
+   "seed": 3006
+  },
+  {
+   "key": "dev3_g08_v0",
+   "why": "sót chữ",
+   "run_id": "run_20261009_094914_d68d",
+   "v": 0,
+   "seed": 3008
+  },
+  {
+   "key": "dev3_g08_v1",
+   "why": "sót chữ",
+   "run_id": "run_20261009_094914_d68d",
+   "v": 1,
+   "seed": 12981
+  },
+  {
+   "key": "dev3_g03_v1",
+   "why": "sót chữ",
+   "run_id": "run_20261009_094914_97f6",
+   "v": 1,
+   "seed": 12976
+  },
+  {
+   "key": "dev2_d02_v0",
+   "why": "sót chữ",
+   "run_id": "run_20261009_064106_7ebe",
+   "v": 0,
+   "seed": 2002
+  },
+  {
+   "key": "dev2_d18_v1",
+   "why": "sót chữ",
+   "run_id": "run_20261009_064107_3bce",
+   "v": 1,
+   "seed": 11991
+  },
+  {
+   "key": "dev2_d01_v1",
+   "why": "sót chữ",
+   "run_id": "run_20261009_064106_2f99",
+   "v": 1,
+   "seed": 11974
+  },
+  {
+   "key": "dev3_p10_v0",
+   "why": "sót chữ",
+   "run_id": "run_20261009_094914_8c94",
+   "v": 0,
+   "seed": 4010
+  },
+  {
+   "key": "dev3_p09_v0",
+   "why": "đổi hình / bố cục",
+   "run_id": "run_20261009_094914_efc7",
+   "v": 0,
+   "seed": 4009
+  },
+  {
+   "key": "dev3_g13_v0",
+   "why": "đổi hình / bố cục",
+   "run_id": "run_20261009_094914_2907",
+   "v": 0,
+   "seed": 3013
+  },
+  {
+   "key": "dev2_d10_v1",
+   "why": "đổi hình / bố cục",
+   "run_id": "run_20261009_064106_ecda",
+   "v": 1,
+   "seed": 11983
+  },
+  {
+   "key": "dev3_p07_v0",
+   "why": "đổi hình / bố cục",
+   "run_id": "run_20261009_094914_e0d4",
+   "v": 0,
+   "seed": 4007
+  },
+  {
+   "key": "dev3_f08_v0",
+   "why": "đổi hình / bố cục",
+   "run_id": "run_20261009_094914_0767",
+   "v": 0,
+   "seed": 5008
+  },
+  {
+   "key": "dev2_d32_v0",
+   "why": "vỏ lúc xoá lúc giữ",
+   "run_id": "run_20261009_064107_da6a",
+   "v": 0,
+   "seed": 2032
+  },
+  {
+   "key": "dev3_g12_v0",
+   "why": "vỏ lúc xoá lúc giữ",
+   "run_id": "run_20261009_094914_d0b1",
+   "v": 0,
+   "seed": 3012
+  },
+  {
+   "key": "dev3_g11_v1",
+   "why": "vỏ lúc xoá lúc giữ",
+   "run_id": "run_20261009_094914_2871",
+   "v": 1,
+   "seed": 12984
+  },
+  {
+   "key": "dev2_d27_v0",
+   "why": "vỏ lúc xoá lúc giữ",
+   "run_id": "run_20261009_064107_d188",
+   "v": 0,
+   "seed": 2027
+  },
+  {
+   "key": "dev3_p08_v0",
+   "why": "vỏ lúc xoá lúc giữ",
+   "run_id": "run_20261009_094914_1e4c",
+   "v": 0,
+   "seed": 4008
+  },
+  {
+   "key": "dev3_p04_v0",
+   "why": "vỏ lúc xoá lúc giữ",
+   "run_id": "run_20261009_094914_2d28",
+   "v": 0,
+   "seed": 4004
+  },
+  {
+   "key": "dev2_d22_v1",
+   "why": "đối chứng (distill xoá tốt)",
+   "run_id": "run_20261009_064107_a505",
+   "v": 1,
+   "seed": 11995
+  },
+  {
+   "key": "dev3_p02_v1",
+   "why": "đối chứng (distill xoá tốt)",
+   "run_id": "run_20261009_094914_0319",
+   "v": 1,
+   "seed": 13975
+  },
+  {
+   "key": "dev3_g07_v0",
+   "why": "đối chứng (distill xoá tốt)",
+   "run_id": "run_20261009_094914_2ad2",
+   "v": 0,
+   "seed": 3007
+  },
+  {
+   "key": "dev2_d09_v1",
+   "why": "đối chứng (distill xoá tốt)",
+   "run_id": "run_20261009_064106_00e5",
+   "v": 1,
+   "seed": 11982
+  }
+ ]
+}
