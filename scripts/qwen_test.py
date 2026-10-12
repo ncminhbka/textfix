@@ -41,7 +41,7 @@ def readme_code(model: Path) -> str:
     f = model / "README.md"
     if not f.is_file():
         return ""
-    blocks = re.findall(r"```(?:python|py)?\n(.*?)```", f.read_text(encoding="utf-8", errors="replace"), flags=re.S)
+    blocks = re.findall(r"```(?:python|py)[ \t]*\r?\n(.*?)```", f.read_text(encoding="utf-8", errors="replace"), flags=re.S)
     return "\n# ----\n".join(b.strip() for b in blocks if "import" in b or "pipe" in b)
 
 
