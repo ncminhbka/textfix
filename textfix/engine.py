@@ -114,6 +114,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
                              product=product)
     if cinfo["lines"]:
         log.insert(0, f"dọn chữ sót: inpaint {cinfo['inpaint']}, FLUX vùng cắt {cinfo['reerase']}")
+    log[:0] = [g for g in M.get("geo_log") or [] if g.startswith("vỏ giả")]
     T["vlm"] = time.time() - t0
     t0 = time.time()
     progress("dựng + kiểm")
@@ -181,6 +182,12 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     missing = [B["texts"][i]["text"] for i in sorted(set(miss_i) | set(code_miss))]
     plan = {"style": P.get("style"), "ops": P["ops"], "missing": missing, "notes": P.get("notes"), "errors": errs, "log": log,
             "slots": slots.public(M), "cleanup": cinfo}
+    # QUAN SÁT vỏ / chi tiết: mỗi loại ô được quyết thế nào ("S:shape", "I:keep"...; dấu * = mã đổi quyết định của VLM)
+    kinds = {m: op.get("kind", "") + ("*" if str(op.get("why") or "").startswith("guard") else "") for op in P["ops"]
+             for m in op.get("marks") or op.get("slots") or []}
+    plan["si"] = {k: n for k, n in sorted(((f"{m['id'][0]}:{kinds.get(m['id'], 'none')}", 0) for m in M["S"] + M["I"]))}
+    for m in M["S"] + M["I"]:
+        plan["si"][f"{m['id'][0]}:{kinds.get(m['id'], 'none')}"] += 1
     steps = _row([draft, slots.marked_image(draft, M), plate, poster])
     plan["errors_first"] = errs_first
     return {"draft": draft, "plate_raw": d["plate_raw"], "plate": plate, "poster": poster, "poster_first": poster_first,

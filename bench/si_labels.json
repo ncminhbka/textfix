@@ -1,0 +1,85 @@
+{
+ "note": "Nhãn S / I chấm bằng mắt MỘT lượt (Claude, 12/10/2026) trên 130 poster đã lưu (dev2, dev3, 10 lượt 12/10): mỗi ô xem nháp | nền | poster. key = 4 ký tự cuối run_id + _v<i>. Ô không có trong danh sách = không thấy lỗi.",
+ "totals": {
+  "posters": 130,
+  "S": 65,
+  "I": 163,
+  "S_by_kind": {
+   "shape": 60,
+   "skip": 5
+  },
+  "I_by_kind": {
+   "skip": 88,
+   "icon": 26,
+   "keep": 25,
+   "text": 21,
+   "shape": 3
+  }
+ },
+ "S_defects": {
+  "shape_lost": [
+   "7252_v1 S1",
+   "d0b1_v0 S1"
+  ],
+  "skipped_with_text": [
+   "7bd6_v0 S1 (ô bỏ sót -> skip)",
+   "2ad2_v1 S1 (màu lòng đo sai)"
+  ],
+  "fake_shell": [
+   "2871_v0 S1"
+  ],
+  "fill_mismeasured": [
+   "2ad2_v1 S1"
+  ],
+  "merged_with_erased_frame": [
+   "3fc7_v0 S1"
+  ],
+  "text_cramped_inside": [
+   "ecda_v1 S1",
+   "1e4c_v0 S1",
+   "ac6d_v0 S1",
+   "b593_v0 S1",
+   "e0d4_v0 S2"
+  ],
+  "skipped_but_text_op_draws_its_own_shell (không phải lỗi)": [
+   "4af9_v0 S1"
+  ]
+ },
+ "I_notes": {
+  "skip": "gần hết là mảng ẢNH bước xoá vẽ lại hơi khác (tia nước, vân mạch, mép vật) + mẩu chữ cung",
+  "keep": "hình in trên sản phẩm, đúng",
+  "icon": "tick / chấm / sao, đúng",
+  "text": "chữ cái tiêu đề cung OCR sót (chữ hình dạng khó, lượt sau)"
+ },
+ "keep_shell_probe": {
+  "how": "scripts/shell_keep_probe.py: ép mọi S shape giữ được thành keep, dựng lại",
+  "kept": 57,
+  "not_keepable": 3,
+  "skip": 5,
+  "visible_defects": {
+   "ghost_old_text": [
+    "0319_v1 S1",
+    "2871_v0 S2",
+    "97f6_v0 S1",
+    "efc7_v0 S1"
+   ],
+   "ragged_or_broken_shell": [
+    "07fe_v0 S1",
+    "0767_v0 S1",
+    "5d27_v0 S1"
+   ],
+   "mask_takes_neighbour_text": [
+    "f0aa_v0 S1"
+   ],
+   "draft_arc_text_kept": [
+    "d0b1_v0 S1"
+   ]
+  },
+  "clear_wins": [
+   "7252_v1 S1 (vòng tròn viền)",
+   "9283_v0 S1 (vỏ chỉ ôm dòng trên)",
+   "3fc7_v0 S1 (dải khung đáy)"
+  ],
+  "verdict": "9 / 57 lộ lỗi > ngưỡng 3 / 65 -> keep KHÔNG là mặc định cho vỏ; chỉ dành cho dáng CSS không vẽ được, một màu phẳng, và ô vỏ to hơn vỏ thật"
+ }
+}

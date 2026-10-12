@@ -32,6 +32,11 @@ ROW_GAP = 0.5        # chi tiết giống nhau (cao lệch <= 25%) cùng hàng (
                      # (hàng sao, hàng chấm: designer dựng cả hàng bằng một thẻ)
 DETAIL_MIN = 0.5     # chi tiết I: cạnh dài >= 0.5 cao dòng chữ trung vị của poster (icon designer đặt không nhỏ hơn nửa chữ thân;
                      # nhỏ hơn = vụn: mép vật FLUX vẽ lại, mẩu hoạ tiết)
+SHELL_INK_DE = 8.0   # VỎ GIẢ: màu lòng "vỏ" gần trùng màu mực của dòng nằm trong nó (ΔE < 8) = nét chữ to bị coi là vỏ (vỏ thật
+                     # luôn khác màu chữ: 130 poster 12/10, 2 ô <= 0.4, ô kế 16.5) -> không tạo ô S
+KEEP_INK_MAX = 0.75  # GIỮ VỎ NHÁP: trong khung các dòng của vỏ, điểm "nét" (khác màu lòng) chiếm > 75% = lòng không phẳng màu
+                     # (ảnh / hoạ tiết / màu lòng đo sai) -> không lấp nét được, vỏ đó vẽ lại bằng CSS
+KEEP_HALO = 2        # nới mặt nạ nét chữ cũ (px): viền khử răng cưa
 
 
 def _lab(x):
@@ -212,9 +217,21 @@ def build(draft: np.ndarray, plate: np.ndarray) -> dict:
         # khung bị cắt hẹp / đẩy mép trái vào mỗi dòng một kiểu: 11-25% dòng, danh sách thò thụt, chữ co). Bản xoá là xoá cả
         # ảnh nên dấu thanh nhô khỏi khung không đè vào đâu; vòng co của render chỉ kiểm tràn NGANG với dòng đơn.
         l["ocr_box"] = list(l["box"])
+    # VỎ GIẢ (12/10 dev3 2871 "Pool Party": một mảng chữ tiêu đề to, đặc, bị coi là vỏ -> VLM vẽ mảng trắng sau chữ): màu lòng
+    # gần trùng màu mực của dòng nằm trong nó -> đó là chữ, bỏ ô vỏ
+    fake = [s for s in O["S"] if s.get("fill") not in (None, "none") and any(
+        L[j].get("color") and float(np.linalg.norm(_hex_lab(L[j]["color"]) - s["_fill_lab"])) < SHELL_INK_DE for j in s["lines"])]
+    for s in fake:
+        for j in s["lines"]:
+            L[j]["shell"] = None
+    O["S"] = [s for s in O["S"] if not any(s is f for f in fake)]
+    for c in O["I"]:
+        if any(c.get("shell") == f["id"] for f in fake):
+            c["shell"] = None
     S =[{k: v for k, v in s.items() if not k.startswith("_")} for s in O["S"]]
     for s in S:
         s["lines"] = [L[j]["id"] for j in s["lines"]]
+    shells = {s["id"]: {"mask": s["_mask"], "fill_lab": s["_fill_lab"]} for s in O["S"]}   # cho "keep" vỏ (không ghi JSON)
     # chi tiết không bao giờ ĐÈ lên chữ; bỏ chi tiết nằm trong khung dòng (gạch đầu dòng OCR gộp vào dòng) và lồng trong chi tiết khác
     I = [c for c in O["I"] if all(_cov(c["box"], l["box"]) < 0.3 and _cov(l["box"], c["box"]) < 0.5 for l in L)]
     area = lambda b: (b[2] - b[0]) * (b[3] - b[1])   # noqa: E731
@@ -242,6 +259,8 @@ def build(draft: np.ndarray, plate: np.ndarray) -> dict:
         s["lines"] = [l["id"] for l in L if x0 <= (l["box"][0] + l["box"][2]) / 2 <= x1 and y0 <= (l["box"][1] + l["box"][3]) / 2 <= y1]
     for s in S:
         s["icons"] = [c["id"] for c in I if c["shell"] == s["id"]]
+    for s in S:   # vỏ này GIỮ được điểm ảnh nháp không (lấp được nét chữ cũ bằng màu lòng)
+        s["keepable"] = _keepable(A, shells[s["id"]], [l["box"] for l in L if l["id"] in s["lines"]])
     for c in I:   # quan hệ với dòng gần nhất (gợi ý cho VLM: avatar cạnh tên, sao dưới tên, icon đầu dòng)
         cx, cy = (c["box"][0] + c["box"][2]) / 2, (c["box"][1] + c["box"][3]) / 2
         best = None
@@ -255,7 +274,59 @@ def build(draft: np.ndarray, plate: np.ndarray) -> dict:
                 best = (d, l["id"], side)
         c["near"] = f"{best[2]} {best[1]}" if best and best[0] <= 3 * max(8.0, c["box"][3] - c["box"][1]) else None
     # mask: lớp phủ (nháp - bản xoá đã dọn), cho "keep" dán lại trọn mảng bị xoá (không ghi JSON)
-    return {"L": L, "S": S, "I": I, "size": [W, H], "by": {m["id"]: m for m in L + S + I}, "mask": O["mask"], "geo_log": glog + glog2}
+    return {"L": L, "S": S, "I": I, "size": [W, H], "by": {m["id"]: m for m in L + S + I}, "mask": O["mask"], "shells": shells,
+            "geo_log": glog + glog2 + [f"vỏ giả (màu lòng = màu chữ) {[round(v) for v in f['box']]} -> bỏ ô vỏ" for f in fake]}
+
+
+def _hex_lab(hx: str) -> np.ndarray:
+    return _lab(np.uint8([[[int(hx[i:i + 2], 16) for i in (1, 3, 5)]]]))[0, 0]
+
+
+def _line_zone(shape, box) -> tuple[slice, slice]:
+    """Vùng nét của một dòng: khung OCR nới 0.3 cao mỗi bên, 0.6 cao phía trên (dấu thanh nhô khỏi khung)."""
+    H, W = shape[:2]
+    x0, y0, x1, y1 = box
+    h = y1 - y0
+    return (slice(int(max(0, y0 - 0.6 * h)), int(min(H, y1 + 0.3 * h))), slice(int(max(0, x0 - 0.3 * h)), int(min(W, x1 + 0.3 * h))))
+
+
+def _shell_ink(A: np.ndarray, sh: dict, boxes: list) -> np.ndarray:
+    """Mặt nạ NÉT CHỮ CŨ trong một vỏ: điểm trong vỏ, trong vùng nét của các dòng, khác màu lòng vỏ >= INK_IN_SHELL."""
+    ink = np.zeros(A.shape[:2], bool)
+    for b in boxes:
+        ys, xs = _line_zone(A.shape, b)
+        ink[ys, xs] = (np.linalg.norm(A[ys, xs] - sh["fill_lab"], axis=2) >= INK_IN_SHELL) & sh["mask"][ys, xs]
+    return ink
+
+
+def _keepable(A: np.ndarray, sh: dict, boxes: list) -> bool:
+    if not boxes:
+        return True
+    zone = np.zeros(A.shape[:2], bool)
+    for b in boxes:
+        zone[_line_zone(A.shape, b)] = True
+    zone &= sh["mask"]
+    return bool(zone.sum() >= 20 and _shell_ink(A, sh, boxes)[zone].mean() <= KEEP_INK_MAX)
+
+
+def attach_shells(M: dict, draft: np.ndarray, plate: np.ndarray) -> dict:
+    """M đọc từ plan.json (không có mặt nạ): tính lại lớp phủ từ nháp + bản xoá + khung dòng đã lưu, gắn mặt nạ / màu lòng cho
+    từng ô vỏ đã lưu (khớp theo khung) -> M["shells"], S["keepable"]. Dùng cho dựng lại tại máy (replay, probe)."""
+    from .overlay import overlay
+    box = lambda l: l.get("ocr_box") or l["box"]   # noqa: E731
+    poly = lambda b: [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]]   # noqa: E731
+    O = overlay(draft, plate, [{"box": box(l), "poly": l.get("poly") or poly(box(l))} for l in M["L"]])
+    A = _lab(draft)
+    M["shells"] = {}
+    M.setdefault("mask", O["mask"])
+    for s in M["S"]:
+        best = max(O["S"], key=lambda o: min(_cov(o["box"], s["box"]), _cov(s["box"], o["box"])), default=None)
+        if best is None or min(_cov(best["box"], s["box"]), _cov(s["box"], best["box"])) < 0.6:
+            s["keepable"] = False
+            continue
+        M["shells"][s["id"]] = {"mask": best["_mask"], "fill_lab": best["_fill_lab"]}
+        s["keepable"] = _keepable(A, M["shells"][s["id"]], [M["by"][i]["box"] for i in s.get("lines", []) if i in M["by"]])
+    return M
 
 
 def public(M: dict) -> dict:
@@ -317,14 +388,18 @@ FOR EACH SLOT, ONE op (a text op may take several consecutive lines of one text 
 - S#: kind "shape", slots ["S1"], box_style = CSS for the shell matching the draft (start from the measured fill and radius; \
 add border / shadow / gradient / transparency if the draft shows it), html "". Or kind "skip" if the shell is junk, or kind \
 "keep" if it is part of the picture (a graphic printed on a product, package or object: its original pixels are restored).
+  A shell whose SHAPE a CSS box cannot draw (a ring or double ring, a seal, a starburst / scalloped badge, a ribbon, a tilted or irregular sticker) and that the draft drew cleanly in ONE flat color: kind "keep" -- the renderer puts the draft's own shell back and wipes the old letters of the L# lines inside; you still write those lines as text ops. Not for glossy, gradient or see-through shells, and not when the shell carries lettering outside its L# lines (curved text along its edge): those are "shape". Also "keep" when the S# box is clearly bigger than the shell you see in the draft (the slot swallowed a \
+frame line or a band next to the pill): a "shape" would paint the whole box, "keep" restores exactly what the draft had. \
+A shell that holds a line you write is never "skip": the text would sit bare on the background.
 - I#: kind "icon", slots ["I3"], html = ONE helper tag without a size (it fills the slot): <i-icon name="<lucide name>" \
 color="#hex"></i-icon>; a person avatar -> <i-icon name="circle-user" color="#hex"></i-icon>; a star row -> <i-stars n="5" \
 fill="#f5b301" empty="#d9d9d9"></i-stars>. Pick the icon from what the model drew and what the nearby text means. Or kind \
 "text" (html = the text) if the detail is really a big character or number OCR missed (a step number "1" in a circle), or kind "skip" for junk or duplicates, or kind "keep" for a detail that belongs to the picture (a logo or graphic printed on a product, \
 package or object, a sign in the scene: its original pixels are restored).
+  "keep" is also right for anything that is NOT lettering and that the draft drew well: a frame line, a divider, an ornament, a sparkle, a logo mark, and any piece of the PHOTO itself (the eraser redrew part of the picture a little differently: "skip" would leave the eraser's version, "keep" gives the draft's back). Unsure between "skip" and "keep" for something that is not lettering -> "keep". "skip" is for garbled letter fragments, duplicates and bullets / icons whose row is dropped; "icon" is for a bullet / check / icon / avatar / star row (redrawn clean).
 - L#: kind "text", slots ["L5"] or ["L5","L6"], html = the text. Or kind "keep" for text printed on a product, package, screen \
 or object in the photo (its original pixels are restored, never redraw such text), or kind "skip" for junk / duplicates.
-- "keep" is only for things printed in the photographed scene. POSTER lettering is never kept, however decorated it is \
+- "keep" never applies to POSTER lettering, however decorated it is \
 (a headline on a ribbon or banner, curved, 3D or metallic letters, badge and sticker text): the draft's letters are often \
 misspelt, so it is always rewritten as a text op with the client's spelling.
 - A product's screen, display, dial, label or packaging text is part of the picture: "keep" it (or "skip"), never write \
@@ -730,6 +805,30 @@ def validate(P: dict, M: dict, texts: list[dict] | None = None, product: bool = 
                 log.append(f"{op.get('id')}: keep chữ nháp {ocr!r} trùng câu khách T{k} -> viết lại {texts[k]['text']!r}")
                 op = {**op, "kind": "text", "html": texts[k]["text"], "client": f"T{k}", "why": "guard: client text was kept"}
         ops.append({**op, "marks": mk, "slots": mk})
+    # VỎ (12/10, xem 65 ô vỏ của 130 poster):
+    #  - vỏ đang chứa dòng chữ ĐƯỢC VIẾT mà bị "skip" -> chữ nằm trần trên nền (2ad2_v1 khung giá, 4af9_v0 pill trắng) -> vẽ lại
+    #    theo số đo (màu lòng / viền, bo góc);
+    #  - vỏ "keep" (giữ điểm ảnh nháp) mà không lấp được nét chữ cũ (lòng không phẳng màu: keepable = False) -> vẽ lại theo số đo.
+    live = {m for op in ops if op.get("kind") == "text" and op.get("html") for m in op["marks"]}
+    for i, op in enumerate(ops):
+        sid = [m for m in op["marks"] if m.startswith("S")]
+        if not sid or len(sid) != len(op["marks"]) or op.get("kind") not in ("skip", "keep"):
+            continue
+        s0 = by[sid[0]]
+        inside = [m for m in s0.get("lines") or [] if m in live]
+        # màu lòng đo được gần trùng màu chữ bên trong: số đo sai (hoặc vỏ giả) -> không vẽ, chữ sẽ chìm
+        same = s0.get("fill") not in (None, "none") and any(
+            by[m].get("color") and float(np.linalg.norm(_hex_lab(by[m]["color"]) - _hex_lab(s0["fill"]))) < SHELL_INK_DE for m in inside)
+        # lệnh chữ bên trong đã tự có nền / viền (VLM vẽ vỏ ngay trên lệnh chữ rồi bỏ ô vỏ -- dev3 g04): vẽ thêm là vỏ lồng vỏ
+        own = any(re.search(r"background|border\s*:", (o.get("box_style") or "") + (o.get("html") or ""), re.I)
+                  for o in ops if o.get("kind") == "text" and set(o["marks"]) & set(inside))
+        if same or own:
+            continue
+        if (op["kind"] == "skip" and inside) or (op["kind"] == "keep" and s0.get("keepable") is False and inside):
+            css = (f"border:{max(1.0, s0.get('border_px') or 2):.0f}px solid {s0['border']}" if s0.get("border")
+                   else f"background:{s0.get('fill')}") + f"; border-radius:{s0.get('radius') or 0:.0f}px"
+            log.append(f"{op.get('id')}: vỏ {sid[0]} {op['kind']} mà chứa chữ được viết {inside} -> vẽ lại theo số đo ({css})")
+            ops[i] = {**op, "kind": "shape", "html": "", "box_style": css, "why": "guard: shell holding written text"}
     # ICON / CHẤM ĐẦU DÒNG TRƠ: chi tiết đi kèm một dòng (near "left of L5") mà dòng đó bị skip -> bỏ luôn chi tiết (09/10 dev3
     # p08, p11: icon / chấm đầu dòng không có chữ)
     dead = {m for op in ops if op.get("kind") == "skip" for m in op["marks"] if m.startswith("L")}
@@ -1110,7 +1209,7 @@ def base_image(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict) -> np.nda
         if op.get("kind") != "keep":
             continue
         for i in op.get("marks") or []:
-            if i not in M["by"]:
+            if i not in M["by"] or i in (M.get("shells") or {}):   # vỏ có mặt nạ: dán theo mặt nạ ở dưới, không dán cả khung
                 continue
             x0, y0, x1, y1 = M["by"][i]["box"]
             h = y1 - y0
@@ -1123,7 +1222,30 @@ def base_image(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict) -> np.nda
                 if len(ids):
                     sel = np.isin(cc[Y0:Y1, X0:X1], ids)
                     m[Y0:Y1, X0:X1] |= cv2.dilate(sel.astype(np.uint8), np.ones((5, 5), np.uint8))
+    # VỎ GIỮ (12/10): vỏ S "keep" -> dán điểm ảnh nháp theo MẶT NẠ vỏ (dáng, viền, bóng, chuyển màu đúng như nháp), rồi lấp nét
+    # chữ cũ trong vùng các dòng của nó bằng nền quanh nét (inpaint) -- chữ mới do lệnh chữ viết lên. Dòng "keep" (chữ in trên
+    # vật) không lấp.
+    kept = {i for op in P.get("ops", []) if op.get("kind") == "keep" for i in op.get("marks") or []}
+    # chi tiết "keep" (đường viền, hoạ tiết, mảng ảnh) kéo theo mảng lớp phủ chạm khung: không được kéo theo chữ nháp của dòng
+    # không giữ (chữ méo dán lại lên poster)
+    if m.any():
+        for l in M["L"]:
+            if l["id"] not in kept:
+                ys, xs = _line_zone((H, W), l["box"])
+                m[ys, xs] = 0
+    wipe = np.zeros((H, W), bool)
+    for sid in sorted(i for i in kept if i in (M.get("shells") or {})):
+        sh = M["shells"][sid]
+        m |= cv2.dilate(sh["mask"].astype(np.uint8), np.ones((7, 7), np.uint8))
+        boxes = [M["by"][i]["box"] for i in M["by"][sid].get("lines", []) if i in M["by"] and i not in kept]
+        if boxes:   # không lấp sát mép vỏ: nét viền của vỏ (vỏ chỉ có viền, vỏ có viền màu) khác màu lòng nhưng không phải chữ
+            e = 2 * int(3 + (M["by"][sid].get("border_px") or 0)) + 1
+            wipe |= _shell_ink(_lab(draft), sh, boxes) & cv2.erode(sh["mask"].astype(np.uint8), np.ones((e, e), np.uint8)).astype(bool)
     if not m.any():
         return plate.copy()
     a = cv2.GaussianBlur(m.astype(np.float32), (0, 0), 2.0)[..., None]
-    return (draft * a + plate * (1 - a)).round().clip(0, 255).astype(np.uint8)
+    out = (draft * a + plate * (1 - a)).round().clip(0, 255).astype(np.uint8)
+    if wipe.any():
+        k = 2 * KEEP_HALO + 1
+        out = cv2.inpaint(out, cv2.dilate(wipe.astype(np.uint8), np.ones((k, k), np.uint8)), 3, cv2.INPAINT_TELEA)
+    return out

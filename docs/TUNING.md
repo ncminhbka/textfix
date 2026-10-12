@@ -286,6 +286,28 @@ hệt nhau; chấm đầu dòng có ở cả 4 lượt có danh sách, không đ
 120 plan dựng lại sau các sửa: không đổi (too_small 29, overflow 3, boxes_overlap 21, content_overlap 2, uneven_size 10).
 4 lời dặn mới CHƯA đo với VLM thật.
 
+### 12/10 tối: vỏ (S) và chi tiết (I) -- giữ, sửa chỗ sai
+
+Mốc (bench/si_labels.json, chấm mắt một lượt 130 poster): 65 vỏ -- ~50 vẽ lại đúng; sai dáng 2, bỏ nhầm vỏ có chữ 2, vỏ giả 1,
+ô dính khung bị xoá 1 (3fc7), chữ trong vỏ co nhỏ 5 (phần L). 163 chi tiết -- 88 bỏ (gần hết là mảng ẢNH bước xoá vẽ lại khác),
+25 giữ, 26 icon, 21 chữ cung (lượt chữ khó).
+- [mã] vỏ "keep" = dán điểm ảnh nháp theo mặt nạ vỏ + lấp nét chữ cũ trong vùng dòng (inpaint), không lấp sát mép / viền.
+  Thử ép cả 57 vỏ giữ được (scripts/shell_keep_probe.py): 9 lộ lỗi (bóng chữ cũ ở vỏ trong mờ / loang 4, vỏ vỡ mép 3, mặt
+  nạ ăn chữ bên cạnh 1, chữ cung nháp còn lại 1) > ngưỡng 3 -> KHÔNG làm mặc định. Thắng rõ: vòng tròn viền (7252_v1), ô vỏ
+  to hơn vỏ thật (3fc7: dải khung đáy trở lại nguyên), vỏ chỉ ôm một dòng (9283_v0).
+  [prompt] S keep chỉ cho dáng CSS không vẽ được + một màu phẳng + không có chữ ngoài các dòng L, và khi ô S to hơn vỏ thấy
+  trên nháp. Thử lọc "lòng phẳng màu" bằng mã (>= 85% lòng cách màu lòng <= 12 ΔE): loại nhầm 22 vỏ tốt, vẫn lọt 6 ca lỗi -> bỏ.
+- [mã] vỏ chứa chữ được viết mà bị skip (hoặc keep không lấp được) -> vẽ lại theo số đo, trừ khi màu lòng đo trùng màu chữ
+  (2ad2_v1) hoặc lệnh chữ bên trong đã tự có nền / viền (dev3 g04: VLM vẽ pill ngay trên lệnh chữ, vẽ thêm là vỏ lồng vỏ).
+  Trên 130 plan chỉ còn nổ ở dev2 d26_v0 (hộp tối sau "Mở cửa 5:00 - 23:00" trở lại, thêm 1 boxes_overlap). [mã] vỏ giả: màu lòng cách màu mực dòng bên trong < 8 ΔE -> không tạo ô S (2 ô <= 0.4, ô kế
+  16.5): bỏ 2871_v0 "Pool Party" và 2ad2_v1 (vỏ thật nhưng màu lòng đo sai thành màu chữ -- trước đó VLM cũng bỏ).
+- [prompt] I: thứ không phải chữ mà nháp vẽ ổn (viền, kẻ, hoạ tiết, logo, mảng ảnh) -> keep; phân vân skip / keep -> keep.
+  [mã] chi tiết keep không kéo theo chữ nháp của dòng không giữ (4 poster cũ đổi: 2 sạch hơn, 1 như cũ, 1 nhoè hơn ở chữ in
+  trên vật mà dòng bị skip).
+- plan.json thêm "si": đếm S / I theo quyết định (dấu * = mã đổi). 120 plan dựng lại: too_small 29, overflow 3, content_overlap 2,
+  uneven_size 10 không đổi; boxes_overlap 21 -> 22 (d26_v0 ở trên).
+CHƯA đo với VLM thật: VLM có chọn keep đúng chỗ không, có giữ nhầm chữ méo không.
+
 ## Lượt chạy server tiếp theo
 
 Cập nhật mã (docs/SERVER.md), khởi động lại máy chủ **và kernel**, rồi:
