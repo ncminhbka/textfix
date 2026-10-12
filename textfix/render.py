@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import base64
 import io
+import os
 import re
 
 import numpy as np
@@ -20,6 +21,10 @@ OVERLAP = 0.1   # chồng nhau > 10% diện tích phần tử nhỏ hơn = lỗi
 CONDENSE = 0.85   # chữ dài hơn ô theo chiều ngang: nén ngang (scaleX) tới 0.85 TRƯỚC khi co cỡ -- chữ giữ chiều cao như nháp
 ROT_MIN = 2.0   # độ: dòng model vẽ nghiêng >= 2 độ thì dựng nghiêng đúng góc đó (dưới 2 độ là nhiễu đo của OCR)
 PARA_WORDS = 10   # đoạn văn: >= 10 chữ trên >= 3 dòng nháp -> tự ngắt dòng
+# NHÓM VLM KHAI = LỆNH (12/10): các lệnh chữ cùng "group" là một khối -- một cỡ chữ, một lề (group_kind "list": các mục riêng;
+# "flow": một ý nháp cắt thành nhiều dòng -> thêm một font / độ đậm / màu); một dòng phải co thì cả nhóm co theo.
+# TEXTFIX_GROUP_FRAME=0: tắt (nhãn nhóm chỉ còn là gợi ý cân cỡ như trước)
+GROUP_FRAME = os.environ.get("TEXTFIX_GROUP_FRAME", "1") != "0"
 LH_ACCENT = 1.15   # line-height tối thiểu khi dòng sau có chữ hoa mang dấu trên (dấu không đâm vào dòng trên)
 EMOJI = re.compile("[\U0001F000-\U0001FAFF️‍]")   # emoji (không có font emoji trong bộ font)
 ACCENT_UP = {"̀", "́", "̃", "̉", "̂", "̆"}   # huyền sắc ngã hỏi, mũ, trăng (dấu nằm TRÊN chữ)
@@ -282,7 +287,10 @@ async (o) => {
       const rr = document.createRange(); rr.selectNodeContents(inner);
       const q = rr.getBoundingClientRect(), b = d.getBoundingClientRect();
       const fs = parseFloat(d.style.fontSize) || 0;
-      return {q, v: Math.max(0, b.left - q.left, q.right - b.right, b.top - q.top - pad.top * fs, q.bottom - b.bottom - pad.bot * fs)};
+      // DÒNG ĐƠN (e.hfit): chỉ kiểm tràn NGANG -- khung ô = khung OCR, không ôm dấu thanh (12/10 bỏ bước nắn khung); nền đã xoá
+      // sạch nên dấu / đuôi chữ nhô khỏi khung trên dưới không đè vào đâu, co chữ vì nó là co oan
+      const vy = e.hfit ? 0 : Math.max(b.top - q.top - pad.top * fs, q.bottom - b.bottom - pad.bot * fs);
+      return {q, v: Math.max(0, b.left - q.left, q.right - b.right, vy)};
     };
     // ô KHÔNG có nội dung (vỏ chỉ có CSS): không đo tràn -- khung nội dung rỗng nằm ở (0,0) cho số tràn ảo (07/10 p11: 429 / 916 px)
     if (!d.textContent.trim() && !d.querySelector('svg')) {
@@ -399,7 +407,7 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         fam = dfont if med and Ls and size >= HEAD * med else tfont
         st_w = [m["stroke"] / m["size"] for m in Ls if m.get("stroke") and m.get("size")]
         wt = WEIGHT(float(np.median(st_w))) if st_w else None
-        # chữ là TOÀN BỘ nội dung một vỏ (pill / nút một dòng): căn giữa dọc theo vỏ -- khung dòng nắn theo nét (dấu thanh, mép
+        # chữ là TOÀN BỘ nội dung một vỏ (pill / nút một dòng): căn giữa dọc theo vỏ -- khung dòng OCR (thân chữ, mép
         # sáng của vỏ) lệch lên, chữ căn giữa khung dòng trông "nảy lên" khỏi tâm vỏ (08/10 m03)
         lm = {m for m in mk if m.startswith("L")}
         sh = next((s for s in M.get("S") or [] if lm and set(s.get("lines") or []) == lm and not s.get("icons")), None)
@@ -451,7 +459,8 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         bs = (f"font-weight:{wt};" if wt else "") + bs
         # ô MỘT dòng nháp, không <br>: không tự xuống dòng -- trình duyệt bẻ dòng khi chữ dài, chiều cao vượt ô, vòng co thu nhỏ
         # tới khi 2 dòng li ti lọt ô (08/10: 59 / 78 lệnh bị co là "tràn dọc" kiểu này); một dòng co theo chiều ngang to hơn
-        if op.get("kind") == "text" and len(lm) == 1 and not re.search(r"<br", op.get("html") or "", flags=re.I):
+        single = op.get("kind") == "text" and len(lm) == 1 and not re.search(r"<br", op.get("html") or "", flags=re.I)
+        if single:
             bs = "white-space:nowrap;" + bs
         cls = None
         if fix.get("color"):   # SỬA BẰNG CODE (fix): chữ chìm nền -> màu tương phản (+ quầng) cưỡng cho mọi phần tử trong khối
@@ -468,19 +477,40 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         els.append({"id": op["id"], "box": b, "html": h, "style": bs, "size": size, "color": color, "font": family(fam),
                     "fit": fix.get("fit") or op.get("fit") or "shrink", "angle": g["angle"], "cls": cls,
                     "condense": fix.get("condense"), "icon": op.get("kind") == "icon" and bool(mk)
-                    and all(m.startswith("I") for m in mk)})
+                    and all(m.startswith("I") for m in mk), "nl": len(lm), "hfit": single})
     log += _align_left(els) + _even_icons(els)
     page.set_viewport_size({"width": W, "height": H})
-    html = (f"<html><head><style>{faces_for(tuple(sorted(used)))} *{{margin:0;padding:0;box-sizing:border-box}} #c{{position:relative;"
-            f"width:{W}px;height:{H}px;overflow:hidden;background:url('{to_data_uri(plate)}') 0 0/{W}px {H}px no-repeat}}"
-            f"{''.join(force)}</style></head><body><div id=c></div></body></html>")
+    page_html = lambda: (   # noqa: E731
+        f"<html><head><style>{faces_for(tuple(sorted(used)))} *{{margin:0;padding:0;box-sizing:border-box}} #c{{position:relative;"
+        f"width:{W}px;height:{H}px;overflow:hidden;background:url('{to_data_uri(plate)}') 0 0/{W}px {H}px no-repeat}}"
+        f"{''.join(force)}</style></head><body><div id=c></div></body></html>")
+    html = page_html()
     page.set_content(html)
     res = page.evaluate(RENDER_JS, {"els": els, "floor": floor or 0.012 * min(W, H), "condense": CONDENSE})
+    glog, gcss = _group_frames(P, M, els, res, W) if GROUP_FRAME else ([], [])
+    if glog:   # nhóm VLM khai: dựng lại với khung / cỡ / lề / kiểu của nhóm, rồi mới cân cỡ (bên dưới)
+        log += glog
+        force += gcss
+        html = page_html()
+        page.set_content(html)
+        res = page.evaluate(RENDER_JS, {"els": els, "floor": floor or 0.012 * min(W, H), "condense": CONDENSE})
     # CÙNG VAI CÙNG CỠ: mỗi dòng tự co cho vừa ô của nó -> các mục một danh sách lệch cỡ (08/10 r01: 20 / 24 / 24 / 19px). Dựng
     # lại cả nhóm ở cỡ nhỏ nhất của nhóm (nhỏ hơn thì chắc chắn vừa ô, không co thêm)
     size0, fs = {e["id"]: e["size"] for e in els}, {r["id"]: r.get("fs") for r in res}
     by_el, by_res, changed = {e["id"]: e for e in els}, {r["id"]: r for r in res}, []
+    strict = [[o["id"] for o in O] for O in declared_groups(P, els).values()] if GROUP_FRAME else []
+    done = {i for g in strict for i in g}
+    for g in strict:   # NHÓM VLM KHAI: cả nhóm một cỡ = cỡ nhỏ nhất vừa ô (một dòng dài kéo cả nhóm: người dùng chấp nhận 12/10)
+        g = [i for i in g if fs.get(i)]
+        lo = min((fs[i] for i in g), default=0)
+        for i in g:
+            if fs[i] > lo * 1.03:
+                by_el[i]["size"], by_el[i]["fit"], by_el[i]["even"] = by_res[i]["size"] * lo / fs[i], "none", True
+                changed.append(i)
     for g in _role_groups(P, M, res):
+        g = [i for i in g if i not in done]
+        if len(g) < 2:
+            continue
         # dòng nhỏ BẤT THƯỜNG (< 0.65 trung vị: chữ quá dài cho ô) không kéo cả nhóm -- để nó lại, too_small báo vòng sửa rút gọn;
         # 0.8 thì danh sách vẫn lệch (08/10 r01_s1: 33 / 33 / 33 / 23 px) -- danh sách ĐỀU quan trọng hơn to
         med = float(np.median([fs[i] for i in g]))
@@ -653,6 +683,78 @@ def _even_icons(els: list[dict]) -> list[str]:
             e["size"] = m
         log.append(f"icon cùng cỡ {[e['id'] for e in g]}: {m:.0f}px")
     return log
+
+
+def declared_groups(P: dict, els: list[dict]) -> dict:
+    """Nhóm do VLM khai: {tên: [lệnh chữ]} (>= 2 lệnh đang được dựng, không nghiêng)."""
+    by_el, G = {e["id"]: e for e in els}, {}
+    for op in P["ops"]:
+        if op.get("kind") == "text" and op.get("group") and op["id"] in by_el:
+            G.setdefault(str(op["group"]).strip().lower(), []).append(op)
+    # nhóm có dòng NGHIÊNG, hoặc có lệnh viết chữ vào ô chi tiết I (dev3 g01_v0: VLM gom 15 mẩu chữ của một tiêu đề cung, mỗi mẩu
+    # một ô I, thành nhóm "arc") không phải danh sách / câu xuống dòng của các DÒNG chữ: ép một cỡ / một lề làm vỡ -> bỏ cả nhóm
+    line = lambda o: any(m.startswith("L") for m in o.get("marks") or [])   # noqa: E731
+    return {k: v for k, v in G.items() if len(v) >= 2 and all(line(o) and not by_el[o["id"]]["angle"] for o in v)}
+
+
+def _group_frames(P: dict, M: dict, els: list[dict], res: list, W: int) -> tuple[list[str], list[str]]:
+    """NHÓM VLM KHAI = LỆNH, thi hành không điều kiện:
+      cỡ    = trung vị cỡ nháp của các dòng (rồi bước cân cỡ lấy cỡ nhỏ nhất vừa ô cho CẢ nhóm);
+      lề    = "align" VLM khai (thiếu: căn lề CSS của lệnh đầu); nhóm xếp CỘT: mép đó của mọi dòng đặt ở TRUNG VỊ mép các khung
+              OCR (một khung OCR lệch / nuốt chấm đầu dòng không kéo được trung vị), bề ngang = hình bao của nhóm -- KHÔNG ra
+              ngoài vỏ chứa dòng, không lấn phần tử khác cùng hàng. Nhóm xếp hàng / lưới: giữ khung, chỉ chung cỡ;
+      flow  = thêm font, độ đậm, màu của lệnh đầu cho cả nhóm (CSS cưỡng).
+    Sửa els tại chỗ. -> (nhật ký, luật CSS thêm)."""
+    by_el, by_res, log, css = {e["id"]: e for e in els}, {r["id"]: r for r in res}, [], []
+    cssal = lambda e: ("left" if re.search(r"justify-content\s*:\s*(flex-)?start", e["style"] or "") else   # noqa: E731
+                       "right" if re.search(r"justify-content\s*:\s*(flex-)?end", e["style"] or "") else "center")
+    CSS = {"left": "justify-content:flex-start;text-align:left", "right": "justify-content:flex-end;text-align:right",
+           "center": "justify-content:center;text-align:center"}
+    for name, O in declared_groups(P, els).items():
+        E = sorted((by_el[o["id"]] for o in O), key=lambda e: e["box"][1])
+        ops = {o["id"]: o for o in O}
+        kind = next((o["group_kind"] for o in O if o.get("group_kind") in ("list", "flow")), "list")
+        al = next((o["align"] for o in O if o.get("align") in CSS), None) or cssal(E[0])
+        size = float(np.median([e["size"] for e in E]))
+        hh = lambda e: e["box"][3] - e["box"][1]   # noqa: E731
+        col = all(a["box"][3] <= b["box"][1] + 0.25 * min(hh(a), hh(b)) for a, b in zip(E, E[1:]))
+        B0 = [list(e["box"]) for e in E]
+        for k, e in enumerate(E):
+            b, b0 = list(e["box"]), B0[k]
+            if col:
+                if al == "left":
+                    b[0], b[2] = float(np.median([x[0] for x in B0])), max(x[2] for x in B0)
+                elif al == "right":
+                    b[0], b[2] = min(x[0] for x in B0), float(np.median([x[2] for x in B0]))
+                else:
+                    cx, hw = float(np.median([(x[0] + x[2]) / 2 for x in B0])), max(x[2] - x[0] for x in B0) / 2
+                    b[0], b[2] = cx - hw, cx + hw
+                # RÀO: vỏ chứa dòng (chữ trong pill không tràn pill), phần tử khác cùng hàng, mép ảnh
+                lo, hi = 0.0, float(W)
+                for m in ops[e["id"]].get("marks") or []:
+                    sh = M["by"].get((M["by"].get(m) or {}).get("shell") or "")
+                    if sh:
+                        lo, hi = max(lo, min(b0[0], sh["box"][0] + 0.25 * size)), min(hi, max(b0[2], sh["box"][2] - 0.25 * size))
+                for x in els:
+                    if x["id"] in ops or min(b0[3], x["box"][3]) - max(b0[1], x["box"][1]) <= 0.3 * (b0[3] - b0[1]):
+                        continue
+                    if x["box"][0] >= b0[2] - 2:
+                        hi = min(hi, max(b0[2], x["box"][0] - 0.25 * size))
+                    elif x["box"][2] <= b0[0] + 2:
+                        lo = max(lo, min(b0[0], x["box"][2] + 0.25 * size))
+                b[0], b[2] = max(b[0], lo), min(b[2], hi)
+                e["style"] = (e["style"] or "") + ";" + CSS[al]
+            e["box"], e["size"] = b, size
+        if kind == "flow":   # một ý: kiểu chữ của lệnh đầu cho cả nhóm
+            r0 = by_res.get(E[0]["id"]) or {}
+            if r0.get("ff"):
+                for e in E[1:]:
+                    cls = f"gf{len(css)}"
+                    e["cls"] = f"{e['cls']} {cls}" if e.get("cls") else cls
+                    css.append(f"#c>.{cls},#c>.{cls} *{{font-family:{r0['ff']}!important;font-weight:{r0.get('fw') or 400}!important;"
+                               + (f"color:{r0['fg']}!important;-webkit-text-fill-color:{r0['fg']}!important;" if r0.get("fg") else "") + "}")
+        log.append(f"nhóm '{name}' ({kind}, {al if col else 'hàng / lưới: giữ khung'}) {[e['id'] for e in E]} -> cỡ {size:.0f}px")
+    return log, css
 
 
 def _align_left(els: list[dict]) -> list[str]:

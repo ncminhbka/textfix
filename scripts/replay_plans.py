@@ -4,6 +4,8 @@
   python -X utf8 scripts/replay_plans.py <thư mục ra> dev3              # cả tập
   python -X utf8 scripts/replay_plans.py <thư mục ra> dev3 g11_v1,g12_v1  # vài ảnh (in log từng ảnh)
   RRTAG=_base ...   # hậu tố thư mục ra (so mã cũ / mới)
+  RRBOX=snap ...    # plan lưu trước 12/10 có cả khung đã nắn ("box") lẫn khung OCR ("ocr_box"): mặc định dựng bằng khung OCR
+                    # (bước nắn đã bỏ); snap = dựng bằng khung nắn cũ (mốc so sánh)
 """
 import json, os, sys, collections
 import numpy as np
@@ -32,6 +34,9 @@ with Browser() as B:
             D = np.asarray(Image.open(r + "draft.png").convert("RGB"))
             pl = r + "plate.png" if os.path.exists(r + "plate.png") else r + "plate_raw.jpg"
             Pl = np.asarray(Image.open(pl).convert("RGB").resize((D.shape[1], D.shape[0])))
+            if os.environ.get("RRBOX") != "snap":
+                for l in P["slots"]["L"]:
+                    if l.get("ocr_box"): l["box"] = list(l["ocr_box"])
             Mm = {**P["slots"], "size": [D.shape[1], D.shape[0]], "by": {x["id"]: x for x in P["slots"]["L"] + P["slots"]["S"] + P["slots"]["I"]}}
             for e in P.get("errors") or []: tot0[e["type"]] += 1
             P = {**P, "ops": [{kk: w for kk, w in o.items() if kk != "fix"} for o in P["ops"]]}

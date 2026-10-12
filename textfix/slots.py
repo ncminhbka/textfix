@@ -1,7 +1,7 @@
 """DESIGNER "ĐIỀN Ô": nháp - bản xoá = lớp phủ model đã vẽ -> các Ô đúng toạ độ; VLM chỉ quyết mỗi ô là gì và điền cho đẹp; code
 dựng đúng khung từng ô (render.py), theo lớp vỏ -> chi tiết -> chữ.
 
-  M = build(draft, plate)                         # S# vỏ, I# chi tiết nhỏ, L# dòng chữ (OCR, khung nắn theo lớp phủ, số đo nét)
+  M = build(draft, plate)                         # S# vỏ, I# chi tiết nhỏ, L# dòng chữ (OCR nguyên khung, số đo nét)
   P = plan(draft, M, prompt, texts, call)         # VLM: {style, ops: [{slots, kind, html, box_style, client}], missing}
   P, log = validate(P, M, texts)                 # + chặn chữ: dấu theo câu khách, chữ bịa, dòng lặp
   base = base_image(draft, plate, M, P)           # bản xoá + dán lại pixel nháp ở dòng "keep" (chữ in trên sản phẩm / màn hình)
@@ -22,9 +22,6 @@ import numpy as np
 CAP_EM = 0.72        # cao chữ hoa / em (cũng ~ cao chữ số, nét lên b d h k l t)
 TALL_MIN = 0.15      # dòng có >= 15% ký tự cao -> ước cỡ theo cao nét cao (glyph h_tall)
 X_EM = 0.53          # cao chữ thường (x-height) / em
-SNAP_SIDE = 0.35     # nắn khung dòng: xét lớp phủ quanh đa giác OCR, nới ngang / xuống 0.35 cao dòng ...
-SNAP_MIN_W = 0.6    # khung nắn (ngoài vỏ) hẹp hơn 0.6 bề ngang OCR = lớp phủ bắt thiếu nét -> giữ bề ngang OCR
-SNAP_UP = 0.9        # ... và lên 0.9 cao dòng (dấu thanh / mũ tiếng Việt)
 INK_IN_SHELL = 25.0  # trong vỏ: nét chữ = khác màu lòng vỏ >= 25 ΔE (cả lòng vỏ đều thuộc lớp phủ)
 GAP_SPLIT = 1.0      # trong một dòng OCR, khoảng KHÔNG nét rộng >= 1 cao dòng = hai mục riêng (khoảng cách từ ~0.3 cao dòng;
                      # OCR gộp "địa chỉ [icon] website" ở chân trang thành một dòng)
@@ -200,113 +197,25 @@ def _split_gaps(img: np.ndarray, l: dict) -> list[dict]:
     return out or [l]
 
 
-def _snap(L: dict, ink: np.ndarray, others: np.ndarray) -> list[float]:
-    """Khung dòng = khung các mảng lớp phủ CHẠM đa giác OCR + mẩu cỡ dấu trong vùng nới (nét bay, dấu thanh, gạch đầu dòng);
-    mảng chạm dòng OCR khác thuộc dòng đó. Dòng nghiêng giữ khung OCR (khung thẳng không ôm được dòng nghiêng)."""
-    import cv2
-    x0, y0, x1, y1 = L["box"]
-    if abs(L.get("angle") or 0) >= 2:
-        return list(L["box"])
-    H, W = ink.shape
-    h = y1 - y0
-    X0, Y0 = int(max(0, x0 - SNAP_SIDE * h)), int(max(0, y0 - SNAP_UP * h))
-    X1, Y1 = int(min(W, x1 + SNAP_SIDE * h)), int(min(H, y1 + SNAP_SIDE * h))
-    sub = ink[Y0:Y1, X0:X1].astype(np.uint8)
-    if not sub.any():
-        return list(L["box"])
-    oth = others[Y0:Y1, X0:X1]
-    n, cc, st, _ = cv2.connectedComponentsWithStats(sub, 8)
-    core = np.zeros_like(sub)
-    cv2.fillPoly(core, [np.round(np.asarray(L["poly"]) - [X0, Y0]).astype(np.int32)], 1)
-    hit = set(np.unique(cc[(core > 0) & (cc > 0)]).tolist())
-    taken = set(np.unique(cc[oth & (cc > 0)]).tolist())
-    keep = []
-    for i in range(1, n):
-        x, y, w, hh, a = st[i]
-        on_edge = x == 0 or y == 0 or x + w >= sub.shape[1] or y + hh >= sub.shape[0]
-        if i in taken and i not in hit:
-            continue
-        if i in hit or (not on_edge and max(w, hh) <= 0.4 * h and a >= 3):
-            keep.append((x, y, x + w, y + hh))
-    if not keep:
-        return list(L["box"])
-    bx = [min(k[0] for k in keep) + X0, min(k[1] for k in keep) + Y0, max(k[2] for k in keep) + X0, max(k[3] for k in keep) + Y0]
-    # chặn nắn quá đà: không nở quá 1 cao dòng mỗi phía so với khung OCR
-    return [float(max(bx[0], x0 - h)), float(max(bx[1], y0 - h)), float(min(bx[2], x1 + h)), float(min(bx[3], y1 + h))]
-
-
-def _unstack(L: list[dict]) -> None:
-    """Hai dòng xếp chồng có nét dính nhau (dấu "Ữ" chạm chân "MENU"): mảng dính chạm cả hai đa giác OCR nên khung nắn của dòng
-    này nuốt cả dòng kia -> hai ô chồng nhau, designer viết hai dòng đè lên nhau (08/10 h02). Khung nắn không được vượt sang
-    ranh giới với dòng bên cạnh (trên / dưới, trái / phải) = giữa khe (hoặc giữa phần giao) hai khung OCR. Khung OCR giao nhau
-    >= nửa cao (rộng) theo cả hai chiều: không phân xử được, giữ nguyên."""
-    new = []
-    for a in L:
-        x0, y0, x1, y1 = a["box"]
-        ox0, oy0, ox1, oy1 = a["ocr_box"]
-        for b in L if abs(a.get("angle") or 0) < 2 else []:
-            if b is a:
-                continue
-            bx0, by0, bx1, by1 = b["ocr_box"]
-            if min(x1, bx1) - max(x0, bx0) <= 0 or min(y1, by1) - max(y0, by0) <= 0:
-                continue   # khung nắn của a không chạm khung OCR của b
-            vy = (min(oy1, by1) - max(oy0, by0)) / max(1.0, min(oy1 - oy0, by1 - by0))
-            vx = (min(ox1, bx1) - max(ox0, bx0)) / max(1.0, min(ox1 - ox0, bx1 - bx0))
-            if vy < 0.5 and vy <= vx:   # trên / dưới
-                if by0 + by1 < oy0 + oy1:
-                    y0 = max(y0, (by1 + oy0) / 2)
-                else:
-                    y1 = min(y1, (by0 + oy1) / 2)
-            elif vx < 0.5:              # trái / phải
-                if bx0 + bx1 < ox0 + ox1:
-                    x0 = max(x0, (bx1 + ox0) / 2)
-                else:
-                    x1 = min(x1, (bx0 + ox1) / 2)
-        # bị cắt từ hai phía tới mức lật / còn quá mỏng (khung giữ bề ngang OCR chạm cả dòng trên lẫn dưới: 09/10 dev3 f03
-        # "y1 must be >= y0") -> chiều đó về khung OCR
-        if y1 - y0 < 0.5 * (oy1 - oy0):
-            y0, y1 = oy0, oy1
-        if x1 - x0 < 0.5 * (ox1 - ox0):
-            x0, x1 = ox0, ox1
-        new.append([float(x0), float(y0), float(x1), float(y1)])
-    for a, b in zip(L, new):
-        a["box"] = b
-
-
 def build(draft: np.ndarray, plate: np.ndarray) -> dict:
-    """Ô của nháp: L# (dòng OCR + số đo nét, khung nắn theo lớp phủ, vỏ chứa nó), S# vỏ, I# chi tiết nhỏ (overlay.overlay)."""
+    """Ô của nháp: L# (dòng OCR nguyên khung + số đo nét, vỏ chứa nó), S# vỏ, I# chi tiết nhỏ (overlay.overlay)."""
     import cv2
     from .overlay import overlay
     H, W = draft.shape[:2]
     L = lines(draft)
     O = overlay(draft, plate, [{"box": l["box"], "poly": l["poly"]} for l in L])
     A = _lab(draft)
-    polys = []
-    for l in L:
-        pm = np.zeros((H, W), np.uint8)
-        cv2.fillPoly(pm, [np.asarray(l["poly"], np.int32)], 1)
-        polys.append(pm.astype(bool))
     for j, l in enumerate(L):
         sh = next((s for s in O["S"] if j in s["lines"]), None)
         l["shell"] = sh["id"] if sh else None
-        ink = (sh["_mask"] & (np.linalg.norm(A - sh["_fill_lab"], axis=2) > INK_IN_SHELL)) if sh else O["mask"]
-        others = np.zeros((H, W), bool)
-        for i, pm in enumerate(polys):
-            if i != j:
-                others |= pm
+        # KHUNG DÒNG = KHUNG OCR, nguyên bản (12/10: bỏ hẳn bước nắn khung theo nét mực -- trên nền ảnh chụp nét mực đo thiếu,
+        # khung bị cắt hẹp / đẩy mép trái vào mỗi dòng một kiểu: 11-25% dòng, danh sách thò thụt, chữ co). Bản xoá là xoá cả
+        # ảnh nên dấu thanh nhô khỏi khung không đè vào đâu; vòng co của render chỉ kiểm tràn NGANG với dòng đơn.
         l["ocr_box"] = list(l["box"])
-        b = _snap(l, ink, others)
-        o = l["ocr_box"]
-        # chữ nhỏ / nhạt ngoài vỏ: lớp phủ chỉ bắt vài mảnh nét -> khung co về một mẩu ("25 Nguyễn Huệ, TP. Huế" 281 -> 30 px,
-        # 09/10 dev2: 16 dòng) -> chữ dựng ở cỡ nháp tràn ngang, co còn 0.25-0.5 (too_small). Bề ngang OCR đáng tin hơn.
-        if not sh and b[2] - b[0] < SNAP_MIN_W * (o[2] - o[0]):
-            b = [o[0], b[1] if b[3] - b[1] >= 0.6 * (o[3] - o[1]) else o[1], o[2], b[3] if b[3] - b[1] >= 0.6 * (o[3] - o[1]) else o[3]]
-        l["box"] = b
-    _unstack(L)
     S =[{k: v for k, v in s.items() if not k.startswith("_")} for s in O["S"]]
     for s in S:
         s["lines"] = [L[j]["id"] for j in s["lines"]]
-    # chi tiết không bao giờ ĐÈ lên chữ; bỏ chi tiết nằm trong khung dòng đã nắn (gạch đầu dòng thuộc dòng) và lồng trong chi tiết khác
+    # chi tiết không bao giờ ĐÈ lên chữ; bỏ chi tiết nằm trong khung dòng (gạch đầu dòng OCR gộp vào dòng) và lồng trong chi tiết khác
     I = [c for c in O["I"] if all(_cov(c["box"], l["box"]) < 0.3 and _cov(l["box"], c["box"]) < 0.5 for l in L)]
     area = lambda b: (b[2] - b[0]) * (b[3] - b[1])   # noqa: E731
     I = [c for c in I if not any(o is not c and _cov(o["box"], c["box"]) >= 0.8 and area(o["box"]) > area(c["box"]) for o in I)]
@@ -474,6 +383,9 @@ colors -- a call-to-action must never end up as bare text. Only then: a line ins
 If a text does not fit, shorten it (facts stay exact) rather than shrinking it.
 - Lists: keep the draft's list structure -- one item per row, each row keeps its own text next to its bullet / check / icon; \
 never merge list rows into one block and never leave a bullet or icon without its text. Every list row (bullet / feature / step) starts with a capital letter, and all rows of one list carry the same "group" name.
+- Row marks: when the draft shows a bullet / check / small icon in front of a row, look at the BASE image. Mark still there \
+-> write only the text. Mark erased and no I# slot for it -> draw it yourself at the start of that row's html ("• " or an \
+<i-icon>), the same mark on every row of the group.
 - Slanted (italic / oblique) lettering in the draft stays italic; tracked (widely spaced) headlines keep their letter-spacing.
 - Weight and family: a heavy / black headline stays heavy (font-weight 800-900 in a font that has it), a script stays a \
 script font, a wide headline is never set in a condensed font (or the reverse). Unset weight = the weight measured on the draft.
@@ -482,9 +394,16 @@ script font, a wide headline is never set in a condensed font (or the reverse). 
 the slot and gets shrunk, a narrower one looks lost in it.
 - Same role, same look: rows of one list / menu / table, the items of one card set, the labels of one badge set share ONE \
 font, size, weight and color -- write the same font-size on all of them (the smallest that fits), never one row big and the \
-next small. Left-aligned columns: "justify-content:flex-start; text-align:left" on every row so the left edges line up. \
-Give every op of such a set the same "group" name (e.g. "benefits", "menu-names", "menu-prices", "badges"): the renderer then \
-draws the whole group at one size, the size that fits its longest member.
+next small. Left-aligned columns: "justify-content:flex-start; text-align:left" on every row so the left edges line up.
+- GROUPS -- you decide, the renderer obeys. Slots that belong together get the same "group" name on their ops (e.g. \
+"benefits", "menu-names", "menu-prices", "badges", "headline"), with the same "group_kind" and "align" on every op of the group:
+  * "group_kind": "list" -- separate items of one list / menu / feature set / step set / badge set, one item per row. The \
+renderer puts every row on ONE margin and draws all rows at ONE size (the size that fits the longest row).
+  * "group_kind": "flow" -- ONE sentence or phrase that the draft broke over several lines and that you did not merge into a \
+single op (a two-line headline, a paragraph). The renderer draws all its lines at ONE size, font, weight and color.
+  * "align": "left" | "center" | "right" -- how the draft aligned the lines of the group.
+  Every list and every multi-line sentence that is not one merged op MUST be a group. Lines the draft deliberately drew \
+different (a huge "FLASH SALE" over a small tagline, a big price next to its small unit) are NOT a group: "group": null.
 - More rows than items: the image model sometimes drew more list rows or bullets than there are client items. A long item \
 may continue on the next row (that row's bullet skipped); otherwise skip the extra rows AND their bullets / icons. \
 Fill the rows top to bottom in order and skip only the LAST extra rows -- never leave an empty row in the middle of a list \
@@ -497,7 +416,8 @@ shape, the text op gets NO background, border or box-shadow of its own.
 OUTPUT: one JSON object
 {"style": {"display_font": "<key>", "text_font": "<key>", "palette": ["#hex"], "notes": "..."},
  "ops": [{"id": "o1", "slots": ["L1"], "kind": "text|keep|skip|shape|icon", "client": "T0" | null, "html": "...",
-          "box_style": "...", "group": "name" | null, "why": "a few words"}],
+          "box_style": "...", "group": "name" | null, "group_kind": "list" | "flow" | null,
+          "align": "left" | "center" | "right" | null, "why": "a few words"}],
  "missing": ["T5"], "notes": "..."}
 
 FONT CATALOG (key: family, class): {fonts}

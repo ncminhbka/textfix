@@ -236,6 +236,35 @@ lưu lại (byte nhị phân thành U+FFFD) -- đừng mở zip trong trình so�
 - Dày chữ (prompt dài): too_small 1.4 / ảnh -- FLUX chừa chỗ ít hơn nhiều so với câu khách; cân nhắc dặn LLM viết prompt có khối chữ
   thân đủ chỗ.
 
+## 12/10: bỏ nắn khung dòng, nhóm VLM khai là lệnh
+
+Chỉ thị của người dùng (12/10): thẩm mỹ số 1, coi trọng nháp hơn prompt; chữ được co trong khung OCR; bỏ hẳn bước nắn khung;
+VLM đánh dấu các khung cùng ngữ nghĩa -- danh sách PHẢI cùng lề + cùng cỡ, một ý xuống dòng PHẢI cùng cỡ / cùng kiểu; một dòng
+phải co thì cả nhóm co theo. Lượt này chỉ làm dòng chữ (L); vỏ (S) và chi tiết (I) giữ nguyên, quan sát thêm.
+
+Nguyên nhân đo được (5 lượt chạy 12/10 + 120 poster dev2 / dev3): bước nắn khung theo nét mực (`slots._snap`) đẩy mép trái vào
+ở 11-25% dòng, cắt thấp 15-39% dòng (nét mực = nháp - bản xoá đo thiếu trên nền ảnh chụp) -> danh sách thò thụt, chữ co. VLM đã
+khai nhóm đúng (`group`) nhưng mã chỉ coi là gợi ý (lề chỉ căn khi hình học khớp, cỡ có ngoại lệ 0.65).
+
+| Bước | Thay đổi | too_small | overflow | boxes_overlap | content_overlap | uneven_size |
+|---|---|---|---|---|---|---|
+| mốc | (mã 2e061e0, dựng lại 120 plan server) | 100 | 8 | 12 | 0 | 10 |
+| A | [code] B2.5 khung dòng = khung OCR nguyên bản (xoá `_snap`, `_unstack`); B4 lệnh chữ MỘT dòng chỉ kiểm tràn NGANG (`hfit`: nền đã xoá sạch, dấu thanh nhô khỏi khung không đè vào đâu) | 32 | 3 | 21 | 2 | 11 |
+| B | [code] B4 nhóm VLM khai (`group`) thi hành không điều kiện (`render._group_frames`, `declared_groups`): cỡ = trung vị cỡ nháp rồi cả nhóm lấy cỡ nhỏ nhất vừa khung; nhóm xếp cột: một lề theo `align`, vị trí = trung vị mép các khung OCR, bề ngang = hình bao nhóm (không ra ngoài vỏ, không lấn phần tử cùng hàng); `flow`: thêm font / đậm / màu của lệnh đầu. Nhóm có dòng nghiêng hoặc viết vào ô I: bỏ qua (dev3 g01_v0: 15 mẩu chữ cung) | 29 | 3 | 21 | 2 | 10 |
+
+- A: 51 / 120 poster ít lỗi hơn, 7 nhiều lỗi hơn (xem mắt cả 7: không poster nào xấu đi; `boxes_overlap` tăng vì khung OCR thô
+  của các dòng sát nhau chạm nhau, chữ dựng ra không đè nhau). B: 26 / 120 poster có nhóm VLM khai, 4 ít lỗi hơn A, 0 nhiều hơn.
+- 5 lượt 12/10 (dựng lại plan server): mép trái danh sách 131 / 92 / 55 / 83 -> 65 / 65 / 65 / 65 (85be), cỡ danh sách 15 ->
+  21-27 px (nháp 25-28); lỗi cuối 4 too_small -> 2 too_small + 1 uneven_size.
+- [prompt, CHƯA đo với VLM] designer: `group_kind` ("list" | "flow") + `align` trên mỗi lệnh; mục danh sách viết hoa chữ đầu;
+  ký hiệu đầu dòng: nền còn thì chỉ viết chữ, nền mất và không có ô I thì tự viết ("•" / `<i-icon>`). LLM brief + mã: mục
+  `list_item` viết hoa chữ đầu (cả trong ngoặc kép của prompt FLUX). Groq miễn phí không chạy được lời dặn designer (17k token
+  một lượt, giới hạn 7k / phút) -> phải đo trên server.
+- Còn thấy: chấm đầu dòng bị bản xoá xoá mà không thành ô I (85be, 7229) -- chờ lời dặn mới; đoạn văn trong thẻ (08aa) vẫn nhỏ
+  vì câu khách dài hơn chỗ nháp vẽ (người dùng chấp nhận co trong khung).
+- Tắt nhóm-là-lệnh: `TEXTFIX_GROUP_FRAME=0`. Công cụ: `scripts/replay_plans.py` (mặc định dựng bằng khung OCR; `RRBOX=snap` =
+  khung nắn cũ lưu trong plan trước 12/10).
+
 ## Lượt chạy server tiếp theo
 
 Cập nhật mã (docs/SERVER.md), khởi động lại máy chủ **và kernel**, rồi:
