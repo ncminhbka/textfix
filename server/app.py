@@ -42,7 +42,7 @@ from typing import Any, List, Optional
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -469,6 +469,43 @@ async def get_job(jid: str):
     pos = ORDER.index(jid) if jid in ORDER else None
     return {k: job[k] for k in ("id", "run_id", "status", "progress", "result", "error")} | \
         {"position": pos, "elapsed": round(time.time() - job.get("started", job["created"]), 1)}
+
+
+ZIP_LIMIT = int(float(os.environ.get("TEXTFIX_ZIP_MB", "22")) * 1024 * 1024)   # < 24 MB (như textfix/ship.py)
+ZIP_JPG = ("poster.png", "poster_first.png", "plate_raw.png")   # ảnh để xem -> JPG; nháp + bản xoá đã dọn giữ PNG (đo lại được)
+
+
+def run_zip(rd: Path, all_jpg: bool = False) -> bytes:
+    """Mọi tệp debug của một lượt chạy (request, brief, ảnh sản phẩm, mỗi phiên bản: nháp, bản xoá thô / đã dọn, ô, lệnh, các bước,
+    poster, plan.json) trong MỘT zip, thư mục gốc <run_id>/ -- giải nén vào output/runs/ ở máy cá nhân. all_jpg: mọi PNG thành JPG
+    95 (khi zip vượt giới hạn)."""
+    import zipfile
+    from PIL import Image
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        for f in sorted(x for x in rd.rglob("*") if x.is_file()):
+            arc = f"{rd.name}/{f.relative_to(rd).as_posix()}"
+            if f.suffix == ".png" and (all_jpg or f.name in ZIP_JPG):
+                b = io.BytesIO()
+                Image.open(f).convert("RGB").save(b, "JPEG", quality=95 if all_jpg else 92)
+                z.writestr(arc[:-4] + ".jpg", b.getvalue(), compress_type=zipfile.ZIP_STORED)
+            else:
+                z.write(f, arc, compress_type=zipfile.ZIP_STORED if f.suffix in (".png", ".jpg") else zipfile.ZIP_DEFLATED)
+    return buf.getvalue()
+
+
+@app.get("/api/runs/{run_id}/zip")
+def download_run(run_id: str):
+    import re
+    rd = RUNS / run_id
+    if not re.fullmatch(r"run_[0-9A-Za-z_]+", run_id) or not rd.is_dir():
+        raise HTTPException(404, "không có lượt chạy này")
+    data = run_zip(rd)
+    if len(data) >= ZIP_LIMIT:
+        data = run_zip(rd, all_jpg=True)
+    if len(data) >= ZIP_LIMIT:
+        raise HTTPException(413, f"zip {len(data) / 2**20:.1f} MB vượt giới hạn {ZIP_LIMIT / 2**20:.0f} MB")
+    return Response(data, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{run_id}.zip"'})
 
 
 @app.post("/api/generate")

@@ -76,6 +76,8 @@
   a.dl { font-size: 12.5px; color: var(--accent); margin-left: auto; }
   .bar { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px; }
   .bar .thumbs { margin: 0; flex: 1; }
+  .dbgbox { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .dbgbox a.dl { margin-left: 0; white-space: nowrap; }
   .dbg { font-size: 12.5px; font-weight: 600; margin: 4px 0 0; white-space: nowrap; cursor: pointer; }
   .vcard { width: 120px; border-radius: 8px; border: 2px solid var(--line); overflow: hidden; cursor: pointer; background: var(--bg); position: relative; }
   .vcard.on { border-color: var(--accent); }
@@ -354,7 +356,8 @@ function show() {
   if (picked >= R.posters.length) picked = 0;
   const P = R.posters[picked];
   let h = `<div class="bar"><div class="thumbs">${R.posters.map(thumb).join("")}</div>
-           <label class="dbg"><input type="checkbox" ${debug ? "checked" : ""} onchange="setDebug(this.checked)"> Debug</label></div>`;
+           <span class="dbgbox"><label class="dbg"><input type="checkbox" ${debug ? "checked" : ""} onchange="setDebug(this.checked)"> Debug</label>
+           ${R.run_id && R.status !== "running" ? `<a class="dl" href="api/runs/${R.run_id}/zip" download title="Mọi tệp debug của lượt này: yêu cầu, brief, nháp, bản xoá, ô, lệnh, poster, plan.json">Tải debug (zip)</a>` : ""}</span></div>`;
   const avail = VIEWS.filter(([k, , d]) => (!d || debug) && (k === "ocr" ? P.plan_url : P[k + "_url"]));
   if (!avail.find(([k]) => k === view)) view = avail.length ? avail[0][0] : "poster";
   if (P.status === "error") h += `<p class="err">Ảnh ${picked + 1} lỗi: ${esc(P.error)}</p>`;
