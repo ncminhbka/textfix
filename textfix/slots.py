@@ -436,7 +436,9 @@ two -- same height, same size, a word gap apart -- go together.)
 - Text the model invented: write what it was meant to say from its role, position and the PROMPT, a natural line of about the \
 same length in the poster's language (usually Vietnamese). Never copy garbled OCR. Commit; do not hedge. But a FACT the \
 model drew that is in no client text (an address, phone, price, date, percentage, website) is never written: skip that slot.
-- Star ratings are always <i-stars n="..."></i-stars>, never star characters (the fonts have no star glyph).
+- Star ratings are always <i-stars n="..."></i-stars>, never star characters (the fonts have no star glyph). The stars \
+ARE the rating: never write "5 sao" / "5 stars" / "5.0" next to a star row (a client text that only says "5 sao" is shown \
+as the stars alone).
 - html: inline spans only (color / weight / italic / size for emphasis), inline CSS only, no <img>, no URLs, no scripts. Sizes \
 in px of the poster (as listed per line). The slot is a flex box centered both ways; for left-aligned text use box_style \
 "justify-content:flex-start; text-align:left".
@@ -770,6 +772,7 @@ def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, produ
     return _to_marks(call(*args))
 
 
+STAR_WORDS = re.compile(r"(>)[\s(]*\d+(?:[.,]\d+)?\s*(?:sao|stars?)[\s)]*(<)", re.I)   # mẩu chữ CHỈ ghi số sao, giữa hai thẻ
 CLIENT_LIKE = 0.6   # chữ OCR của ô giống câu khách >= 0.6 (bỏ dấu, chữ thường) = chữ poster chứa câu khách
 PRINTED = re.compile(r"\b(printed|on (the )?(product|package|packaging|label|can|bottle|jar|box|screen))\b", re.I)
 
@@ -818,6 +821,12 @@ def validate(P: dict, M: dict, texts: list[dict] | None = None, product: bool = 
             if k is not None:
                 log.append(f"{op.get('id')}: keep chữ nháp {ocr!r} trùng câu khách T{k} -> viết lại {texts[k]['text']!r}")
                 op = {**op, "kind": "text", "html": texts[k]["text"], "client": f"T{k}", "why": "guard: client text was kept"}
+        # SAO ĐÃ VẼ thì không viết thêm "5 sao" (12/10 run 38ef: hàng sao + chữ "5 sao"): bỏ mẩu chữ chỉ ghi số sao đứng cạnh thẻ sao
+        if "<i-stars" in (op.get("html") or ""):
+            h = STAR_WORDS.sub(lambda m: m.group(1) + m.group(2), ">" + op["html"] + "<")[1:-1]
+            if h != op["html"]:
+                log.append(f"{op.get('id')}: đã có hàng sao -> bỏ chữ ghi số sao")
+                op = {**op, "html": h}
         ops.append({**op, "marks": mk, "slots": mk})
     # VỎ (12/10, xem 65 ô vỏ của 130 poster):
     #  - vỏ đang chứa dòng chữ ĐƯỢC VIẾT mà bị "skip" -> chữ nằm trần trên nền (2ad2_v1 khung giá, 4af9_v0 pill trắng) -> vẽ lại

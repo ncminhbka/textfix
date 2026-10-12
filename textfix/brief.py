@@ -17,6 +17,7 @@ ROLES = ["headline", "subheadline", "body", "price", "old_price", "offer", "date
          "review_quote", "review_name", "label"]
 TECH_KEYS = {"image_base64", "seed", "num_images", "aspect_ratio", "primary_color", "style_pref", "has_product_image"}
 QUOTED = re.compile(r'"([^"]+)"')
+STAR_TEXT = re.compile(r"^\d+(?:[.,]\d+)?\s*(?:sao|stars?)$", re.I)   # câu CHỈ ghi số sao ("5 sao")
 CURLY = re.compile(r"“([^”]+)”")   # ngoặc kép cong (gõ trên điện thoại / Word)
 # vai mặc định của trường form (thêm lại trường LLM bỏ sót)
 FIELD_ROLE = {"title": "headline", "discount": "offer", "applied_product": "subheadline", "date_start": "date", "date_end": "date",
@@ -53,6 +54,8 @@ Input: the user's poster form (category + filled fields, JSON) and/or a free pro
    - Add concrete visual specifics: subject, form, materials, textures, lighting (quality, direction, color), shadows, spatial relationships, environment, mood, and a clean professional poster layout (where the headline, price / offer, list and footer sit; flat graphic text, badges, pills or cards where suitable).
    - Text in images: put EVERY text of the poster in double quotes, EXACTLY as written in "texts" below (Vietnamese with full diacritics), and say its role, typographic style and its place (e.g. headline "..." in a bold condensed sans-serif at the top center). Never add any text that is not in "texts".
    - Put texts on calm areas, never on the main subject.
+   - A star rating the user asks for ("đánh giá 5 sao", "review 5 sao") is a PICTURE: describe a row of gold stars; never make
+     "5 sao" a text and never quote it.
    - Never invent commercial claims: no price, discount, promotional offer, deadline / date, phone number, address or warranty that the user did not give.
    - Never write aspect ratios, resolutions or sizes (e.g. 9:16, 4k, 1080p).
 2. texts -- the texts the poster must show, each with "source". source "user" = the user's own words: copy every text EXACTLY character for character from the form values or from the quoted strings / explicit texts of the prompt (same case, accents, punctuation). Never invent, translate, shorten or rewrite text. Every filled content field appears in full (store name, phone, address, website included). The form fields "highlights" and "feedback_highlights" are lists: ALWAYS one text per comma-separated item (role list_item). A comma-separated list of highlights / features in the free prompt becomes one text per item ONLY if the user separated them; copy each item exactly, except that every list item (role list_item: a bullet / feature / step row) STARTS WITH A CAPITAL LETTER ("nhận phản hồi trực tiếp" -> "Nhận phản hồi trực tiếp"), in texts and inside the quotes of prompt_en alike.
@@ -160,6 +163,18 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
             continue
         seen.add(text)
         out.append({"text": text, "role": t.get("role") if t.get("role") in ROLES else "body", "source": "user"})
+    # SỐ SAO là hình, không phải chữ (12/10 run 38ef: prompt "hiển thị đánh giá 5 sao" -> LLM đưa "5 sao" vào texts -> poster có
+    # hàng sao KÈM chữ "5 sao"): câu chỉ ghi số sao mà khách không đặt trong ngoặc kép / không điền ở form -> bỏ khỏi texts,
+    # trong prompt đổi thành lời tả hàng sao
+    for t in [t for t in out if STAR_TEXT.match(t["text"]) and t["text"] not in must
+              and not any(_norm(str(v)).casefold() == t["text"].casefold() for v in form.values())]:
+        out.remove(t)
+        seen.discard(t["text"])
+        n = re.match(r"\d+", t["text"]).group(0)
+        raw = {**raw, "prompt_en": raw.get("prompt_en", "").replace(f'"{t["text"]}"', f"a row of {n} gold rating stars"),
+               "variants": [{**v, "prompt_en": str(v.get("prompt_en") or "").replace(f'"{t["text"]}"', f"a row of {n} gold rating stars")}
+                            for v in (raw.get("variants") or []) if isinstance(v, dict)]}
+        log.setdefault("stars_not_text", []).append(t["text"])
     for q in must:   # chuỗi người dùng viết trong ngoặc kép mà LLM bỏ sót -> thêm lại nguyên văn (trừ khi đã tách thành các ý)
         qn = _norm(q)
         parts = [t for t in seen if t.casefold() in qn.casefold()]   # mục danh sách đã viết hoa chữ đầu vẫn là một phần của chuỗi

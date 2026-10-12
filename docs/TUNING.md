@@ -342,6 +342,10 @@ Yêu cầu không chữ nào ("tạo poster quảng cáo quán của tôi") ra �
 - bench/form1.json: 22 ca mô phỏng người dùng điền form (6 loại x tối thiểu / điển hình / đủ; không tiêu đề; gõ thường, không
   dấu; prompt mơ hồ không chữ; 2 ca ảnh thường). Chạy: `%run scripts/dev_batch.py bench/form1.json`.
 
+- 38ef: hàng sao kèm chữ "5 sao" (prompt "hiển thị đánh giá 5 sao" -> LLM đưa "5 sao" vào texts). [mã] brief: câu chỉ ghi số
+  sao mà khách không đặt trong ngoặc kép / không điền ở form -> bỏ khỏi texts, prompt tả "a row of N gold rating stars";
+  designer: lệnh có thẻ sao thì bỏ mẩu chữ chỉ ghi số sao. [prompt] cả hai bước: sao là hình, không viết "5 sao" cạnh hàng sao.
+
 ## Lượt chạy server tiếp theo
 
 Cập nhật mã (docs/SERVER.md), khởi động lại máy chủ **và kernel**, rồi:
