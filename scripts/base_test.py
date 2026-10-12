@@ -11,6 +11,9 @@
   %run scripts/base_test.py                      # mọi ca, mọi GPU -> zip < 24 MB, tự tải về
   %run scripts/base_test.py --what erase --only dev2_d09_v0,dev3_g04_v0
   %run scripts/base_test.py --steps 28           # thử ít bước hơn (ra thư mục riêng output/base_test_s28)
+  %run scripts/base_test.py --what erase --why sót --neg "text, letters, numbers, words, typography, captions"
+                                                 # PROMPT ÂM cho bước xoá (chỉ base có): 13 ca sót chữ -> output/base_test_neg
+  %run scripts/base_test.py --what erase --why sót --neg "..." --cfg 6 --tag neg6     # đổi CFG, thư mục riêng theo --tag
   %run scripts/base_test.py --ship-only          # chỉ gói lại kết quả đã có
 Chạy lại sau khi đứt: việc đã có ảnh thì bỏ qua (--force để chạy lại).
 
@@ -60,7 +63,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--what", default="gen,erase", help="gen,erase (phẩy)")
     ap.add_argument("--chain", action="store_true", help="xoá luôn các nháp base vừa vẽ")
     ap.add_argument("--only", default="", help="key, cách nhau dấu phẩy (dev3_p04_v0,dev2_d20_v0)")
+    ap.add_argument("--why", default="", help="chỉ các ca có nhóm lỗi chứa chuỗi này (sót, đổi hình, vỏ, đối chứng)")
     ap.add_argument("--steps", type=int, default=0, help="số bước khử nhiễu (0 = mặc định của base: 50)")
+    ap.add_argument("--neg", default="", help="prompt âm cho bước XOÁ (erase / chain); bước vẽ nháp không dùng")
+    ap.add_argument("--cfg", type=float, default=0, help="CFG (0 = mặc định của base: 4.0)")
+    ap.add_argument("--tag", default="", help="hậu tố thư mục ra (mặc định: neg khi có --neg, cfg<x> khi có --cfg)")
     ap.add_argument("--runs", type=Path, default=ROOT / "output" / "runs", help="nơi máy chủ giữ các lượt chạy (nháp distill)")
     ap.add_argument("--drafts", type=Path, default=ROOT / "output" / "base_test_drafts", help="nháp distill dự phòng: <key>.png")
     ap.add_argument("-o", "--out", type=Path, default=None)
@@ -72,11 +79,12 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     config.load_env()
     C = json.loads(a.cases.read_text(encoding="utf-8"))
-    out = a.out or ROOT / "output" / ("base_test" + (f"_s{a.steps}" if a.steps else ""))
+    tag = a.tag or "_".join(([f"cfg{a.cfg:g}"] if a.cfg else []) + (["neg"] if a.neg else []))
+    out = a.out or ROOT / "output" / ("base_test" + (f"_s{a.steps}" if a.steps else "") + (f"_{tag}" if tag else ""))
     out.mkdir(parents=True, exist_ok=True)
     only = {x.strip() for x in a.only.split(",") if x.strip()}
     what = {x.strip() for x in a.what.split(",")}
-    pick = lambda rows: [c for c in rows if not only or c["key"] in only]   # noqa: E731
+    pick = lambda rows: [c for c in rows if (not only or c["key"] in only) and a.why in c.get("why", "")]   # noqa: E731
 
     def draft_of(c: dict) -> Path | None:
         return next((p for p in (a.runs / c["run_id"] / f"v{c['v']}" / "draft.png", a.drafts / f"{c['key']}.png") if p.is_file()),
@@ -104,7 +112,8 @@ def main(argv: list[str] | None = None) -> int:
     if todo:
         t0 = time.time()
         F = Flux("base", steps=a.steps or None).load()
-        info["flux"] = {**F.info(), "erase_prompt": ERASE_PROMPT}
+        F.cfg = a.cfg or F.cfg
+        info["flux"] = {**F.info(), "erase_prompt": ERASE_PROMPT, "erase_neg": a.neg}
         n = sum(len(u) for u in todo)
         print(f"nạp FLUX base {time.time() - t0:.0f}s ({F.steps} bước, CFG {F.cfg}); {n} việc")
     k = 0
@@ -126,7 +135,7 @@ def main(argv: list[str] | None = None) -> int:
                 else:   # erase: nháp distill; chain: nháp base vừa vẽ
                     src = out / "gen" / f"{c['key']}.png" if kind == "chain" else draft_of(c)
                     draft = np.asarray(Image.open(src).convert("RGB"))
-                    img, rec["register"] = register(draft, F.edit(draft, ERASE_PROMPT, c["seed"]))
+                    img, rec["register"] = register(draft, F.edit(draft, ERASE_PROMPT, c["seed"], neg=a.neg or None))
                 rec["s"] = round(time.time() - t1, 1)
             except Exception as e:
                 print(f"{kind} {c['key']}: LỖI {type(e).__name__}: {str(e)[:300]}")

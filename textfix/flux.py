@@ -131,8 +131,9 @@ class Flux:
         return (torch.cat(toks)[None].to(self.dev_dit, torch.bfloat16), torch.cat(ids)[None].to(self.dev_dit))
 
     # ------------------------------------------------------------------------------------------------ khử nhiễu
-    def _sample(self, ctx, w: int, h: int, seed: int, refs=None) -> np.ndarray:
-        """Euler theo lịch flux2.sampling.get_schedule; CFG (bản base): batch [có prompt, prompt rỗng]."""
+    def _sample(self, ctx, w: int, h: int, seed: int, refs=None, neg: str | None = None) -> np.ndarray:
+        """Euler theo lịch flux2.sampling.get_schedule; CFG (bản base): batch [có prompt, prompt rỗng]. neg: prompt âm thay cho
+        prompt rỗng (chỉ bản có CFG; distill không có nhánh này nên bỏ qua)."""
         import torch
         from flux2.sampling import get_schedule, prc_img
         dev, cfg = self.dev_dit, self.cfg
@@ -145,7 +146,8 @@ class Flux:
         nb = 2 if cfg else 1
         c, c_ids = ctx
         if cfg:
-            c, c_ids = torch.cat([c, self._unc[0]]), torch.cat([c_ids, self._unc[1]])
+            unc = self._encode(neg) if neg else self._unc
+            c, c_ids = torch.cat([c, unc[0]]), torch.cat([c_ids, unc[1]])
         with torch.no_grad():
             for t_curr, t_prev in zip(ts[:-1], ts[1:]):
                 xi, ii = x, x_ids
@@ -163,15 +165,16 @@ class Flux:
         torch.cuda.empty_cache()
         return out
 
-    def generate(self, prompt: str, w: int, h: int, seed: int, refs: list[np.ndarray] | None = None, **_) -> np.ndarray:
+    def generate(self, prompt: str, w: int, h: int, seed: int, refs: list[np.ndarray] | None = None, neg: str | None = None,
+                 **_) -> np.ndarray:
         """B1: nháp. refs: ảnh sản phẩm người dùng tải lên (FLUX.2 nhận nhiều ảnh tham chiếu)."""
-        return self._sample(self._encode(prompt), w, h, seed, self._refs(refs) if refs else None)
+        return self._sample(self._encode(prompt), w, h, seed, self._refs(refs) if refs else None, neg)
 
-    def edit(self, img: np.ndarray, prompt: str, seed: int) -> np.ndarray:
+    def edit(self, img: np.ndarray, prompt: str, seed: int, neg: str | None = None) -> np.ndarray:
         """B2: sửa ảnh theo lời dặn, ảnh vào làm tham chiếu duy nhất; ra cùng cỡ ảnh vào (đã là bội số 16)."""
         H, W = img.shape[:2]
         w, h = W // 16 * 16, H // 16 * 16
-        out = self._sample(self._encode(prompt), w, h, seed, self._refs([img]))
+        out = self._sample(self._encode(prompt), w, h, seed, self._refs([img]), neg)
         if (w, h) != (W, H):
             from PIL import Image
             out = np.asarray(Image.fromarray(out).resize((W, H), Image.LANCZOS))
