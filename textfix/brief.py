@@ -46,7 +46,7 @@ ORIENT = {"1:1": "a square canvas", "4:5": "a portrait (slightly tall) canvas", 
 SYSTEM = """You are the copy planner and prompt engineer of a Vietnamese poster generator built on FLUX.2 by Black Forest Labs.
 Input: the user's poster form (category + filled fields, JSON) and/or a free prompt. Output ONE JSON object with:
 
-0. intent -- "poster" when the user wants words on the image: any quoted string, any filled form field, or a poster / banner / flyer / ad / menu / sign whose content (name, offer, price, date, slogan, ...) the user gave. "image" when the user only wants a picture (photo, illustration, artwork, wallpaper, ...) and gives no words to show. Never "image" when there is any user text to show. Most users are not prompt writers: a short vague prompt ("tạo poster", "làm banner cho quán tôi", "đẹp nhé") next to a filled form is "poster", and it never cancels the form -- every filled form field is still a text.
+0. intent -- "poster" when the user wants words on the image: any quoted string, any filled form field, or a poster / banner / flyer / ad / menu / sign whose content (name, offer, price, date, slogan, ...) the user gave. "image" when the user only wants a picture (photo, illustration, artwork, wallpaper, ...) and gives no words to show. Vietnamese users say "ảnh" for posters too: "ảnh feedback ...", "ảnh quảng cáo ...", "ảnh khuyến mãi / giới thiệu / tuyển dụng / khai trương ...", "banner", "poster", "menu" are POSTERS even with no words given (you write the support copy, see 2); "ảnh một con bò", "cho tôi đứng cạnh con chó" are pictures. Never "image" when there is any user text to show. Most users are not prompt writers: a short vague prompt ("tạo poster", "làm banner cho quán tôi", "đẹp nhé") next to a filled form is "poster", and it never cancels the form -- every filled form field is still a text.
    For "image": texts = [], and prompt_en (and every variant) is a plain FLUX.2 image prompt following the same upsampling guidelines (subject, details, materials, lighting, mood, composition) WITHOUT poster layout and without adding any text; the rules about texts below do not apply.
 
 1. prompt_en -- an English prompt for FLUX.2 that draws the WHOLE poster including its text. Follow the official FLUX.2 prompt-upsampling guidelines:
@@ -66,7 +66,9 @@ Input: the user's poster form (category + filled fields, JSON) and/or a free pro
      "Khách hàng nói gì") -- each <= 5 words except the headline, natural for this business and category, with full diacritics.
      They carry NO facts and NO promises: never a number of any kind, price, discount, gift, "free", date, deadline, phone,
      address, link, name of a person / brand / shop / place, customer quote, rating, statistic, warranty, guarantee or
-     superlative ("số 1", "tốt nhất"). When the user gave no shop / brand name, the poster has none. Do not repeat what a user
+     superlative ("số 1", "tốt nhất"). Always Vietnamese ("Khai trương", never "Grand Opening"). A call-to-action never
+     points to a contact the user did not give (no "Gọi điện đặt bàn" without a phone number: use "Ghé quán hôm nay").
+     When the user gave no shop / brand name, the poster has none. Do not repeat what a user
      text already says. Only for intent "poster"; when the user's texts already make a complete poster, add none.
    - Prompt and form disagree (a different value for the same thing: discount 20% in the form, "GIẢM 30%" in the prompt; another
      headline): the PROMPT wins -- use the prompt's text, leave that form value out of texts and prompt_en, and put the form field
@@ -136,6 +138,10 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
     sources = [_norm(prompt or "")] + [_norm(v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)) for k, v in form.items()
                                        if k != "category"]
     must = list(dict.fromkeys(QUOTED.findall(prompt or "") + CURLY.findall(prompt or "")))
+    # giá trị khách (ô form, chuỗi trong ngoặc kép của prompt), dài trước: để nhận câu LLM ghép / bọc các giá trị đó
+    vals = sorted({_norm(str(x)) for k, v in form.items() if k != "category" for x in (v if isinstance(v, list) else [v])}
+                  | {_norm(q) for q in must}, key=len, reverse=True)
+    vals = [v for v in vals if len(v) >= 3]
     out, log, seen = [], {"dropped": [], "added": []}, set()
     # PROMPT THẮNG (09/10, d23): trường form mà prompt ghi giá trị khác -> bỏ giá trị form khỏi câu khách, không thêm lại
     over = {k for k in raw.get("overridden") or [] if k in form and k != "category"} if prompt else set()
@@ -151,15 +157,26 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
         # không nguyên văn từ người dùng -> bỏ (không bịa chữ); so không phân biệt hoa / thường (08/10: "Khai trương cửa hàng ..."
         # viết hoa chữ đầu, prompt khách viết thường -> bị bỏ oan, tiêu đề mất khỏi câu khách -> VLM chép chữ nháp "TRƯỞNG")
         if not any(text.casefold() in s.casefold() for s in sources):
-            # không phải chữ khách: chỉ giữ khi LLM khai là chữ phụ trợ và không chứa sự thật / cam kết nào (xem AI_BAN)
-            why = _ai_reject(text, t, sum(1 for o in out if o.get("source") == "ai"))
+            role = t.get("role") if t.get("role") in ROLES else "body"
+            rest = _strip_values(text, vals)
+            # GHÉP các giá trị khách bằng dấu nối ("20/10 - 31/10" từ hai ô ngày, form1 f02: bị bỏ, hai ngày rời không lên poster):
+            # bỏ hết giá trị khách mà không còn chữ / số nào -> vẫn là chữ khách
+            if rest is not None and not any(ch.isalnum() for ch in rest):
+                seen.add(text)
+                out.append({"text": text, "role": role, "source": "user"})
+                log.setdefault("joined", []).append(text)
+                continue
+            # không phải chữ khách: chỉ giữ khi LLM khai là chữ phụ trợ và phần LLM viết không chứa sự thật / cam kết nào (AI_BAN)
+            why = _ai_reject(text if rest is None else rest, t, sum(1 for o in out if o.get("source") == "ai"), len(text))
             if why:
                 log["dropped"].append(text)
                 log.setdefault("ai_rejected", []).append(f"{text} ({why})")
                 continue
             seen.add(text)
-            out.append({"text": text, "role": t.get("role") if t.get("role") in ROLES else "body", "source": "ai"})
-            log.setdefault("ai_added", []).append(text)
+            # câu phụ trợ BỌC một giá trị khách ("Tuyển dụng Nhân viên bán hàng", f12): sự thật nằm trong đó -> giữ như chữ khách
+            # (designer không được rút gọn / bỏ)
+            out.append({"text": text, "role": role, "source": "ai" if rest is None else "user"})
+            log.setdefault("ai_added" if rest is None else "ai_wraps_user", []).append(text)
             continue
         seen.add(text)
         out.append({"text": text, "role": t.get("role") if t.get("role") in ROLES else "body", "source": "user"})
@@ -269,13 +286,22 @@ def _requote(pe: str, texts: list[dict]) -> str:
     return QUOTED.sub(lambda m: '"' + by.get(_norm(m.group(1)).casefold(), m.group(1)) + '"', pe)
 
 
-def _ai_reject(text: str, t: dict, n_have: int) -> str | None:
-    """Câu LLM tự viết có được giữ làm chữ phụ trợ không. -> lý do bỏ, hoặc None (giữ)."""
+def _strip_values(text: str, vals: list[str]) -> str | None:
+    """Bỏ các giá trị khách (không phân biệt hoa thường) khỏi câu -> phần còn lại; None nếu câu không chứa giá trị nào."""
+    rest, hit = text, False
+    for v in vals:
+        r2 = re.sub(re.escape(v), " ", rest, flags=re.I)
+        hit, rest = hit or r2 != rest, r2
+    return rest if hit else None
+
+
+def _ai_reject(text: str, t: dict, n_have: int, full_len: int | None = None) -> str | None:
+    """Câu (hoặc phần LLM tự viết của câu) có được giữ làm chữ phụ trợ không. -> lý do bỏ, hoặc None (giữ)."""
     if t.get("source") != "ai":
         return "không nguyên văn của khách"
     if n_have >= AI_MAX:
         return f"quá {AI_MAX} câu phụ trợ"
-    if len(text) > AI_MAX_CHARS:
+    if len(text.strip()) > AI_MAX_CHARS or (full_len or 0) > 2 * AI_MAX_CHARS:
         return "dài"
     if AI_BAN.search(text):
         return "có số / tiền / liên kết"

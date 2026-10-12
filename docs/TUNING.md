@@ -346,6 +346,23 @@ Yêu cầu không chữ nào ("tạo poster quảng cáo quán của tôi") ra �
   sao mà khách không đặt trong ngoặc kép / không điền ở form -> bỏ khỏi texts, prompt tả "a row of N gold rating stars";
   designer: lệnh có thẻ sao thì bỏ mẩu chữ chỉ ghi số sao. [prompt] cả hai bước: sao là hình, không viết "5 sao" cạnh hàng sao.
 
+### 12/10 tối: bộ form1 (22 ca người dùng điền form), LLM / VLM thật
+
+22 / 22 chạy xong. Bước brief: 2 ca ảnh thường đúng là ảnh; "Điểm nổi bật" tách đúng ở 4 / 4 ca ("1,5 lít" không bị tách);
+LLM viết chữ phụ trợ ở 11 / 20 ca poster, không câu nào mang số / giá / tên bịa; chữ không dấu của khách giữ nguyên.
+- f17 "tạo cho tôi ảnh feedback dịch vụ tiếng anh" bị coi là ảnh thường (nháp có bong bóng chữ loạn, không ai sửa).
+  [prompt] người Việt gọi poster là "ảnh": "ảnh feedback / quảng cáo / khuyến mãi...", banner, menu = poster.
+- f02: LLM ghép hai ô ngày thành "20/10 - 31/10" -> bị bỏ (không nguyên văn), hai ngày rời không lên poster. [mã] câu chỉ
+  gồm các giá trị khách nối bằng dấu -> là chữ khách. f12: câu phụ trợ bọc giá trị khách ("Tuyển dụng Nhân viên bán hàng")
+  -> giữ, đánh dấu như chữ khách (designer không được rút gọn); phần LLM viết vẫn qua bộ chặn.
+- f07 "Grand Opening" (tiếng Anh), f16 "GỌI ĐIỆN THOẠI ĐẶT BÀN" khi khách không cho số. [prompt] chữ phụ trợ luôn tiếng Việt,
+  nút kêu gọi không trỏ tới liên hệ khách không cho.
+- f09: câu trích 85 ký tự co còn 0.32 (12 px). [mã] LỖI DỰNG CHUNG: html là chữ trần lẫn span ('chữ <span>đậm</span> chữ')
+  đặt thẳng vào khung flex -> mỗi mẩu thành một cột xếp ngang. Có chữ trần ở cấp ngoài thì bọc một span. Dựng lại f09: 32 px.
+  120 plan cũ dựng lại: tổng lỗi không đổi.
+- Chưa sửa: f16 tiêu đề co 0.54 (VLM chèn một dòng trống đầu lệnh); f15 khách cho 6 bước, nháp vẽ 5 hàng đánh số 1 2 3 5
+  (giới hạn model vẽ); f11 tên gói dịch vụ không có chỗ trên nháp.
+
 ## Lượt chạy server tiếp theo
 
 Cập nhật mã (docs/SERVER.md), khởi động lại máy chủ **và kernel**, rồi:

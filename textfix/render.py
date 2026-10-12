@@ -245,6 +245,15 @@ async (o) => {
                           `width:${e.box[2] - e.box[0]}px;height:${e.box[3] - e.box[1]}px;`) + (e.style || '');
     d.innerHTML = e.html;
     if (e.cls) d.className = e.cls;
+    // CHỮ TRẦN LẪN THẺ ngay trong khung (12/10 form1 f09: câu trích 'chữ <span>đậm</span> chữ <span>đậm</span> chữ' không bọc
+    // thẻ nào): khung là flex nên mỗi mẩu chữ / mỗi span thành một CỘT xếp ngang -> tràn, co còn 0.32. Có mẩu chữ trần ở cấp
+    // ngoài = nội dung chảy theo dòng -> bọc một span (một con flex). Bố cục cột thật (các span, không chữ trần) giữ nguyên.
+    if (d.childNodes.length > 1 && [...d.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) &&
+        ![...d.children].some(x => /flex/.test(x.getAttribute('style') || ''))) {
+      const w = document.createElement('span');
+      while (d.firstChild) w.appendChild(d.firstChild);
+      d.appendChild(w);
+    }
     // CỘT FLEX trong thẻ font: VLM viết <i-font><span style="flex:1">tên</span><span style="flex:0 0 30%">giá</span></i-font> --
     // span bọc font (inline) là con flex duy nhất, tên và giá dính liền "Bún bò tái40.000đ" (09/10 dev2 d05) -> bọc font
     // display:contents, các span flex thành con flex thật của khung (vẫn thừa hưởng font)
