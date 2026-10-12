@@ -260,6 +260,10 @@ khai nhóm đúng (`group`) nhưng mã chỉ coi là gợi ý (lề chỉ căn k
   ký hiệu đầu dòng: nền còn thì chỉ viết chữ, nền mất và không có ô I thì tự viết ("•" / `<i-icon>`). LLM brief + mã: mục
   `list_item` viết hoa chữ đầu (cả trong ngoặc kép của prompt FLUX). Groq miễn phí không chạy được lời dặn designer (17k token
   một lượt, giới hạn 7k / phút) -> phải đo trên server.
+- [code, phòng thủ] nhóm VLM khai GIỐNG HỆT: ngoài cỡ + lề còn một font / độ đậm / màu / nghiêng / giãn chữ / hoa-thường (giá
+  trị nhiều dòng dùng nhất, CSS cưỡng), cỡ bằng nhau tuyệt đối (bỏ dung sai 3%). Lý do: VLM viết từng dòng riêng, cùng `group`
+  mà ghi đậm 400 / 300 / 400, cỡ 28 / 29 / 27 (lượt 08aa). 120 plan dựng lại: lỗi không đổi so với bước B (0 poster xấu đi).
+  [prompt] designer phải tự viết mọi lệnh của một nhóm y hệt nhau (cùng font, đậm, cỡ, màu) -- mã chỉ là lưới đỡ.
 - Còn thấy: chấm đầu dòng bị bản xoá xoá mà không thành ô I (85be, 7229) -- chờ lời dặn mới; đoạn văn trong thẻ (08aa) vẫn nhỏ
   vì câu khách dài hơn chỗ nháp vẽ (người dùng chấp nhận co trong khung).
 - Tắt nhóm-là-lệnh: `TEXTFIX_GROUP_FRAME=0`. Công cụ: `scripts/replay_plans.py` (mặc định dựng bằng khung OCR; `RRBOX=snap` =

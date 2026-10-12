@@ -21,8 +21,8 @@ OVERLAP = 0.1   # chồng nhau > 10% diện tích phần tử nhỏ hơn = lỗi
 CONDENSE = 0.85   # chữ dài hơn ô theo chiều ngang: nén ngang (scaleX) tới 0.85 TRƯỚC khi co cỡ -- chữ giữ chiều cao như nháp
 ROT_MIN = 2.0   # độ: dòng model vẽ nghiêng >= 2 độ thì dựng nghiêng đúng góc đó (dưới 2 độ là nhiễu đo của OCR)
 PARA_WORDS = 10   # đoạn văn: >= 10 chữ trên >= 3 dòng nháp -> tự ngắt dòng
-# NHÓM VLM KHAI = LỆNH (12/10): các lệnh chữ cùng "group" là một khối -- một cỡ chữ, một lề (group_kind "list": các mục riêng;
-# "flow": một ý nháp cắt thành nhiều dòng -> thêm một font / độ đậm / màu); một dòng phải co thì cả nhóm co theo.
+# NHÓM VLM KHAI = LỆNH (12/10): các lệnh chữ cùng "group" là một khối, chữ GIỐNG HỆT nhau -- một cỡ, một font / độ đậm / màu,
+# một lề (group_kind "list": các mục riêng; "flow": một ý nháp cắt thành nhiều dòng); một dòng phải co thì cả nhóm co theo.
 # TEXTFIX_GROUP_FRAME=0: tắt (nhãn nhóm chỉ còn là gợi ý cân cỡ như trước)
 GROUP_FRAME = os.environ.get("TEXTFIX_GROUP_FRAME", "1") != "0"
 LH_ACCENT = 1.15   # line-height tối thiểu khi dòng sau có chữ hoa mang dấu trên (dấu không đâm vào dòng trên)
@@ -344,7 +344,7 @@ async (o) => {
     const fsn = parseFloat(d.style.fontSize) || 0;
     const it = e.angle ? 0 : Math.min(pad.top * fsn, (q.bottom - q.top) / 3), ib = e.angle ? 0 : Math.min(pad.bot * fsn, (q.bottom - q.top) / 3);
     // MÀU CHỮ thật (màu tính được của phần tử chứa nhiều chữ nhất) + có hiệu ứng tách nền không (bóng / viền / chữ tô gradient)
-    let fg = null, fx = false, best = 0, fs = null, ff = null, fw = null;
+    let fg = null, fx = false, best = 0, fs = null, ff = null, fw = null, fi = null, ls = null, tt = null;
     const runs = [];   // từng đoạn chữ (màu / hiệu ứng riêng): khối hai màu -- "Giảm" trắng + "40%" cam trên nền đỏ (09/10 dev2 d11)
     const tw = document.createTreeWalker(d, NodeFilter.SHOW_TEXT);
     for (let t = tw.nextNode(); t; t = tw.nextNode()) {
@@ -352,7 +352,8 @@ async (o) => {
       const tfx = cs.textShadow !== 'none' || parseFloat(cs.webkitTextStrokeWidth) > 0 || cs.backgroundClip === 'text' ||
           cs.webkitBackgroundClip === 'text';
       if (tfx) fx = true;
-      if (n > best) { best = n; fg = cs.webkitTextFillColor || cs.color; fs = parseFloat(cs.fontSize); ff = cs.fontFamily; fw = parseInt(cs.fontWeight); }
+      if (n > best) { best = n; fg = cs.webkitTextFillColor || cs.color; fs = parseFloat(cs.fontSize); ff = cs.fontFamily; fw = parseInt(cs.fontWeight);
+                      fi = cs.fontStyle; ls = cs.letterSpacing; tt = cs.textTransform; }
       if (n >= 2) {
         const rg = document.createRange(); rg.selectNodeContents(t);
         const rc = rg.getBoundingClientRect();
@@ -360,7 +361,7 @@ async (o) => {
                    ink: [rc.left - R0.left, rc.top - R0.top, rc.right - R0.left, rc.bottom - R0.top]});
       }
     }
-    out.push({id: e.id, size: s, shrink: e.size ? s / e.size : 1, over: m.v, o0, fg, fx, fs, ff, fw, sx: +sx.toFixed(2), ink0, angle: e.angle, runs,
+    out.push({id: e.id, size: s, shrink: e.size ? s / e.size : 1, over: m.v, o0, fg, fx, fs, ff, fw, fi, ls, tt, sx: +sx.toFixed(2), ink0, angle: e.angle, runs,
               ink: [q.left - R0.left, q.top - R0.top + it, q.right - R0.left, q.bottom - R0.top - ib],
               box: [b.left - R0.left, b.top - R0.top, b.right - R0.left, b.bottom - R0.top]});
   }
@@ -504,7 +505,7 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         g = [i for i in g if fs.get(i)]
         lo = min((fs[i] for i in g), default=0)
         for i in g:
-            if fs[i] > lo * 1.03:
+            if fs[i] > lo + 0.05:   # GIỐNG HỆT: không dung sai (nhóm code đoán bên dưới vẫn dung sai 3%)
                 by_el[i]["size"], by_el[i]["fit"], by_el[i]["even"] = by_res[i]["size"] * lo / fs[i], "none", True
                 changed.append(i)
     for g in _role_groups(P, M, res):
@@ -703,7 +704,7 @@ def _group_frames(P: dict, M: dict, els: list[dict], res: list, W: int) -> tuple
       lề    = "align" VLM khai (thiếu: căn lề CSS của lệnh đầu); nhóm xếp CỘT: mép đó của mọi dòng đặt ở TRUNG VỊ mép các khung
               OCR (một khung OCR lệch / nuốt chấm đầu dòng không kéo được trung vị), bề ngang = hình bao của nhóm -- KHÔNG ra
               ngoài vỏ chứa dòng, không lấn phần tử khác cùng hàng. Nhóm xếp hàng / lưới: giữ khung, chỉ chung cỡ;
-      flow  = thêm font, độ đậm, màu của lệnh đầu cho cả nhóm (CSS cưỡng).
+      kiểu  = MỘT font / độ đậm / màu / nghiêng / giãn chữ cho cả nhóm, list lẫn flow (giá trị nhiều dòng dùng nhất; CSS cưỡng).
     Sửa els tại chỗ. -> (nhật ký, luật CSS thêm)."""
     by_el, by_res, log, css = {e["id"]: e for e in els}, {r["id"]: r for r in res}, [], []
     cssal = lambda e: ("left" if re.search(r"justify-content\s*:\s*(flex-)?start", e["style"] or "") else   # noqa: E731
@@ -745,14 +746,20 @@ def _group_frames(P: dict, M: dict, els: list[dict], res: list, W: int) -> tuple
                 b[0], b[2] = max(b[0], lo), min(b[2], hi)
                 e["style"] = (e["style"] or "") + ";" + CSS[al]
             e["box"], e["size"] = b, size
-        if kind == "flow":   # một ý: kiểu chữ của lệnh đầu cho cả nhóm
-            r0 = by_res.get(E[0]["id"]) or {}
-            if r0.get("ff"):
-                for e in E[1:]:
-                    cls = f"gf{len(css)}"
-                    e["cls"] = f"{e['cls']} {cls}" if e.get("cls") else cls
-                    css.append(f"#c>.{cls},#c>.{cls} *{{font-family:{r0['ff']}!important;font-weight:{r0.get('fw') or 400}!important;"
-                               + (f"color:{r0['fg']}!important;-webkit-text-fill-color:{r0['fg']}!important;" if r0.get("fg") else "") + "}")
+        # MỘT KIỂU CHỮ cho cả nhóm (list lẫn flow): VLM viết từng dòng riêng nên hay lệch nhẹ -- dòng đậm 400, dòng 300; cỡ 27 /
+        # 28 / 29 (12/10 lượt 08aa). Kiểu = giá trị NHIỀU DÒNG DÙNG NHẤT của font, độ đậm, màu, nghiêng, giãn chữ, hoa / thường
+        # (bằng nhau thì lấy dòng đầu), cưỡng bằng CSS cho mọi dòng và mọi phần tử bên trong.
+        R = [by_res[e["id"]] for e in E if by_res.get(e["id"], {}).get("ff")]
+        if R:
+            mode = lambda k: max((r.get(k) for r in R), key=lambda v: (sum(r.get(k) == v for r in R), -[r.get(k) for r in R].index(v)))  # noqa: E731
+            ff, fw, fg, fi, ls, tt = (mode(k) for k in ("ff", "fw", "fg", "fi", "ls", "tt"))
+            rule = (f"font-family:{ff}!important;font-weight:{fw or 400}!important;font-style:{fi or 'normal'}!important;"
+                    f"letter-spacing:{ls or 'normal'}!important;text-transform:{tt or 'none'}!important;"
+                    + (f"color:{fg}!important;-webkit-text-fill-color:{fg}!important;" if fg else ""))
+            cls = f"gf{len(css)}"
+            for e in E:
+                e["cls"] = f"{e['cls']} {cls}" if e.get("cls") else cls
+            css.append(f"#c>.{cls},#c>.{cls} *{{{rule}}}")
         log.append(f"nhóm '{name}' ({kind}, {al if col else 'hàng / lưới: giữ khung'}) {[e['id'] for e in E]} -> cỡ {size:.0f}px")
     return log, css
 

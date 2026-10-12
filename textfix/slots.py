@@ -382,7 +382,7 @@ colors -- a call-to-action must never end up as bare text. Only then: a line ins
 - Size: write every line at the size measured for its slot; fine print, labels and footers too -- never smaller "to be safe". \
 If a text does not fit, shorten it (facts stay exact) rather than shrinking it.
 - Lists: keep the draft's list structure -- one item per row, each row keeps its own text next to its bullet / check / icon; \
-never merge list rows into one block and never leave a bullet or icon without its text. Every list row (bullet / feature / step) starts with a capital letter, and all rows of one list carry the same "group" name.
+never merge list rows into one block and never leave a bullet or icon without its text. Every list row (bullet / feature / step) starts with a capital letter, and all rows of one list carry the same "group" name with "group_kind": "list".
 - Row marks: when the draft shows a bullet / check / small icon in front of a row, look at the BASE image. Mark still there \
 -> write only the text. Mark erased and no I# slot for it -> draw it yourself at the start of that row's html ("• " or an \
 <i-icon>), the same mark on every row of the group.
@@ -398,10 +398,12 @@ next small. Left-aligned columns: "justify-content:flex-start; text-align:left" 
 - GROUPS -- you decide, the renderer obeys. Slots that belong together get the same "group" name on their ops (e.g. \
 "benefits", "menu-names", "menu-prices", "badges", "headline"), with the same "group_kind" and "align" on every op of the group:
   * "group_kind": "list" -- separate items of one list / menu / feature set / step set / badge set, one item per row. The \
-renderer puts every row on ONE margin and draws all rows at ONE size (the size that fits the longest row).
+renderer puts every row on ONE margin and draws all rows exactly alike: ONE size (the size that fits the longest row), font, weight and color.
   * "group_kind": "flow" -- ONE sentence or phrase that the draft broke over several lines and that you did not merge into a \
-single op (a two-line headline, a paragraph). The renderer draws all its lines at ONE size, font, weight and color.
+single op (a two-line headline, a paragraph). The renderer draws all its lines exactly alike: ONE size, font, weight and color.
   * "align": "left" | "center" | "right" -- how the draft aligned the lines of the group.
+  Write every op of a group IDENTICALLY yourself: the same font key, the same weight, the same size, the same color, the same \
+case and letter-spacing in html / box_style -- copy the first op's styling to the others and change only the words.
   Every list and every multi-line sentence that is not one merged op MUST be a group. Lines the draft deliberately drew \
 different (a huge "FLASH SALE" over a small tagline, a big price next to its small unit) are NOT a group: "group": null.
 - More rows than items: the image model sometimes drew more list rows or bullets than there are client items. A long item \
