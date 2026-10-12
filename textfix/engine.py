@@ -106,7 +106,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     draft, plate, cinfo, T = d["draft"], d["plate"], d["cinfo"], dict(d["timing"])
     t0 = time.time()
     progress("đo ô (OCR + lớp phủ)")
-    M = slots.build(draft, plate)
+    M = slots.build(draft, plate, product=product)
     T["o"] = time.time() - t0
     t0 = time.time()
     progress("VLM thiết kế")
@@ -114,7 +114,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
                              product=product)
     if cinfo["lines"]:
         log.insert(0, f"dọn chữ sót: inpaint {cinfo['inpaint']}, FLUX vùng cắt {cinfo['reerase']}")
-    log[:0] = [g for g in M.get("geo_log") or [] if g.startswith("vỏ giả")]
+    log[:0] = list(M.get("geo_log") or [])   # vỏ giả, vùng chữ của bộ dò, ô chữ cong, dòng OCR sót
     T["vlm"] = time.time() - t0
     t0 = time.time()
     progress("dựng + kiểm")

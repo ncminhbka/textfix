@@ -112,6 +112,39 @@ def _geom(op: dict, M: dict) -> dict | None:
             "aabb": [max(0.0, min(xs)), max(0.0, min(ys)), min(float(W), max(xs)), min(float(H), max(ys))]}
 
 
+def path_of(op: dict, M: dict) -> list | None:
+    """Đường chân của lệnh chữ viết vào MỘT ô cung / lượn (textfix/geo.py) -> các điểm, hướng đọc trái -> phải; lệnh thường: None.
+    Lệnh gộp ô cung với ô khác: dựng như lệnh thường (không đoán đường cho nhiều dòng)."""
+    if op.get("kind") != "text":
+        return None
+    lm = [m for m in op.get("marks") or [] if m.startswith("L") and m in M["by"]]
+    if len(lm) != 1 or len(lm) != len(op.get("marks") or []):
+        return None
+    pt = M["by"][lm[0]].get("path")
+    return pt if pt and len(pt) >= 2 else None
+
+
+def _path_polys(path: list, size: float) -> list:
+    """Dải chữ dọc đường chân: mỗi khúc một tứ giác lồi (chân chữ -> đỉnh chữ hoa, phía trên của hướng đọc)."""
+    out, hh = [], 0.8 * size
+    for (ax, ay), (bx, by) in zip(path[:-1], path[1:]):
+        dx, dy = bx - ax, by - ay
+        ln = float(np.hypot(dx, dy)) or 1.0
+        nx, ny = dy / ln, -dx / ln
+        out.append([[ax, ay], [bx, by], [bx + nx * hh, by + ny * hh], [ax + nx * hh, ay + ny * hh]])
+    return out
+
+
+def _multi_ov(A: list, B: list) -> float:
+    """Phần giao hai HỢP đa giác lồi (chữ theo đường = nhiều khúc) / diện tích hợp nhỏ hơn."""
+    import cv2
+    pa, pb = [np.asarray(x, np.float32) for x in A], [np.asarray(x, np.float32) for x in B]
+    sm = min(sum(abs(cv2.contourArea(x)) for x in pa), sum(abs(cv2.contourArea(x)) for x in pb))
+    if sm <= 0:
+        return 0.0
+    return float(sum(cv2.intersectConvexConvex(x, y)[0] for x in pa for y in pb)) / sm
+
+
 def op_box(op: dict, M: dict) -> list[float] | None:
     """Khung thẳng ôm khung dựng của lệnh (để kiểm, cắt ảnh lỗi, vẽ debug)."""
     g = op_geom(op, M)
@@ -238,6 +271,72 @@ async (o) => {
   await document.fonts.ready;
   const out = [];
   for (const e of o.els) {
+    // CHỮ THEO ĐƯỜNG (ô cung / lượn của textfix/geo.py: e.path = các điểm ĐƯỜNG CHÂN, hướng đọc trái -> phải): dựng bằng SVG
+    // textPath, chữ căn giữa đường. Kiểu chữ lấy từ chính lệnh của VLM (đo trên một khối ẩn), như mọi lệnh khác. Chữ dài hơn
+    // đường: nén ngang tới o.condense rồi mới co cỡ -- cùng thứ tự với dòng thẳng.
+    if (e.path && e.path.length >= 2) {
+      const c0 = document.getElementById('c'), R0 = c0.getBoundingClientRect();
+      const h = document.createElement('div');
+      h.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;line-height:1.15;font-family:${e.font};color:${e.color};` +
+                        `font-size:${e.size}px;` + (e.style || '');
+      h.innerHTML = e.html;
+      c0.appendChild(h);
+      let el = h, best = 0;
+      const wk = document.createTreeWalker(h, NodeFilter.SHOW_TEXT);
+      for (let n = wk.nextNode(); n; n = wk.nextNode()) { const k = n.textContent.trim().length; if (k > best) { best = k; el = n.parentElement; } }
+      const cs = getComputedStyle(el);
+      let txt = h.textContent.replace(/\s+/g, ' ').trim();
+      if (cs.textTransform === 'uppercase') txt = txt.toUpperCase(); else if (cs.textTransform === 'lowercase') txt = txt.toLowerCase();
+      // chữ tô dải màu (background-clip:text, ruột chữ trong suốt): SVG không tô được nền vào chữ -> lấy màu chữ của lệnh / màu đo
+      const clear = v => !v || v === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(v);
+      const grad = /text/.test(cs.webkitBackgroundClip || cs.backgroundClip || '') ? (cs.backgroundImage.match(/rgba?\([^)]*\)/) || [])[0] : null;
+      const fill = [cs.webkitTextFillColor, grad, cs.color, e.color].find(v => !clear(v)) || '#111';
+      const sty = {ff: cs.fontFamily, fw: cs.fontWeight, fi: cs.fontStyle, fg: fill, ls: cs.letterSpacing,
+                   sw: parseFloat(cs.webkitTextStrokeWidth) || 0, sc: cs.webkitTextStrokeColor, sh: cs.textShadow,
+                   k: (parseFloat(cs.fontSize) || e.size) / e.size};
+      h.remove();
+      const NS = 'http://www.w3.org/2000/svg', mk = t => document.createElementNS(NS, t);
+      const svg = mk('svg'), p = mk('path'), t = mk('text'), tp = mk('textPath');
+      svg.setAttribute('width', R0.width); svg.setAttribute('height', R0.height);
+      svg.setAttribute('viewBox', `0 0 ${R0.width} ${R0.height}`);
+      svg.style.cssText = 'position:absolute;left:0;top:0;overflow:visible;pointer-events:none';
+      if (e.cls) svg.setAttribute('class', e.cls);
+      p.setAttribute('id', 'tp_' + e.id); p.setAttribute('fill', 'none');
+      p.setAttribute('d', 'M' + e.path.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L'));
+      let s = e.size * sty.k;
+      t.style.cssText = `font-family:${sty.ff};font-weight:${sty.fw};font-style:${sty.fi};font-size:${s}px;fill:${sty.fg};` +
+                        `letter-spacing:${sty.ls};` + (sty.sh && sty.sh !== 'none' ? `text-shadow:${sty.sh};` : '') +
+                        (sty.sw > 0 ? `stroke:${sty.sc};stroke-width:${sty.sw}px;stroke-linejoin:round;` +
+                                      (/stroke/.test(cs.paintOrder || '') ? `paint-order:${cs.paintOrder};` : '') : '');   // như -webkit-text-stroke
+      tp.setAttribute('href', '#tp_' + e.id); tp.setAttribute('startOffset', '50%'); tp.setAttribute('text-anchor', 'middle');
+      tp.textContent = txt;
+      t.appendChild(tp); svg.appendChild(p); svg.appendChild(t); c0.appendChild(svg);
+      const span = p.getTotalLength();
+      let w = t.getComputedTextLength(), sx = 1, k = 0;
+      const w0 = w;
+      if (w > span) {   // nén ngang (giãn chữ + nét) rồi mới co cỡ
+        sx = Math.max(e.condense || o.condense, span / w);
+        tp.setAttribute('lengthAdjust', 'spacingAndGlyphs'); tp.setAttribute('textLength', (w * sx).toFixed(1));
+        while (w * sx > span + 1 && s > o.floor && k < 80) {
+          s *= 0.95; t.style.fontSize = s + 'px'; tp.removeAttribute('textLength'); w = t.getComputedTextLength();
+          tp.setAttribute('textLength', (w * sx).toFixed(1)); k++;
+        }
+      }
+      const used = w * sx, a0 = Math.max(0, (span - used) / 2), N = 8, polys = [];
+      // nét mực = dải chữ dọc đường (từng khúc là một tứ giác lồi: chân chữ -> đỉnh chữ hoa, phía "trên" của hướng đọc)
+      for (let i = 0; i < N; i++) {
+        const u0 = a0 + used * i / N, u1 = a0 + used * (i + 1) / N;
+        const A = p.getPointAtLength(u0), B = p.getPointAtLength(u1);
+        const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy) || 1, nx = dy / L, ny = -dx / L, hh = 0.8 * s;
+        polys.push([[A.x, A.y], [B.x, B.y], [B.x + nx * hh, B.y + ny * hh], [A.x + nx * hh, A.y + ny * hh]]);
+      }
+      const xs = polys.flat().map(q => q[0]), ys = polys.flat().map(q => q[1]);
+      const bb = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+      out.push({id: e.id, size: s / sty.k, shrink: e.size ? s / sty.k / e.size : 1, over: Math.max(0, used - span - 1), o0: [Math.max(0, w0 - span), 0],
+                fg: sty.fg, fx: sty.sw > 0 || (sty.sh && sty.sh !== 'none'), fs: s, ff: sty.ff, fw: parseInt(sty.fw), fi: sty.fi, ls: sty.ls,
+                tt: cs.textTransform, sx: +sx.toFixed(2), ink0: null, angle: 0, runs: [], path: true, polys, ink: bb, box: bb});
+      continue;
+    }
     const d = document.createElement('div');
     d.style.cssText = `position:absolute;left:${e.box[0]}px;top:${e.box[1]}px;box-sizing:border-box;display:flex;align-items:center;` +
       `justify-content:center;text-align:center;line-height:1.15;font-synthesis:style;font-family:${e.font};color:${e.color};font-size:${e.size}px;` +
@@ -490,7 +589,8 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         els.append({"id": op["id"], "box": b, "html": h, "style": bs, "size": size, "color": color, "font": family(fam),
                     "fit": fix.get("fit") or op.get("fit") or "shrink", "angle": g["angle"], "cls": cls,
                     "condense": fix.get("condense"), "icon": op.get("kind") == "icon" and bool(mk)
-                    and all(m.startswith("I") for m in mk), "iset": op.get("icon_set"), "nl": len(lm), "hfit": single})
+                    and all(m.startswith("I") for m in mk), "iset": op.get("icon_set"), "nl": len(lm), "hfit": single,
+                    "path": path_of(op, M)})
     log += _align_left(els) + _even_icons(els)
     page.set_viewport_size({"width": W, "height": H})
     page_html = lambda: (   # noqa: E731
@@ -723,7 +823,8 @@ def declared_groups(P: dict, els: list[dict]) -> dict:
     # nhóm có dòng NGHIÊNG, hoặc có lệnh viết chữ vào ô chi tiết I (dev3 g01_v0: VLM gom 15 mẩu chữ của một tiêu đề cung, mỗi mẩu
     # một ô I, thành nhóm "arc") không phải danh sách / câu xuống dòng của các DÒNG chữ: ép một cỡ / một lề làm vỡ -> bỏ cả nhóm
     line = lambda o: any(m.startswith("L") for m in o.get("marks") or [])   # noqa: E731
-    return {k: v for k, v in G.items() if len(v) >= 2 and all(line(o) and not by_el[o["id"]]["angle"] for o in v)}
+    return {k: v for k, v in G.items()
+            if len(v) >= 2 and all(line(o) and not by_el[o["id"]]["angle"] and not by_el[o["id"]].get("path") for o in v)}
 
 
 def _group_frames(P: dict, M: dict, els: list[dict], res: list, W: int) -> tuple[list[str], list[str]]:
@@ -796,7 +897,7 @@ def _align_left(els: list[dict]) -> list[str]:
     """Cột căn trái (các mục của một danh sách / thực đơn): khung OCR mỗi dòng thò thụt vài px -> dựng ra mép trái lởm chởm
     (08/10 r01, h02). Dòng căn trái, cùng cỡ (+-25%), mép trái lệch <= 0.6 cỡ, cách nhau <= 3 cỡ theo chiều dọc = một cột:
     mép trái cả cột = mép trái nhỏ nhất (khung chỉ nới sang trái, không đổi ô đo)."""
-    L = [e for e in els if not e["angle"] and re.search(r"justify-content\s*:\s*(flex-)?start", e["style"] or "")]
+    L = [e for e in els if not e["angle"] and not e.get("path") and re.search(r"justify-content\s*:\s*(flex-)?start", e["style"] or "")]
     par = list(range(len(L)))
 
     def root(i):
@@ -871,7 +972,12 @@ def check(P: dict, M: dict, res: list | None = None, shrink_min: float | None = 
             seen.setdefault(m, op["id"])
     geoms = {op["id"]: op_geom(op, M) for op in draw}
     boxes = {i: (g["aabb"] if g else None) for i, g in geoms.items()}
-    polys = {i: (g["poly"] if g else None) for i, g in geoms.items()}
+    polys = {i: ([g["poly"]] if g else None) for i, g in geoms.items()}
+    for op in draw:   # lệnh chữ theo đường: khung thẳng ôm cả cung phủ lên thứ nằm dưới vòm -> dùng dải chữ dọc đường
+        pt = path_of(op, M)
+        if pt:
+            lm = M["by"][next(m for m in op["marks"] if m.startswith("L"))]
+            polys[op["id"]] = _path_polys(pt, lm.get("size") or 1.0)
     kinds = {op["id"]: op.get("kind") for op in draw}
     pairs = set()
     for i, a in enumerate(draw):
@@ -880,7 +986,7 @@ def check(P: dict, M: dict, res: list | None = None, shrink_min: float | None = 
             if not ba or not bb:
                 continue
             # phần tử nằm gọn trong một VỎ (shape / group) không phải lỗi: vỏ chứa chữ / icon là bình thường
-            o = _poly_ov(polys[a["id"]], polys[b["id"]])
+            o = _multi_ov(polys[a["id"]], polys[b["id"]])
             inside = bool({kinds[a["id"]], kinds[b["id"]]} & {"group", "shape"}) and o >= 0.95
             if o > OVERLAP and not inside:
                 errs.append({"type": "boxes_overlap", "ops": [a["id"], b["id"]], "frac": round(o, 2)})
@@ -889,7 +995,10 @@ def check(P: dict, M: dict, res: list | None = None, shrink_min: float | None = 
         for b in (res or [])[i + 1:]:
             if a.get("empty") or b.get("empty"):
                 continue
-            o = _poly_ov(_ink_poly(a), _ink_poly(b)) if a.get("angle") or b.get("angle") else _ov(a["ink"], b["ink"])
+            if a.get("polys") or b.get("polys"):
+                o = _multi_ov(a.get("polys") or [_ink_poly(a)], b.get("polys") or [_ink_poly(b)])
+            else:
+                o = _poly_ov(_ink_poly(a), _ink_poly(b)) if a.get("angle") or b.get("angle") else _ov(a["ink"], b["ink"])
             if (a["id"], b["id"]) not in pairs and o > OVERLAP:
                 errs.append({"type": "content_overlap", "ops": [a["id"], b["id"]], "frac": round(o, 2)})
         if a["over"] > 1 and boxes.get(a["id"]):
@@ -967,7 +1076,7 @@ def autofix(P: dict, M: dict, errs: list[dict], res: list[dict]) -> tuple[dict, 
                 a, b = r["ink"], box[i]
                 area = max(1.0, (a[2] - a[0]) * (a[3] - a[1]))
                 return 1 - _ov(a, b) * min(area, (b[2] - b[0]) * (b[3] - b[1])) / area
-            cand = [i for i in ids if ops[i].get("kind") not in ("shape", "group")]
+            cand = [i for i in ids if ops[i].get("kind") not in ("shape", "group") and not path_of(ops[i], M)]   # chữ theo đường không cắt khung
             if not cand:
                 continue
             area = lambda i: (box[i][2] - box[i][0]) * (box[i][3] - box[i][1])   # noqa: E731
@@ -1015,7 +1124,7 @@ def _role_groups(P: dict, M: dict, res: list, same_font: bool = True) -> list[li
     T = []
     for op in P["ops"]:
         Ls = [M["by"][m] for m in op.get("marks") or [] if m.startswith("L") and m in M["by"]]
-        if op.get("kind") != "text" or not Ls or op["id"] not in fs:
+        if op.get("kind") != "text" or not Ls or op["id"] not in fs or path_of(op, M):   # chữ theo đường: không cân cỡ với dòng thẳng
             continue
         b = [min(m["box"][0] for m in Ls), min(m["box"][1] for m in Ls), max(m["box"][2] for m in Ls), max(m["box"][3] for m in Ls)]
         T.append((op["id"], float(np.median([m["size"] for m in Ls])), b))

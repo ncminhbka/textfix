@@ -74,3 +74,72 @@ def _read(img: np.ndarray | str, multi: bool) -> list[dict]:
         if all(_cover(x["box"], o["box"]) < 0.3 and _cover(o["box"], x["box"]) < 0.3 for o in out):
             out.append(x)
     return out
+
+
+REGION_THRESH = 0.3   # ngưỡng bản đồ vùng chữ, cùng số bộ dò dùng (Det.thresh)
+REGION_MIN = 0.0005   # vùng >= 0.05% ảnh (bỏ đốm)
+UNCLIP = 1.6          # bộ dò co vùng chữ lại khi học; nới trả như chính nó làm (Det.unclip_ratio): khoảng nới = diện tích * 1.6 / chu vi
+
+
+def regions(img: np.ndarray) -> list[dict]:
+    """VÙNG CHỮ HÌNH DẠNG TỰ DO (12/10, chữ khó): bản đồ xác suất của chính bộ dò trong RapidOCR (DBNet), lấy đường viền từng vùng
+    TRƯỚC khi nó bị ép thành khung 4 điểm. Bộ dò thấy đủ dòng cong / xiên / chữ trang trí; chúng chỉ bị mất ở khâu ép khung (vùng
+    cong chiếm ít diện tích trong hình chữ nhật bao nó -> điểm thấp -> bị loại: vòm "KHAI TRƯƠNG", nửa "TIỆM BÁNH" của con dấu,
+    cả dòng "FLASH SALE"). -> [{mask (vùng LÕI, bool cỡ ảnh), pad (px cần nới ra mỗi phía để ôm chữ), area}]; [] nếu bản RapidOCR
+    đang cài không cho lấy bản đồ (khi đó phần chữ khó tự tắt, mọi thứ khác chạy như cũ)."""
+    import cv2
+    try:
+        det = _engine().text_detector
+        post, cap = det.postprocess_op, {}
+
+        class _Tap:   # nghe lén đầu vào khâu ép khung: không phụ thuộc cách tiền xử lý của từng phiên bản
+            def __call__(self, pred, *a, **k):
+                cap["pred"] = np.asarray(pred)
+                return post(pred, *a, **k)
+
+            def __getattr__(self, name):
+                return getattr(post, name)
+        det.postprocess_op = _Tap()
+        try:
+            det(np.ascontiguousarray(img))
+        finally:
+            det.postprocess_op = post
+        pm = cap["pred"]
+        pm = pm.reshape(pm.shape[-2], pm.shape[-1]).astype(np.float32)
+    except Exception:
+        return []
+    H, W = img.shape[:2]
+    m = (cv2.resize(pm, (W, H), interpolation=cv2.INTER_LINEAR) > REGION_THRESH).astype(np.uint8)
+    n, cc, st, _ = cv2.connectedComponentsWithStats(m, 8)
+    out = []
+    for i in range(1, n):
+        if st[i][4] < REGION_MIN * W * H:
+            continue
+        mk = cc == i
+        cs, _h = cv2.findContours(mk.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        per = float(sum(cv2.arcLength(c, True) for c in cs)) or 1.0
+        out.append({"mask": mk, "area": int(st[i][4]), "pad": float(st[i][4]) * UNCLIP / per})
+    return out
+
+
+def read_region(img: np.ndarray, rect) -> str:
+    """Đọc chữ trong một hình chữ nhật xoay (cv2.minAreaRect) bằng bộ đọc của RapidOCR -- để biết một vùng chữ mà bộ dò thấy nhưng
+    khâu ép khung đã bỏ có thật là CHỮ không (hàng sao, hoạ tiết đọc ra rỗng). Lỗi / phiên bản không hỗ trợ: ""."""
+    import cv2
+    try:
+        (cx, cy), (w, h), a = rect
+        if w < h:
+            w, h, a = h, w, a + 90
+        w, h = int(w * 1.08) + 2, int(h * 1.25) + 2
+        Mx = cv2.getRotationMatrix2D((cx, cy), a, 1.0)
+        Mx[0, 2] += w / 2 - cx
+        Mx[1, 2] += h / 2 - cy
+        crop = cv2.warpAffine(np.ascontiguousarray(img), Mx, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+        res = _engine().text_recognizer([crop])
+        rec = res[0] if isinstance(res, tuple) else res
+        return str(rec[0][0]) if rec and rec[0] and float(rec[0][1]) >= MIN_REC else ""
+    except Exception:
+        return ""
+
+
+MIN_REC = 0.3   # độ tin tối thiểu của bộ đọc (chữ méo của nháp đọc ra độ tin thấp vẫn là chữ)

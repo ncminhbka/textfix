@@ -363,6 +363,28 @@ LLM viết chữ phụ trợ ở 11 / 20 ca poster, không câu nào mang số /
 - Chưa sửa: f16 tiêu đề co 0.54 (VLM chèn một dòng trống đầu lệnh); f15 khách cho 6 bước, nháp vẽ 5 hàng đánh số 1 2 3 5
   (giới hạn model vẽ); f11 tên gói dịch vụ không có chỗ trên nháp.
 
+### 12/10 đêm: chữ hình dạng khó (cung, dòng to OCR sót) -- TEXTFIX_GEO=on, mặc định còn TẮT
+
+Mốc (xem mắt 32 nháp g01-g16 của dev3): hỏng 5 / 7 nháp chữ cung, mất hẳn tiêu đề "FLASH SALE" (OCR không ra dòng), 2 / 4 nhãn
+nghiêng nhiều dòng; chữ nghiêng một khối và một dòng nhiều cỡ đã ổn.
+- NGUỒN ĐO: bản đồ vùng chữ của chính bộ dò trong RapidOCR (DBNet), lấy TRƯỚC khâu ép khung 4 điểm (`ocr.regions`). Bộ dò thấy đủ
+  vòm chữ, vòng con dấu, "FLASH SALE", dòng giữa nhãn dán; chúng chỉ mất ở khâu ép khung. Không thêm model.
+  1307 vùng / 162 nháp: mọi vùng hiển thị (cao dòng >= 3.5% cạnh ngắn) võng >= 0.3 cao dòng là chữ cong thật (dòng thẳng <= 0.24).
+- Đã thử và BỎ: đo từ nét mực (nháp - bản xoá). `geo.arcs` nhánh "lượn / to dần" bắt nhầm 30 / 130 poster thường; dải nét
+  (`geo.bands`) bắt nhầm 36 / 130 (chữ V, A, W làm đường tâm gợn), phải ba ngưỡng đặt tay mới về 0. Mã còn trong geo.py, không gọi.
+- [mã] B2.5 `slots._geo_lines`: (a) vùng cong -> một ô L có đường chân, gộp mẩu OCR + chi tiết trên nó; (b) vùng không có dòng
+  OCR, là lớp phủ bị gỡ (nét mực >= 10% vùng), bộ đọc ra >= 2 chữ / số -> ô L mới (không làm khi khách tải ảnh sản phẩm: con dấu
+  bánh pía, chữ trên lon cũng là "vùng không dòng OCR"). 162 nháp: ô cung ở 8 nháp chữ khó + 2 poster thường có tiêu đề cong
+  thật; ô dòng sót: "FLASH", "MAI", "SAPE", "I vi" (4 nháp không ảnh sản phẩm). Không ô nào đổi sai.
+- [mã] B4: lệnh chữ viết vào một ô cung dựng bằng SVG textPath theo đường chân (kiểu chữ đo từ chính lệnh; nén rồi co như dòng
+  thẳng); kiểm chồng theo dải chữ dọc đường (`_multi_ov`), không cân cỡ / căn lề / cắt khung với dòng thẳng. B3: mô tả "CURVED
+  LINE ... room for about N characters", "OCR missed this line", ảnh khoanh ô vẽ đường cong; lời dặn hai đoạn.
+- Dựng thử 9 nháp (lệnh VLM cũ, câu của ô cung gán bằng mã): cả 9 ra đúng dáng nháp. 120 plan cũ dựng lại: tổng lỗi không đổi.
+- CHƯA đo: VLM thật với ô cung / ô dòng sót; nhãn nghiêng nhiều dòng (góc chung, dòng "MỚI" chưa thành ô); "FLASH" + "SALE" xếp
+  chồng ra một vùng dính (một ô, cỡ đo 244 px); ca g08_v1 chưa tìm nguyên nhân; bản RapidOCR trên server có lấy được bản đồ
+  không (log "bộ dò: N vùng chữ" / "KHÔNG lấy được bản đồ").
+  Chạy: `export TEXTFIX_GEO=on` trước khi khởi động máy chủ, rồi `%run scripts/dev_batch.py bench/dev3.json --only g01,...,g16`.
+
 ## Lượt chạy server tiếp theo
 
 Cập nhật mã (docs/SERVER.md), khởi động lại máy chủ **và kernel**, rồi:
