@@ -44,7 +44,7 @@ Input: the user's poster form (category + filled fields, JSON) and/or a free pro
    - Put texts on calm areas, never on the main subject.
    - Never invent commercial claims: no price, discount, promotional offer, deadline / date, phone number, address or warranty that the user did not give.
    - Never write aspect ratios, resolutions or sizes (e.g. 9:16, 4k, 1080p).
-2. texts -- the texts the poster must show. ONLY the user's own words: copy every text EXACTLY character for character from the form values or from the quoted strings / explicit texts of the prompt (same case, accents, punctuation). Never invent, translate, shorten or rewrite text. Every filled content field appears in full (store name, phone, address, website included). A comma-separated list of highlights / features the user wrote becomes one text per item ONLY if the user separated them; copy each item exactly.
+2. texts -- the texts the poster must show. ONLY the user's own words: copy every text EXACTLY character for character from the form values or from the quoted strings / explicit texts of the prompt (same case, accents, punctuation). Never invent, translate, shorten or rewrite text. Every filled content field appears in full (store name, phone, address, website included). A comma-separated list of highlights / features the user wrote becomes one text per item ONLY if the user separated them; copy each item exactly, except that every list item (role list_item: a bullet / feature / step row) STARTS WITH A CAPITAL LETTER ("nhận phản hồi trực tiếp" -> "Nhận phản hồi trực tiếp"), in texts and inside the quotes of prompt_en alike.
    - role: one of """ + ", ".join(ROLES) + """ (old_price = an original price shown crossed out next to the new price).
    - Prompt and form disagree (a different value for the same thing: discount 20% in the form, "GIẢM 30%" in the prompt; another
      headline): the PROMPT wins -- use the prompt's text, leave that form value out of texts and prompt_en, and put the form field
@@ -182,7 +182,27 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
         tail = " No text, letters, words or logos anywhere in the image."
         pe += tail
         variants = [{**v, "prompt_en": v["prompt_en"] + tail} for v in variants]
+    # MỤC DANH SÁCH VIẾT HOA CHỮ ĐẦU (12/10): khách viết các ý cách nhau dấu phẩy, ý sau thường không viết hoa -> các gạch đầu
+    # dòng chỗ hoa chỗ thường. Sửa bằng mã (LLM đã được dặn, nhưng bước nguyên văn ở trên trả lại đúng chữ khách), cả trong
+    # ngoặc kép của prompt để FLUX vẽ đúng chữ sẽ dựng.
+    for t in out:
+        c = _cap_first(t["text"])
+        if t.get("role") == "list_item" and c != t["text"]:
+            old, t["text"] = t["text"], c
+            pe = pe.replace(f'"{old}"', f'"{c}"')
+            variants = [{**v, "prompt_en": v["prompt_en"].replace(f'"{old}"', f'"{c}"')} for v in variants]
+            log.setdefault("list_capitalized", []).append(c)
     return {"mode": mode, "prompt_en": pe, "texts": out, "variants": variants, "log": log}
+
+
+def _cap_first(s: str) -> str:
+    """Viết hoa chữ cái đầu tiên (bỏ qua ký hiệu / số đứng đầu: "- ý", "3 bước"); phần còn lại giữ nguyên."""
+    for i, ch in enumerate(s):
+        if ch.isalpha():
+            return s[:i] + ch.upper() + s[i + 1:] if ch.islower() else s
+        if ch.isdigit():
+            return s
+    return s
 
 
 def _approved(q: str, texts: list[dict]) -> bool:

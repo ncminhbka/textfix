@@ -473,7 +473,7 @@ colors -- a call-to-action must never end up as bare text. Only then: a line ins
 - Size: write every line at the size measured for its slot; fine print, labels and footers too -- never smaller "to be safe". \
 If a text does not fit, shorten it (facts stay exact) rather than shrinking it.
 - Lists: keep the draft's list structure -- one item per row, each row keeps its own text next to its bullet / check / icon; \
-never merge list rows into one block and never leave a bullet or icon without its text.
+never merge list rows into one block and never leave a bullet or icon without its text. Every list row (bullet / feature / step) starts with a capital letter, and all rows of one list carry the same "group" name.
 - Slanted (italic / oblique) lettering in the draft stays italic; tracked (widely spaced) headlines keep their letter-spacing.
 - Weight and family: a heavy / black headline stays heavy (font-weight 800-900 in a font that has it), a script stays a \
 script font, a wide headline is never set in a condensed font (or the reverse). Unset weight = the weight measured on the draft.
