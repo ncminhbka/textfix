@@ -7,6 +7,7 @@ bản xoá thô / đã dọn, lượt đầu, poster, plan.json) thành zip < 24
   %run scripts/dev_batch.py                       # bench/dev2.json, gửi hết một lần (máy chủ tự xếp hàng, 2 GPU gối đầu)
   %run scripts/dev_batch.py --only d05,d19        # vài ca
   %run scripts/dev_batch.py                       # chạy lại sau khi notebook đứt: đọc manifest, chờ tiếp các job cũ, KHÔNG gửi lại
+  %run scripts/dev_batch.py bench/dev3.json --only g01,g02 --fresh   # sau khi cập nhật mã: chạy LẠI các ca đã có trong manifest
 
 Manifest: output/dev/<tên tập>_manifest.json {ca: {run_id, job_id, status, error, elapsed}} -- gói kèm vào zip (ca -> lượt chạy).
 Zip: output/runs_zip/<tên tập>_<giờ>_NN.zip, mỗi ảnh (v<i>/) nằm gọn một zip; giải nén vào output/runs/ ở máy cá nhân.
@@ -47,6 +48,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--only", default="", help="chỉ các ca này (phẩy)")
     ap.add_argument("--timeout", type=float, default=3 * 3600, help="giây chờ tối đa cả tập")
     ap.add_argument("--resubmit", action="store_true", help="gửi lại các ca lỗi / mất job (máy chủ khởi động lại)")
+    ap.add_argument("--fresh", action="store_true", help="CHẠY LẠI các ca được chọn dù manifest ghi đã xong (sau khi cập nhật mã): "
+                                                         "manifest cũ lưu thành <tên>_manifest_<giờ>.json, lượt chạy cũ vẫn còn trong output/runs")
     ap.add_argument("--no-ship", action="store_true")
     a = ap.parse_args(argv)
     cases = json.loads(a.set.read_text(encoding="utf-8"))
@@ -58,6 +61,13 @@ def main(argv: list[str] | None = None) -> int:
     mf.parent.mkdir(parents=True, exist_ok=True)
     M = json.loads(mf.read_text(encoding="utf-8")) if mf.exists() else {}
     save = lambda: mf.write_text(json.dumps(M, ensure_ascii=False, indent=1), encoding="utf-8")   # noqa: E731
+    if a.fresh and any(c["id"] in M for c in cases):
+        old = mf.with_name(f"{name}_manifest_{time.strftime('%m%d_%H%M%S')}.json")
+        old.write_text(json.dumps(M, ensure_ascii=False, indent=1), encoding="utf-8")
+        for c in cases:
+            M.pop(c["id"], None)
+        save()
+        print(f"--fresh: quên {len(cases)} ca trong manifest (bản cũ: {old.name}), gửi lại")
 
     try:
         h = _call(a.url + "/api/health", timeout=10)
