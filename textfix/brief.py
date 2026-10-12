@@ -134,7 +134,7 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
         out.append({"text": text, "role": t.get("role") if t.get("role") in ROLES else "body"})
     for q in must:   # chuỗi người dùng viết trong ngoặc kép mà LLM bỏ sót -> thêm lại nguyên văn (trừ khi đã tách thành các ý)
         qn = _norm(q)
-        parts = [t for t in seen if t in qn]
+        parts = [t for t in seen if t.casefold() in qn.casefold()]   # mục danh sách đã viết hoa chữ đầu vẫn là một phần của chuỗi
         if qn not in seen and not (parts and sum(len(p) for p in parts) >= 0.8 * len(qn)):
             # LLM dùng chuỗi đó làm TỪ TẢ trong prompt_en (không ngoặc kép): khách đặt ngoặc cho phong cách, không phải chữ in
             # (09/10 dev2 d06: phong cách "Y2K", "vintage" -> "Y2K-style t-shirt with a vintage aesthetic") -> không thêm lại

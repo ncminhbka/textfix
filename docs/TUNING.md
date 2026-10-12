@@ -269,6 +269,23 @@ khai nhóm đúng (`group`) nhưng mã chỉ coi là gợi ý (lề chỉ căn k
 - Tắt nhóm-là-lệnh: `TEXTFIX_GROUP_FRAME=0`. Công cụ: `scripts/replay_plans.py` (mặc định dựng bằng khung OCR; `RRBOX=snap` =
   khung nắn cũ lưu trong plan trước 12/10).
 
+### 12/10 chiều: 5 lượt e2e đầu với lời dặn mới (run 320d, 7a00, 3fc7, 777c, 5d27)
+
+Chấm lời dặn: cả 5 lượt khai nhóm kèm kiểu + cách căn; 7 nhóm >= 2 lệnh, 6 đúng kiểu (7a00 khai danh sách thành flow), 6 viết y
+hệt nhau; chấm đầu dòng có ở cả 4 lượt có danh sách, không đôi. 777c, 5d27 đẹp; 3 poster còn hỏng vì lý do khác:
+- 320d: hai cột chữ ở đáy, số ô xen kẽ trái / phải, VLM gộp theo số liền nhau (L6 + L7 + L8) -> hai khối đè nhau.
+  [prompt] COLUMNS: các ô của một lệnh phải chồng dọc cùng cột; chỉ mảnh của một dòng OCR cắt đôi mới gộp ngang.
+- 7a00: nháp 3 gạch đầu dòng, VLM nhồi 3 ý vào gạch đầu, bỏ gạch cuối -> cả nhóm co 0.70. [prompt] mỗi gạch nháp vẽ một ý.
+- 777c: chấm đầu dòng thành icon vòng tròn rỗng to. [prompt] chấm nhỏ -> "• ", icon chỉ khi nháp vẽ icon / tick.
+- 3fc7, 320d: câu ưu đãi dài co 0.63 - 0.70 trong vỏ. [prompt] chữ trong vỏ rút còn từ chính, giữ cỡ nháp.
+- 5d27: luật chống lặp xoá "tổng vệ sinh" giữa huy hiệu vì trùng tên "An Gia Tổng Vệ Sinh". [mã] cùng cụm chữ nằm trong hai câu
+  khách: mỗi lệnh khai một câu riêng chứa cụm đó là hợp lệ.
+- brief (3fc7, 777c, 5d27): danh sách vào texts HAI lần (từng mục + cả câu gốc làm body, nối vào cuối prompt FLUX) từ khi mục
+  danh sách viết hoa chữ đầu: phép so "các mục đã phủ chuỗi trong ngoặc kép" phân biệt hoa thường. [mã] so casefold.
+- Ghi cho lượt S / I: 3fc7 vỏ S1 dính đường viền bị xoá (43..982 thay vì ~240..760) -> thanh navy đè khung.
+120 plan dựng lại sau các sửa: không đổi (too_small 29, overflow 3, boxes_overlap 21, content_overlap 2, uneven_size 10).
+4 lời dặn mới CHƯA đo với VLM thật.
+
 ## Lượt chạy server tiếp theo
 
 Cập nhật mã (docs/SERVER.md), khởi động lại máy chủ **và kernel**, rồi:

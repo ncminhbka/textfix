@@ -348,6 +348,11 @@ claims a client text.
 - One client text drawn over several stacked lines (MENU / TRÀ SỮA): one op with all those slots, <br> between the lines. \
 Read the OCR letters to find those lines even when garbled: a short slot below a line that ends its sentence ("chainn vi" \
 under "Coffee rang moc") is that text's second line, never the start of another text.
+- COLUMNS: slot numbers run row by row across the whole poster, so two text blocks standing side by side have their lines \
+numbered alternately (L6 left, L7 right, L8 left, L9 right). Never merge by consecutive numbers: check the boxes. The slots of \
+one op must be stacked one under the other in the SAME column (their x ranges overlap); lines side by side at the same height \
+with a wide gap between them belong to different blocks and different ops. (Only pieces of ONE drawn line that OCR cut in \
+two -- same height, same size, a word gap apart -- go together.)
 - List items, steps and item / price rows keep the client's order and pairing (each name with its own price, steps \
 1, 2, 3 in order), even where the draft drew them in another order.
 - Text the model invented: write what it was meant to say from its role, position and the PROMPT, a natural line of about the \
@@ -385,7 +390,8 @@ If a text does not fit, shorten it (facts stay exact) rather than shrinking it.
 never merge list rows into one block and never leave a bullet or icon without its text. Every list row (bullet / feature / step) starts with a capital letter, and all rows of one list carry the same "group" name with "group_kind": "list".
 - Row marks: when the draft shows a bullet / check / small icon in front of a row, look at the BASE image. Mark still there \
 -> write only the text. Mark erased and no I# slot for it -> draw it yourself at the start of that row's html ("• " or an \
-<i-icon>), the same mark on every row of the group.
+<i-icon>), the same mark on every row of the group. Copy the mark the draft drew: a small dot -> "• " (a text bullet, the \
+size of the text); an <i-icon> only where the draft drew a real icon or check mark, never a big ring for a dot.
 - Slanted (italic / oblique) lettering in the draft stays italic; tracked (widely spaced) headlines keep their letter-spacing.
 - Weight and family: a heavy / black headline stays heavy (font-weight 800-900 in a font that has it), a script stays a \
 script font, a wide headline is never set in a condensed font (or the reverse). Unset weight = the weight measured on the draft.
@@ -410,6 +416,13 @@ different (a huge "FLASH SALE" over a small tagline, a big price next to its sma
 may continue on the next row (that row's bullet skipped); otherwise skip the extra rows AND their bullets / icons. \
 Fill the rows top to bottom in order and skip only the LAST extra rows -- never leave an empty row in the middle of a list \
 (a garbled or repeated row in the middle is just the next row of the list).
+- More items than rows, or one client text holding several items ("A, B, C, D") where the draft drew bullets: ONE item per \
+drawn bullet, each short enough for its row, first letter capital, in the client's order. Never pack two or three items \
+into one row and never leave a drawn bullet empty while another row is crammed; items that get no row are dropped \
+("missing") or two short ones share a row only where the draft drew them so.
+- Text in a pill / button / badge / band: the shell fixes the room. A sentence much longer than the line the model drew there \
+is shortened to its key words (facts exact: "Tặng buổi tư vấn đầu cho khách mới") so it stays at the drawn size -- never a \
+full sentence shrunk to fine print inside its shell.
 - Badges / coins / stickers with a big middle line: put the key word or number of the client text big in the big slot and \
 the rest small in the small slots (Giảm / 50%; Tặng / quà); skip slots left over rather than filling them with made-up words.
 - Never a shell inside a shell: when the BASE still shows a pill / card / band behind a line, or its S# slot is drawn as a \
@@ -862,7 +875,10 @@ def _guard(ops: list[dict], M: dict, texts: list[dict]) -> tuple[list[dict], lis
             if len(f.replace(" ", "")) >= 3:
                 groups.setdefault(f, []).append(i)
     for f, idx in groups.items():
-        allowed = max(1, sum(1 for t in ftxt if t == f))
+        # cùng cụm chữ nằm trong HAI câu khách khác nhau (tên "An Gia Tổng Vệ Sinh" và ưu đãi "... đặt lịch tổng vệ sinh trước Tết",
+        # 12/10 run 5d27: dòng giữa huy hiệu bị xoá oan) -> mỗi lệnh khai một câu khách riêng có chứa cụm đó là một lần viết hợp lệ
+        own = {k for i in idx for k in [_tid(out[i].get("client"))] if k is not None and k < len(ftxt) and f" {f} " in f" {ftxt[k]} "}
+        allowed = max(1, sum(1 for t in ftxt if t == f), len(own))
         if len(idx) <= allowed:
             continue
         ocr = lambda i: _fold(" ".join(M["by"][m].get("ocr", "") for m in out[i]["marks"] if m.startswith("L")))   # noqa: E731
