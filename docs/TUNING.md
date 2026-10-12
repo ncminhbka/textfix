@@ -308,6 +308,40 @@ Mốc (bench/si_labels.json, chấm mắt một lượt 130 poster): 65 vỏ -- 
   uneven_size 10 không đổi; boxes_overlap 21 -> 22 (d26_v0 ở trên).
 CHƯA đo với VLM thật: VLM có chọn keep đúng chỗ không, có giữ nhầm chữ méo không.
 
+### 12/10 tối: 4 lượt e2e sau sửa S / I (run 28aa kombucha, e97e gym, 38ef bootcamp, 93f1 thợ điện nước)
+
+Chấm: mỗi gạch đầu dòng một ý + viết hoa đúng ở 2 / 3 poster có danh sách; nhóm viết y hệt đúng cả 4; keep cho S / I và luật
+cột chưa có dịp thử (không poster nào có vỏ dáng lạ, mảng ảnh bị đổi, hai cột chữ). Lỗi thấy:
+- 38ef: hàng lặp giữa danh sách bị VLM bỏ -> thủng một hàng. [mã] `slots._pack_lists`: hàng bị bỏ nằm giữa các hàng của một
+  danh sách VLM khai, cùng cột, cùng số dòng -> dồn các ý lên, hàng trống xuống cuối.
+- 38ef: tiêu đề 10 chữ / 3 dòng bị luật "đoạn văn" ngắt lại thành 2 dòng ("kỹ / sư"). [mã] dòng cỡ tiêu đề (>= 1.4 trung vị)
+  giữ cách ngắt VLM viết.
+- 93f1: ba hàng danh sách -- icon to, hai icon nhỏ chồng nhau, không icon. [mã] `slots._icon_sets`: từ nửa số hàng (>= 2) có
+  icon thì mỗi hàng đúng một icon (thừa -> giữ cái trên, ô icon bị VLM bỏ -> vẽ lại bằng icon hay dùng nhất), cả bộ cùng cỡ
+  trung vị + thẳng một cột (`render._even_icons`). [prompt] icon của danh sách là một bộ.
+- 28aa: huy hiệu bước xoá giữ lại mà VLM bỏ hết chữ bịa bên trong -> huy hiệu trống. [prompt] vỏ còn trên nền không để trống:
+  viết một ý ngắn từ câu khách. 28aa: VLM tô thanh nền cho từng dòng danh sách. [prompt] tương phản bằng bóng chữ, không nền riêng.
+- CHƯA sửa (chờ người dùng quyết): chữ nhồi vào ô quá nhỏ rồi co (28aa mô tả 110 ký tự vào dòng 20 ký tự: 0.54; e97e ưu đãi
+  hai dòng vào ô một dòng: 0.46; 93f1 tiêu đề 0.66) -- đề xuất một vòng hỏi lại VLM riêng cho lệnh co < 0.6; 93f1 các hàng danh
+  sách lặp nội dung (một câu khách "a, b, c, d" cho ba hàng) -- đề xuất mã tự chia ý; tiêu đề đúng số dòng nháp thì co ngang
+  thay vì ngắt thêm dòng.
+
+### 12/10 tối: bước brief -- chữ phụ trợ do LLM viết, tách "Điểm nổi bật" bằng mã, tập form1
+
+Người dùng thật điền đủ các ô form (sự thật: ưu đãi, giá, ngày, liên hệ) nhưng ô prompt trống hoặc một câu mơ hồ; trước đây
+LLM bị cấm thêm chữ -> poster thiếu tiêu đề / nút, FLUX tự vẽ chữ vô nghĩa cho đầy, VLM phải đoán (huy hiệu trống ở 28aa).
+Yêu cầu không chữ nào ("tạo poster quảng cáo quán của tôi") ra ảnh trơn.
+- [prompt + mã] texts có "source": "user" (đúng từng chữ như cũ) | "ai" (tối đa 4 câu, <= 48 ký tự: tiêu đề khi khách không
+  cho, khẩu hiệu, nút kêu gọi, nhãn mục). Mã bỏ câu "ai" có số / % / tiền / liên kết hoặc chữ cam kết - ưu đãi (giảm, tặng,
+  miễn phí, bảo hành, cam kết, số một...). Designer thấy câu "ai" gắn nhãn OURS: được rút gọn / đổi chữ / bỏ; không tính là
+  "câu khách thiếu". LLM nói "image" và không có chữ khách -> bỏ hết câu "ai" (ảnh con bò vẫn là ảnh).
+- [mã] trường form highlights / feedback_highlights: tách theo ", " / ";" / xuống dòng thành từng list_item (không tách "1,5 lít"),
+  thay chuỗi gộp trong ngoặc kép của prompt bằng từng ý. Chữ trong ngoặc kép của prompt lấy đúng cách viết hoa của texts.
+- Thử bằng LLM giả 6 ca (form khuyến mại, điểm nổi bật gộp / đã tách, prompt mơ hồ, ảnh con bò, bịa không khai): đúng cả 6.
+  CHƯA đo với LLM thật.
+- bench/form1.json: 22 ca mô phỏng người dùng điền form (6 loại x tối thiểu / điển hình / đủ; không tiêu đề; gõ thường, không
+  dấu; prompt mơ hồ không chữ; 2 ca ảnh thường). Chạy: `%run scripts/dev_batch.py bench/form1.json`.
+
 ## Lượt chạy server tiếp theo
 
 Cập nhật mã (docs/SERVER.md), khởi động lại máy chủ **và kernel**, rồi:

@@ -439,7 +439,10 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         # ĐOẠN VĂN (>= 3 dòng nháp, >= PARA_WORDS chữ): bỏ <br> chép theo dòng nháp, trình duyệt tự ngắt theo bề ngang khung --
         # dòng nháp và dòng chữ thật dài khác nhau, giữ <br> thì dòng dài tự gãy thêm, một chữ mồ côi mỗi dòng ("lưng", "thể":
         # 09/10 dev2 d17), khối phải co nhỏ cho vừa
-        if op.get("kind") == "text" and len(lm) >= 3 and len(re.sub(r"<[^>]+>", " ", h).split()) >= PARA_WORDS \
+        # TIÊU ĐỀ không phải đoạn văn (12/10 run 38ef: tiêu đề 10 chữ / 3 dòng bị ngắt lại thành 2 dòng, gãy "kỹ / sư"): dòng cỡ
+        # tiêu đề giữ cách ngắt dòng VLM viết
+        head = bool(med and Ls and float(np.median([m["size"] for m in Ls])) >= HEAD * med)
+        if op.get("kind") == "text" and len(lm) >= 3 and not head and len(re.sub(r"<[^>]+>", " ", h).split()) >= PARA_WORDS \
                 and re.search(r"<br", h, flags=re.I) and not re.search(r"<(div|p|li|ul|ol)\b", h, flags=re.I):
             h = re.sub(r"\s*<\s*br\b[^>]*>\s*", " ", h, flags=re.I)
             bs = "text-wrap:pretty;" + bs
@@ -478,7 +481,7 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         els.append({"id": op["id"], "box": b, "html": h, "style": bs, "size": size, "color": color, "font": family(fam),
                     "fit": fix.get("fit") or op.get("fit") or "shrink", "angle": g["angle"], "cls": cls,
                     "condense": fix.get("condense"), "icon": op.get("kind") == "icon" and bool(mk)
-                    and all(m.startswith("I") for m in mk), "nl": len(lm), "hfit": single})
+                    and all(m.startswith("I") for m in mk), "iset": op.get("icon_set"), "nl": len(lm), "hfit": single})
     log += _align_left(els) + _even_icons(els)
     page.set_viewport_size({"width": W, "height": H})
     page_html = lambda: (   # noqa: E731
@@ -655,6 +658,22 @@ def _even_icons(els: list[dict]) -> list[str]:
     I = [e for e in els if e.get("icon") and not e["angle"]]
     side = lambda e: min(e["box"][2] - e["box"][0], e["box"][3] - e["box"][1])   # noqa: E731
     cen = lambda e: ((e["box"][0] + e["box"][2]) / 2, (e["box"][1] + e["box"][3]) / 2)   # noqa: E731
+    # BỘ icon của một danh sách VLM khai (slots._icon_sets): cùng cỡ (trung vị) và thẳng MỘT cột (tâm ngang trung vị), bất kể
+    # khung đo trên nháp to nhỏ thế nào (12/10 run 93f1: icon 47 px và 26 px cùng danh sách, lệch quá 1.6 lần nên không được nối)
+    pre, sets = [], {}
+    for e in I:
+        if e.get("iset"):
+            sets.setdefault(e["iset"], []).append(e)
+    for name, g in sets.items():
+        if len(g) < 2:
+            continue
+        m, cx = float(np.median([side(e) for e in g])), float(np.median([cen(e)[0] for e in g]))
+        for e in g:
+            cy = cen(e)[1]
+            e["box"] = [cx - m / 2, cy - m / 2, cx + m / 2, cy + m / 2]
+            e["size"] = m
+        pre.append(f"icon một bộ '{name}' {[e['id'] for e in g]}: {m:.0f}px, cột x={cx:.0f}")
+    I = [e for e in I if not (e.get("iset") and len(sets[e["iset"]]) >= 2)]
     par = list(range(len(I)))
 
     def root(i):
@@ -683,7 +702,7 @@ def _even_icons(els: list[dict]) -> list[str]:
             e["box"] = [cx - m / 2, cy - m / 2, cx + m / 2, cy + m / 2]
             e["size"] = m
         log.append(f"icon cùng cỡ {[e['id'] for e in g]}: {m:.0f}px")
-    return log
+    return pre + log
 
 
 def declared_groups(P: dict, els: list[dict]) -> dict:

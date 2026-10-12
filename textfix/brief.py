@@ -26,6 +26,17 @@ FIELD_ROLE = {"title": "headline", "discount": "offer", "applied_product": "subh
               "special_offer": "offer", "job_position": "headline", "job_desc": "body", "apply_deadline": "date",
               "apply_method": "contact", "guide_steps": "list_item", "store_name": "info", "phone": "contact",
               "address": "contact", "website_link": "contact"}
+# trường form là DANH SÁCH các ý cách nhau dấu phẩy (ví dụ mẫu của form: "Pin 40 giờ, Bluetooth 5.3, Nặng 180g") -> mã tách
+# từng ý thành một câu list_item, không phụ thuộc LLM (12/10: LLM lúc tách lúc không; không tách thì VLM chia sai các hàng)
+LIST_FIELDS = ("highlights", "feedback_highlights")
+# CHỮ PHỤ TRỢ do LLM viết (source "ai", 12/10): người dùng điền form (sự thật: ưu đãi, giá, ngày, liên hệ) nhưng không viết
+# tiêu đề / khẩu hiệu / nút kêu gọi / nhãn mục -> poster thiếu thành phần, FLUX tự vẽ chữ vô nghĩa cho đầy. LLM được viết các
+# dòng đó, mã chặn mọi thứ là sự thật / cam kết thương mại:
+AI_MAX = 4           # tối đa 4 câu phụ trợ một poster
+AI_MAX_CHARS = 48    # mỗi câu <= 48 ký tự (tiêu đề ~7 chữ)
+AI_BAN = re.compile(r"\d|[%@₫$€£]|https?:|www\.|\.(?:vn|com|net|org)\b", re.I)   # số (giá, %, ngày, SĐT, số liệu), tiền, liên kết
+AI_BAN_WORDS = ("giảm", "tặng", "miễn phí", "khuyến mãi", "khuyến mại", "bảo hành", "cam kết", "hoàn tiền", "trả góp", "đổi trả",
+                "free", "sale", "voucher", "số một", "tốt nhất", "rẻ nhất", "hàng đầu", "chính hãng", "uy tín nhất")
 # khung ảnh (tỉ lệ người dùng chọn) bằng lời: LLM mặc định "vertical poster" cả khi khung ngang (09/10 dev2 d16, d32 16:9)
 ORIENT = {"1:1": "a square canvas", "4:5": "a portrait (slightly tall) canvas", "3:4": "a portrait canvas",
           "9:16": "a tall vertical canvas (phone story)", "16:9": "a wide horizontal landscape canvas (web banner)",
@@ -40,12 +51,20 @@ Input: the user's poster form (category + filled fields, JSON) and/or a free pro
 1. prompt_en -- an English prompt for FLUX.2 that draws the WHOLE poster including its text. Follow the official FLUX.2 prompt-upsampling guidelines:
    - Strictly preserve the user's subject and intent. Convert the request into a detailed paragraph.
    - Add concrete visual specifics: subject, form, materials, textures, lighting (quality, direction, color), shadows, spatial relationships, environment, mood, and a clean professional poster layout (where the headline, price / offer, list and footer sit; flat graphic text, badges, pills or cards where suitable).
-   - Text in images: put EVERY text of the poster in double quotes, EXACTLY as written in "texts" below (Vietnamese with full diacritics), and say its role, typographic style and its place (e.g. headline "..." in a bold condensed sans-serif at the top center). Never add any other text.
+   - Text in images: put EVERY text of the poster in double quotes, EXACTLY as written in "texts" below (Vietnamese with full diacritics), and say its role, typographic style and its place (e.g. headline "..." in a bold condensed sans-serif at the top center). Never add any text that is not in "texts".
    - Put texts on calm areas, never on the main subject.
    - Never invent commercial claims: no price, discount, promotional offer, deadline / date, phone number, address or warranty that the user did not give.
    - Never write aspect ratios, resolutions or sizes (e.g. 9:16, 4k, 1080p).
-2. texts -- the texts the poster must show. ONLY the user's own words: copy every text EXACTLY character for character from the form values or from the quoted strings / explicit texts of the prompt (same case, accents, punctuation). Never invent, translate, shorten or rewrite text. Every filled content field appears in full (store name, phone, address, website included). A comma-separated list of highlights / features the user wrote becomes one text per item ONLY if the user separated them; copy each item exactly, except that every list item (role list_item: a bullet / feature / step row) STARTS WITH A CAPITAL LETTER ("nhận phản hồi trực tiếp" -> "Nhận phản hồi trực tiếp"), in texts and inside the quotes of prompt_en alike.
+2. texts -- the texts the poster must show, each with "source". source "user" = the user's own words: copy every text EXACTLY character for character from the form values or from the quoted strings / explicit texts of the prompt (same case, accents, punctuation). Never invent, translate, shorten or rewrite text. Every filled content field appears in full (store name, phone, address, website included). The form fields "highlights" and "feedback_highlights" are lists: ALWAYS one text per comma-separated item (role list_item). A comma-separated list of highlights / features in the free prompt becomes one text per item ONLY if the user separated them; copy each item exactly, except that every list item (role list_item: a bullet / feature / step row) STARTS WITH A CAPITAL LETTER ("nhận phản hồi trực tiếp" -> "Nhận phản hồi trực tiếp"), in texts and inside the quotes of prompt_en alike.
    - role: one of """ + ", ".join(ROLES) + """ (old_price = an original price shown crossed out next to the new price).
+   - SUPPORT COPY (source "ai"): most users fill the facts and nothing else, so the poster lacks its basic parts. You may
+     WRITE up to 4 short Vietnamese texts yourself to complete it -- a headline when the user gave none (<= 7 words), one short
+     tagline, a call-to-action button ("Đặt lịch ngay", "Xem thêm", "Liên hệ ngay"), a section label ("Điểm nổi bật", "Ưu đãi",
+     "Khách hàng nói gì") -- each <= 5 words except the headline, natural for this business and category, with full diacritics.
+     They carry NO facts and NO promises: never a number of any kind, price, discount, gift, "free", date, deadline, phone,
+     address, link, name of a person / brand / shop / place, customer quote, rating, statistic, warranty, guarantee or
+     superlative ("số 1", "tốt nhất"). When the user gave no shop / brand name, the poster has none. Do not repeat what a user
+     text already says. Only for intent "poster"; when the user's texts already make a complete poster, add none.
    - Prompt and form disagree (a different value for the same thing: discount 20% in the form, "GIẢM 30%" in the prompt; another
      headline): the PROMPT wins -- use the prompt's text, leave that form value out of texts and prompt_en, and put the form field
      name in "overridden".
@@ -66,7 +85,8 @@ SCHEMA = {"type": "object", "additionalProperties": False, "required": ["intent"
                              "properties": {"name": {"type": "string"}, "prompt_en": {"type": "string"}}}},
                          "texts": {"type": "array", "items": {
                              "type": "object", "additionalProperties": False, "required": ["text", "role"],
-                             "properties": {"text": {"type": "string"}, "role": {"type": "string", "enum": ROLES}}}}}}
+                             "properties": {"text": {"type": "string"}, "role": {"type": "string", "enum": ROLES},
+                                            "source": {"type": "string", "enum": ["user", "ai"]}}}}}}
 
 # gợi ý thiết kế từ UI (không phải chữ)
 STYLES = {"hien_dai": "modern, minimal, clean", "sang_trong": "luxury, premium, elegant", "nang_dong": "energetic, sporty, dynamic",
@@ -128,10 +148,18 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
         # không nguyên văn từ người dùng -> bỏ (không bịa chữ); so không phân biệt hoa / thường (08/10: "Khai trương cửa hàng ..."
         # viết hoa chữ đầu, prompt khách viết thường -> bị bỏ oan, tiêu đề mất khỏi câu khách -> VLM chép chữ nháp "TRƯỞNG")
         if not any(text.casefold() in s.casefold() for s in sources):
-            log["dropped"].append(text)
+            # không phải chữ khách: chỉ giữ khi LLM khai là chữ phụ trợ và không chứa sự thật / cam kết nào (xem AI_BAN)
+            why = _ai_reject(text, t, sum(1 for o in out if o.get("source") == "ai"))
+            if why:
+                log["dropped"].append(text)
+                log.setdefault("ai_rejected", []).append(f"{text} ({why})")
+                continue
+            seen.add(text)
+            out.append({"text": text, "role": t.get("role") if t.get("role") in ROLES else "body", "source": "ai"})
+            log.setdefault("ai_added", []).append(text)
             continue
         seen.add(text)
-        out.append({"text": text, "role": t.get("role") if t.get("role") in ROLES else "body"})
+        out.append({"text": text, "role": t.get("role") if t.get("role") in ROLES else "body", "source": "user"})
     for q in must:   # chuỗi người dùng viết trong ngoặc kép mà LLM bỏ sót -> thêm lại nguyên văn (trừ khi đã tách thành các ý)
         qn = _norm(q)
         parts = [t for t in seen if t.casefold() in qn.casefold()]   # mục danh sách đã viết hoa chữ đầu vẫn là một phần của chuỗi
@@ -141,7 +169,7 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
             if re.search(r"(?<!\w)" + re.escape(qn.casefold()) + r"(?!\w)", pe_open):
                 log.setdefault("quoted_as_style", []).append(qn)
                 continue
-            out.append({"text": qn, "role": "body"})
+            out.append({"text": qn, "role": "body", "source": "user"})
             seen.add(qn)
             log["added"].append(qn)
     # TRƯỜNG FORM đã điền mà không có trong câu khách (LLM viết lại thành câu khác -- "Apply deadline: 15/12/2026" -- nên bị bỏ ở
@@ -156,9 +184,44 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
             parts = [t for t in seen if t.casefold() in xn.casefold()]
             if parts and sum(len(p) for p in parts) >= 0.8 * len(xn):   # đã tách thành các ý / các dòng
                 continue
-            out.append({"text": xn, "role": FIELD_ROLE.get(k, "info")})
+            out.append({"text": xn, "role": FIELD_ROLE.get(k, "info"), "source": "user"})
             seen.add(xn)
             log.setdefault("form_added", []).append(xn)
+    # TRƯỜNG DANH SÁCH của form: mỗi ý một câu list_item, đúng thứ tự người dùng viết; bỏ câu gộp cả trường và các mảnh LLM tách
+    # kiểu khác (gộp hai ý, cắt giữa ý); trong prompt chuỗi gộp trong ngoặc kép -> từng ý trong ngoặc kép
+    pe_raw2, var_raw = raw.get("prompt_en", ""), [dict(v) for v in (raw.get("variants") or []) if isinstance(v, dict)]
+    for k in LIST_FIELDS:
+        if k not in form or k in over or not isinstance(form[k], str):
+            continue
+        whole = _norm(form[k])
+        items = [x for x in (_norm(y) for y in re.split(r",\s+|;\s*|\n+", form[k])) if x]
+        if len(items) < 2:
+            continue
+        at = next((i for i, t in enumerate(out) if t["text"].casefold() in whole.casefold() and t.get("source") != "ai"), len(out))
+        out = [t for t in out if t.get("source") == "ai" or t["text"].casefold() not in whole.casefold()]
+        at = min(at, len(out))
+        out[at:at] = [{"text": x, "role": "list_item", "source": "user"} for x in items]
+        seen |= set(items)
+        each = ", ".join(f'"{x}"' for x in items)
+        pe_raw2 = pe_raw2.replace(f'"{whole}"', each).replace(f'"{form[k].strip()}"', each)
+        for v in var_raw:
+            v["prompt_en"] = str(v.get("prompt_en") or "").replace(f'"{whole}"', each).replace(f'"{form[k].strip()}"', each)
+        log.setdefault("list_split", []).append(items)
+    raw = {**raw, "prompt_en": pe_raw2, "variants": var_raw}
+    # ẢNH THƯỜNG: LLM nói "image" và không có chữ khách nào -> bỏ chữ phụ trợ TRƯỚC khi sửa prompt (không tự thành poster,
+    # không nối chữ vào prompt ảnh)
+    if raw.get("intent") == "image" and not any(t.get("source") != "ai" for t in out):
+        out = []
+    # MỤC DANH SÁCH VIẾT HOA CHỮ ĐẦU (12/10), rồi chữ trong ngoặc kép của prompt lấy đúng cách viết của câu trong texts (LLM viết
+    # "Nặng 180g", khách viết "nặng 180g": so đúng từng chữ thì coi là thiếu -> nối thêm lần nữa vào cuối prompt)
+    for t in out:
+        c = _cap_first(t["text"])
+        if t.get("role") == "list_item" and c != t["text"]:
+            t["text"] = c
+            log.setdefault("list_capitalized", []).append(c)
+    raw = {**raw, "prompt_en": _requote(raw.get("prompt_en", ""), out),
+           "variants": [{**v, "prompt_en": _requote(str(v.get("prompt_en") or ""), out)} for v in (raw.get("variants") or [])
+                        if isinstance(v, dict)]}
     pe, miss = _fix_prompt(raw.get("prompt_en", ""), out)
     gone = _quoted_extra(raw.get("prompt_en", ""), out)
     if gone:
@@ -182,17 +245,28 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
         tail = " No text, letters, words or logos anywhere in the image."
         pe += tail
         variants = [{**v, "prompt_en": v["prompt_en"] + tail} for v in variants]
-    # MỤC DANH SÁCH VIẾT HOA CHỮ ĐẦU (12/10): khách viết các ý cách nhau dấu phẩy, ý sau thường không viết hoa -> các gạch đầu
-    # dòng chỗ hoa chỗ thường. Sửa bằng mã (LLM đã được dặn, nhưng bước nguyên văn ở trên trả lại đúng chữ khách), cả trong
-    # ngoặc kép của prompt để FLUX vẽ đúng chữ sẽ dựng.
-    for t in out:
-        c = _cap_first(t["text"])
-        if t.get("role") == "list_item" and c != t["text"]:
-            old, t["text"] = t["text"], c
-            pe = pe.replace(f'"{old}"', f'"{c}"')
-            variants = [{**v, "prompt_en": v["prompt_en"].replace(f'"{old}"', f'"{c}"')} for v in variants]
-            log.setdefault("list_capitalized", []).append(c)
     return {"mode": mode, "prompt_en": pe, "texts": out, "variants": variants, "log": log}
+
+
+def _requote(pe: str, texts: list[dict]) -> str:
+    """Chuỗi trong ngoặc kép của prompt trùng một câu trong texts khi không phân biệt hoa / thường -> viết đúng như câu đó."""
+    by = {t["text"].casefold(): t["text"] for t in texts}
+    return QUOTED.sub(lambda m: '"' + by.get(_norm(m.group(1)).casefold(), m.group(1)) + '"', pe)
+
+
+def _ai_reject(text: str, t: dict, n_have: int) -> str | None:
+    """Câu LLM tự viết có được giữ làm chữ phụ trợ không. -> lý do bỏ, hoặc None (giữ)."""
+    if t.get("source") != "ai":
+        return "không nguyên văn của khách"
+    if n_have >= AI_MAX:
+        return f"quá {AI_MAX} câu phụ trợ"
+    if len(text) > AI_MAX_CHARS:
+        return "dài"
+    if AI_BAN.search(text):
+        return "có số / tiền / liên kết"
+    low = " " + re.sub(r"[^\w\s]", " ", text.casefold()) + " "
+    hit = next((w for w in AI_BAN_WORDS if f" {w} " in low), None)
+    return f"có chữ cam kết / ưu đãi '{hit}'" if hit else None
 
 
 def _cap_first(s: str) -> str:

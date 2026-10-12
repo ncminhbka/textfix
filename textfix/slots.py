@@ -415,6 +415,9 @@ numbers, dates, phones, addresses, emails, links) are never changed, abbreviated
 stays "Quận 3", never "Q.3") or leave them out; the unit belongs to the number (15-25 triệu, 35.000đ, 30 phút, 50%): never drop it. Set \
 "client": "T<i>" on ops writing (part of) a client text; list client texts the model did not draw, or that you dropped, in \
 "missing".
+- Client texts marked OURS are filler copy we wrote (a headline, tagline, button or section label the client did not give): \
+you may shorten, reword or drop them freely so the poster fits and looks right; they never carry facts. All other client \
+texts follow the rules above and below.
 - SPELLING: copy client words character for character, with every Vietnamese diacritic. The draft's letters are often \
 wrong (TRƯỞNG or TRƯỜNG drawn for TRƯƠNG, Thứ Bẩy for Thứ Bảy): never take spelling from the image or the OCR.
 - ONCE: each client text is written once. The image model often repeats a line (the same date, price or badge label twice): \
@@ -498,6 +501,15 @@ into one row and never leave a drawn bullet empty while another row is crammed; 
 - Text in a pill / button / badge / band: the shell fixes the room. A sentence much longer than the line the model drew there \
 is shortened to its key words (facts exact: "Tặng buổi tư vấn đầu cho khách mới") so it stays at the drawn size -- never a \
 full sentence shrunk to fine print inside its shell.
+- A badge / seal / shell the BASE still shows is never left EMPTY: when the lines the model drew inside it are invented \
+or do not match any client text, write ONE short phrase taken from the client texts there (the key number or benefit: \
+"14 ngày", "1 tỷ lợi khuẩn", "Tặng bình giữ nhiệt") and skip the other lines -- an empty badge is worse than a short one.
+- No background bars: a list row or a body line never gets its own background / box in box_style. For contrast on a busy \
+picture use a text-shadow (or a lighter / darker text color from the palette). Only a call-to-action or offer whose pill \
+the draft showed gets a recreated shell.
+- List icons are ONE set: when the rows of a list have an icon in front, EVERY row you write keeps exactly one icon op -- \
+never skip the icon of a row you write, and when the model drew two small marks in front of one row, put both I# slots \
+in ONE icon op. Same style and color on every row.
 - Badges / coins / stickers with a big middle line: put the key word or number of the client text big in the big slot and \
 the rest small in the small slots (Giảm / 50%; Tặng / quà); skip slots left over rather than filling them with made-up words.
 - Never a shell inside a shell: when the BASE still shows a pill / card / band behind a line, or its S# slot is drawn as a \
@@ -664,7 +676,9 @@ def _to_marks(P) -> dict:
 
 
 def _texts(texts: list[dict]) -> str:
-    return "\n".join(f"T{i} ({t.get('role', '')}): {t['text']}" for i, t in enumerate(texts))
+    # câu "ai" = chữ phụ trợ bước brief tự viết (tiêu đề / khẩu hiệu / nút / nhãn khi khách chỉ điền sự thật): không phải lời khách
+    return "\n".join(f"T{i} ({t.get('role', '')}{', OURS' if t.get('source') == 'ai' else ''}): {t['text']}"
+                     for i, t in enumerate(texts))
 
 
 PRODUCT_NOTE = ("The client uploaded a photo of their product and the image model copied it into the draft. Text, logos and "
@@ -829,21 +843,119 @@ def validate(P: dict, M: dict, texts: list[dict] | None = None, product: bool = 
                    else f"background:{s0.get('fill')}") + f"; border-radius:{s0.get('radius') or 0:.0f}px"
             log.append(f"{op.get('id')}: vỏ {sid[0]} {op['kind']} mà chứa chữ được viết {inside} -> vẽ lại theo số đo ({css})")
             ops[i] = {**op, "kind": "shape", "html": "", "box_style": css, "why": "guard: shell holding written text"}
+    if texts:
+        ops, lg = _guard(ops, M, texts)
+        log += lg
+    log += _pack_lists(ops, by)
     # ICON / CHẤM ĐẦU DÒNG TRƠ: chi tiết đi kèm một dòng (near "left of L5") mà dòng đó bị skip -> bỏ luôn chi tiết (09/10 dev3
-    # p08, p11: icon / chấm đầu dòng không có chữ)
+    # p08, p11: icon / chấm đầu dòng không có chữ). Chạy SAU chặn chữ và dồn hàng: dòng bị bỏ ở hai bước đó cũng tính.
     dead = {m for op in ops if op.get("kind") == "skip" for m in op["marks"] if m.startswith("L")}
     live = {m for op in ops if op.get("kind") in ("text", "keep") for m in op["marks"]}
     for i, op in enumerate(ops):
         if op.get("kind") in ("icon", "stars") and all(m.startswith("I") for m in op["marks"]):
-            near = [(by[m].get("near") or "").split() for m in op["marks"]]
-            tied = [n[-1] for n in near if len(n) >= 2 and n[0] in ("left", "on")]
+            tied = _tied(op, by)
             if tied and all(t in dead and t not in live for t in tied):
                 log.append(f"{op.get('id')}: chi tiết đi kèm dòng bị bỏ {tied} -> skip")
                 ops[i] = {**op, "kind": "skip", "html": "", "why": "guard: orphan bullet / icon"}
-    if texts:
-        ops, lg = _guard(ops, M, texts)
-        log += lg
+    log += _icon_sets(ops, by)
     return {**P, "ops": ops}, log
+
+
+def _tied(op: dict, by: dict) -> list[str]:
+    """Các dòng mà chi tiết của lệnh đi kèm (đứng bên trái / nằm trên dòng đó)."""
+    near = [(by[m].get("near") or "").split() for m in op.get("marks") or [] if m in by]
+    return [n[-1] for n in near if len(n) >= 2 and n[0] in ("left", "on")]
+
+
+def _lists(ops: list[dict], by: dict) -> dict:
+    """Danh sách VLM khai: {tên nhóm: [chỉ số lệnh chữ]} (group_kind "list", >= 2 lệnh, mỗi lệnh có dòng L, không nghiêng)."""
+    G = {}
+    for i, op in enumerate(ops):
+        if op.get("kind") == "text" and op.get("html") and op.get("group") and op.get("group_kind") == "list":
+            G.setdefault(op["group"], []).append(i)
+
+    def ok(i):
+        lm = [m for m in ops[i]["marks"] if m.startswith("L")]
+        return bool(lm) and all(abs(by[m].get("angle") or 0) < 2 for m in lm)
+    return {g: idx for g, idx in G.items() if len(idx) >= 2 and all(ok(i) for i in idx)}
+
+
+def _pack_lists(ops: list[dict], by: dict) -> list[str]:
+    """HÀNG TRỐNG GIỮA DANH SÁCH (12/10 run 38ef: nháp vẽ một ý hai lần, VLM bỏ hàng lặp ở giữa -> danh sách thủng một hàng):
+    hàng bị bỏ nằm GIỮA các hàng của một danh sách VLM khai, cùng cột, cùng số dòng -> dồn các ý lên theo thứ tự, hàng trống
+    xuống cuối. Chỉ đổi ô giữa các lệnh (ý nào viết vào hàng nào); chữ, kiểu, nhóm giữ nguyên."""
+    log = []
+
+    def box(lm):
+        return [min(by[m]["box"][0] for m in lm), min(by[m]["box"][1] for m in lm),
+                max(by[m]["box"][2] for m in lm), max(by[m]["box"][3] for m in lm)]
+    for name, idx in _lists(ops, by).items():
+        if any(not all(m.startswith("L") for m in ops[i]["marks"]) for i in idx):
+            continue
+        mb = {i: box(ops[i]["marks"]) for i in idx}
+        x0, x1 = min(b[0] for b in mb.values()), max(b[2] for b in mb.values())
+        y0, y1 = min(b[1] for b in mb.values()), max(b[3] for b in mb.values())
+        holes = []
+        for j, op in enumerate(ops):
+            lm = op.get("marks") or []
+            if op.get("kind") != "skip" or not lm or not all(m.startswith("L") for m in lm):
+                continue
+            b = box(lm)
+            if y0 < (b[1] + b[3]) / 2 < y1 and min(b[2], x1) - max(b[0], x0) >= 0.5 * (b[2] - b[0]) \
+                    and not any(min(b[3], q[3]) - max(b[1], q[1]) > 0.5 * (b[3] - b[1]) for q in mb.values()):
+                holes.append(j)
+        if not holes:
+            continue
+        units = sorted(idx + holes, key=lambda i: box(ops[i]["marks"])[1])
+        mem = [i for i in units if i in idx]
+        rest = [i for i in units if i not in idx]
+        marks = [list(ops[i]["marks"]) for i in units]
+        if any(len(marks[k]) != len(ops[mem[k]]["marks"]) for k in range(len(mem))):
+            continue   # hàng trống có số dòng khác ý sẽ dồn vào: để nguyên
+        for k, i in enumerate(mem):
+            ops[i] = {**ops[i], "marks": marks[k], "slots": marks[k]}
+        for k, i in enumerate(rest):
+            ops[i] = {**ops[i], "marks": marks[len(mem) + k], "slots": marks[len(mem) + k]}
+        log.append(f"danh sách '{name}': hàng trống ở giữa -> dồn các ý lên, hàng trống xuống cuối ({[ops[i].get('id') for i in rest]})")
+    return log
+
+
+def _icon_sets(ops: list[dict], by: dict) -> list[str]:
+    """ICON CỦA MỘT DANH SÁCH là MỘT BỘ (12/10 run 93f1: ba hàng -- icon to, hai icon nhỏ chồng nhau, không icon): khi từ nửa số
+    hàng (>= 2) của danh sách VLM khai có icon đầu hàng, thì mỗi hàng đúng MỘT icon: hàng có nhiều icon giữ cái trên cùng, hàng
+    có ô icon mà VLM bỏ -> vẽ lại bằng icon hay dùng nhất của bộ. Gắn "icon_set" cho cả bộ: bước dựng cho cùng cỡ, thẳng một cột."""
+    log = []
+
+    def top(j):
+        return min(by[m]["box"][1] for m in ops[j]["marks"])
+    for name, idx in _lists(ops, by).items():
+        rows = {i: set(ops[i]["marks"]) for i in idx}
+        icons, skipped = {i: [] for i in idx}, {i: [] for i in idx}
+        for j, op in enumerate(ops):
+            mk = op.get("marks") or []
+            if not mk or not all(m.startswith("I") for m in mk) or op.get("kind") not in ("icon", "skip"):
+                continue
+            row = next((i for i, r in rows.items() if set(_tied(op, by)) & r), None)
+            if row is not None:
+                (icons if op["kind"] == "icon" else skipped)[row].append(j)
+        have = [i for i in idx if icons[i]]
+        if len(have) < 2 or 2 * len(have) < len(idx):
+            continue
+        htmls = [ops[j].get("html") or "" for i in idx for j in icons[i]]
+        tpl = max(sorted(set(htmls)), key=htmls.count)
+        for i in idx:
+            js = sorted(icons[i], key=top)
+            for j in js[1:]:
+                log.append(f"{ops[j].get('id')}: hàng {ops[i].get('id')} đã có icon {ops[js[0]].get('id')} -> skip")
+                ops[j] = {**ops[j], "kind": "skip", "html": "", "why": "guard: one icon per list row"}
+            if not js and skipped[i]:
+                j = min(skipped[i], key=top)
+                log.append(f"{ops[j].get('id')}: hàng {ops[i].get('id')} mất icon (các hàng khác của '{name}' có) -> vẽ lại")
+                ops[j] = {**ops[j], "kind": "icon", "html": tpl, "why": "guard: list row lost its icon"}
+                js = [j]
+            for j in js[:1]:
+                ops[j] = {**ops[j], "icon_set": name}
+    return log
 
 
 def uncovered(P: dict, texts: list[dict]) -> list[int]:

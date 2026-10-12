@@ -177,6 +177,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     tid = lambda m: int(m[1:]) if isinstance(m, str) and m[1:].isdigit() else m   # noqa: E731  "T5" -> 5
     miss_i = [i for i in map(tid, P.get("missing") or []) if isinstance(i, int) and 0 <= i < len(B["texts"])]
     code_miss = [i for i in slots.uncovered(P, B["texts"]) if i not in miss_i]   # VLM bỏ câu mà không khai
+    code_miss = [i for i in code_miss if B["texts"][i].get("source") != "ai"]    # chữ phụ trợ (không phải lời khách) được phép bỏ
     if code_miss:
         log.append(f"câu khách không có trên poster (đo bằng mã): {[B['texts'][i]['text'] for i in code_miss]}")
     missing = [B["texts"][i]["text"] for i in sorted(set(miss_i) | set(code_miss))]
