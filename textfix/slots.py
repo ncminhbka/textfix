@@ -321,6 +321,102 @@ MARK_SQUARE = 0.4   # ... và gọn: cạnh ngắn >= 0.4 cạnh dài (chấm, t
 MARK_GAP = 1.2    # ... cách mép trái dòng <= 1.2 cao dòng, tâm nằm trong chiều cao dòng (nới 0.25 cao)
 
 
+MARK_REACH = 2.4   # dò dấu trên NHÁP: cửa sổ bên trái dòng rộng 2,4 cao dòng
+MARK_SEP = 0.12    # ... cách mép trái dòng >= 0,12 cao dòng (sát hơn là mẩu của chữ cái đầu dòng)
+MARK_ALONE = 0.3   # dấu nhỏ hơn 0,3 cao dòng (chấm tròn) chỉ nhận khi >= 2 dòng có dấu thẳng cột (danh sách); to hơn thì nhận lẻ
+MARK_MIN = 0.12    # ... dấu có cạnh dài >= 0,12 cao dòng (nhỏ hơn là hạt nhiễu)
+MARK_FLAT = 6.0    # ... nền cửa sổ phẳng: trung vị cách màu nền <= 6 ΔE (trên ảnh chụp không dò)
+MARK_DE = 25.0     # ... dấu khác màu nền >= 25 ΔE
+
+
+def _draft_marks(L: list, I: list, A: np.ndarray, img: np.ndarray, only: set | None = None) -> tuple[list, list[str]]:
+    """DẤU ĐẦU DÒNG DÒ NGAY TRÊN NHÁP, không qua danh sách chi tiết của lớp phủ. 14/10: 507 dòng của accept2 + mix1 chỉ 8 dòng
+    được gắn dấu trong khi VLM viết dấu ở 27 dòng; đo 9 dòng có dấu: bản xoá gỡ dấu 6 / 9 mà mã không gắn dòng nào (dấu rơi ở
+    bộ lọc chi tiết, hoặc dòng bị coi là nghiêng). Chế độ chỉ dòng chữ: dấu không thuộc dòng thì không được gỡ, VLM lại viết
+    thêm một dấu -> "● • Quét mã QR". Luật: mảng nhỏ, gọn, khác màu nền, nằm TRỌN trong dải cao của dòng ngay bên trái dòng,
+    trên nền phẳng, không đụng ô dòng khác. Mảng chạm mép trên / dưới / trái cửa sổ là hình to hơn dòng (icon to, ảnh): bỏ.
+    only: chỉ xét các dòng này và NỚI luật (bỏ điều kiện thẳng cột / đọc ra số) -- dùng khi đã có bằng chứng thứ hai là VLM
+    viết dấu đầu dòng cho đúng dòng đó (lonly.lead_marks). -> (I đã bỏ chi tiết trùng dấu, log)."""
+    import cv2
+    H, W = A.shape[:2]
+    taken = np.zeros((H, W), bool)
+    for l in L:
+        x0, y0, x1, y1 = (int(v) for v in l["box"])
+        taken[max(0, y0):y1, max(0, x0):x1] = True
+    log, found = [], []
+    for l in L:
+        if l.get("mark") or l.get("path") or l.get("vertical") or abs(l.get("angle") or 0) >= 2:
+            continue
+        if only is not None and l["id"] not in only:
+            continue
+        x0, y0, x1, y1 = (int(round(v)) for v in l["box"])
+        h = y1 - y0
+        wx0, wy0, wy1 = max(0, x0 - int(MARK_REACH * h)), max(0, y0 - int(0.1 * h)), min(H, y1 + int(0.1 * h))
+        if h < 8 or x0 - 2 - wx0 < 6:
+            continue
+        a, tk = A[wy0:wy1, wx0:x0 - 2], taken[wy0:wy1, wx0:x0 - 2]
+        free = a[~tk]
+        if len(free) < 30:
+            continue
+        d = np.linalg.norm(a - np.median(free, axis=0), axis=2)
+        if float(np.median(d[~tk])) > MARK_FLAT:
+            continue
+        n, cc, st, _c = cv2.connectedComponentsWithStats(((d > MARK_DE) & ~tk).astype(np.uint8), 8)
+        best, cands = None, 0
+        for i in range(1, n):
+            bx, by, bw, bh = (int(v) for v in st[i][:4])
+            side = max(bw, bh)
+            if not (MARK_MIN * h <= side <= MARK_MAX * h) or min(bw, bh) < MARK_SQUARE * side:
+                continue
+            gap = a.shape[1] - (bx + bw)
+            # sát mép phải cửa sổ = mẩu của chữ cái đầu dòng (khung OCR cắt vào chữ); chạm mép trên / dưới / trái = hình to hơn dòng
+            if bx == 0 or by == 0 or by + bh >= a.shape[0] or gap > MARK_GAP * h or gap < MARK_SEP * h:
+                continue
+            if tk[by:by + bh, bx:bx + bw].any():
+                continue
+            cands += 1
+            if best is None or bx > best[0]:
+                best = (bx, by, bw, bh)
+        if best is None or cands >= 3:   # ba mảng trở lên trong một dải: hàng chấm nối / hoạ tiết lặp, không phải dấu của dòng
+            continue
+        bx, by, bw, bh = best
+        tiny = max(bw, bh) < MARK_ALONE * h
+        # chấm nhỏ mà trong dải còn >= 3 chấm li ti khác: hàng chấm nối tên - giá của thực đơn (accept1 c03)
+        if tiny and sum(1 for i in range(1, n) if max(st[i][2], st[i][3]) < MARK_ALONE * h and st[i][4] >= 2) >= 3:
+            continue
+        # nằm lọt trong khung của một mảng khác (ký tự / hình trong vòng tròn): dấu là cả VÒNG; vòng quá cỡ thì không phải dấu
+        outer = [st[i] for i in range(1, n) if st[i][0] <= bx and st[i][1] <= by and st[i][0] + st[i][2] >= bx + bw
+                 and st[i][1] + st[i][3] >= by + bh and (st[i][2], st[i][3]) != (bw, bh)]
+        if outer:
+            ox, oy, ow, oh = (int(v) for v in max(outer, key=lambda t: t[2] * t[3])[:4])
+            if max(ow, oh) > MARK_MAX * h or ox == 0 or oy == 0 or oy + oh >= a.shape[0]:
+                continue
+            bx, by, bw, bh = ox, oy, ow, oh
+            best, tiny = (bx, by, bw, bh), False
+        # dấu to mà đọc ra chữ / số: SỐ BƯỚC trong vòng tròn ("①"), chữ cái trang trí -- là nội dung, không phải dấu để vẽ lại
+        if not tiny and only is None:
+            from .ocr import read_rect
+            t, sc = read_rect(img, (wx0 + bx + bw / 2, wy0 + by + bh / 2), bw * 1.2, bh * 1.2, 0.0)
+            if sc >= 0.5 and any(ch.isalnum() for ch in t):
+                continue
+        bx, by, bw, bh = best
+        found.append((l, [wx0 + bx, wy0 + by, wx0 + bx + bw, wy0 + by + bh]))
+    # chấm nhỏ đứng lẻ là hạt trang trí / nhiễu; chấm của danh sách thì thẳng cột với chấm của dòng khác
+    col = lambda mb: (mb[0] + mb[2]) / 2   # noqa: E731
+    tall = lambda l: l["box"][3] - l["box"][1]   # noqa: E731
+    found = [(l, mb) for l, mb in found if only is not None or max(mb[2] - mb[0], mb[3] - mb[1]) >= MARK_ALONE * tall(l)
+             or any(o is not l and abs(col(mb) - col(ob)) <= 0.5 * tall(l) for o, ob in found)]
+    for l, mb in found:
+        b = l["box"]
+        l["mark"] = {"box": [float(v) for v in mb], "color": None, "from": "draft"}
+        l["box"] = [float(min(b[0], mb[0])), b[1], b[2], b[3]]
+        l["ocr_box"] = list(l["box"])
+        l["poly"] = [[l["box"][0], b[1]], [b[2], b[1]], [b[2], b[3]], [l["box"][0], b[3]]]
+        log.append(f"dấu đầu dòng trên nháp {[round(v) for v in mb]} -> nhập vào {l['id']}")
+    inside = lambda c, mb: min(c[2], mb[2]) > max(c[0], mb[0]) and min(c[3], mb[3]) > max(c[1], mb[1])   # noqa: E731
+    return [c for c in I if not any(inside(c["box"], mb) for _l, mb in found)], log
+
+
 def _row_marks(L: list, I: list) -> tuple[list, list[str]]:
     """DẤU ĐẦU DÒNG (chấm, tick, icon nhỏ ngay bên trái một dòng, cùng hàng) nhập vào Ô CỦA DÒNG ĐÓ: khung dòng nới sang trái ôm
     cả dấu, l["mark"] ghi lại; chi tiết đó không còn là ô I. Lý do (13/10 run 1f85, 93f1): dấu và chữ là hai lệnh rời thì lệch
@@ -462,6 +558,8 @@ def build(draft: np.ndarray, plate: np.ndarray, product: bool = False) -> dict:
     mlog = []
     if ROWMARK:
         I, mlog = _row_marks(L, I)
+        I, dlog = _draft_marks(L, I, A, draft)
+        mlog += dlog
     for s in S:   # dòng trong vỏ: tính lại theo điểm trên dòng (ô đã gộp; dòng cong: điểm giữa chữ, không phải tâm khung thẳng)
         x0, y0, x1, y1 = s["box"]
         s["lines"] = [l["id"] for l in L if x0 <= _anchor(l)[0] <= x1 and y0 <= _anchor(l)[1] <= y1]

@@ -678,6 +678,19 @@ hỏng vì gỡ chữ; 3 ca ảnh sản phẩm giữ đủ chữ; không kế ho
 - [công cụ] `scripts/ab_lonly.sh <đề>`: chạy hướng cũ rồi chỉ dòng chữ cùng seed; báo cáo xếp nháp | lượt trước | lượt này và gói
   poster + plan lượt trước vào cùng zip. `bench/icons1.json`: 12 đề nhiều icon (seed 9101-9112) để so hai hướng.
 
+**DẤU ĐẦU DÒNG BỊ ĐÚP (14/10, người dùng: "● • Quét mã QR", bản xoá ĐÃ gỡ chấm mà poster vẫn còn):** ở chế độ chỉ dòng chữ nền
+là NHÁP, nên dấu của nháp chỉ mất khi nó thuộc vùng gỡ của một dòng. `_row_marks` chỉ gắn dấu lấy từ danh sách chi tiết I của
+lớp phủ; đo 9 dòng có dấu (accept2 + mix1): bản xoá gỡ dấu 6 / 9 mà không dòng nào được gắn (dấu rơi ở bộ lọc chi tiết). 507
+dòng: mã gắn 8, VLM viết dấu 27.
+- [mã] `slots._draft_marks`: dò dấu NGAY TRÊN NHÁP bên trái mỗi dòng thẳng -- mảng gọn, khác nền >= 25 ΔE, cạnh 0,12-1,6 cao
+  dòng, cách chữ 0,12-1,2 cao dòng, nền cửa sổ phẳng, không đụng ô dòng khác. Loại: >= 3 mảng trong dải / hàng chấm li ti (chấm
+  nối tên - giá), chấm nhỏ đứng lẻ không thẳng cột với chấm dòng khác, vòng tròn đọc ra số (số bước). Sáu tập, 1.519 dòng: thêm
+  13 dấu ở 9 poster, xem ảnh 10 đúng / 3 nhầm (hạt trang trí).
+- [mã] `lonly.lead_marks` (sau validate): dòng mà VLM VIẾT dấu ở đầu lệnh chữ nhưng chưa có dấu gắn -> dò lại đúng dòng đó với
+  luật nới. Thử trên 8 poster có danh sách đã lưu: chỉ thêm 1 dấu -- ở các poster còn lại chấm "•" đã nằm trong khung OCR của
+  dòng (được gỡ cùng chữ, không đúp). Ca của người dùng (chấm trắng cách chữ một quãng) không có tệp để dựng lại: CHƯA xác nhận.
+- CÒN: dòng có khung OCR cao bất thường trùm hàng trên (accept2 q02) che mất dấu của hàng đó.
+
 **Bộ thi `bench/accept2.json` (30 ca, seed 9001-9030):** e nút / thẻ / huy hiệu (6), h nền khó (5), k chữ khó (5), l danh sách /
 bảng / các bước (5), q ảnh sản phẩm (3), r form thường gặp (6). CHỈ chạy và chấm, không sửa mã theo từng ca của bộ này; lỗi
 thấy ở đây chỉ sửa khi nó hiện thành một con số trên tập luyện (mix1, accept1, dev2, dev3, form1).

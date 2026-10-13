@@ -158,7 +158,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     P, log = slots.validate(raw, M, B["texts"], product=product)
     if L_ONLY:
         P, glog = lonly.fill_gaps(P, M, B["texts"])
-        log += glog
+        log += glog + lonly.lead_marks(P, M, draft)
     log[:0] = llog
     if empty:
         log.insert(0, "VLM trả kế hoạch không có lệnh chữ nào -> gọi lại: " + ("được" if wrote(raw) else "VẪN RỖNG"))

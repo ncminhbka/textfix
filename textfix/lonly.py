@@ -52,6 +52,32 @@ def covered(P: dict, M: dict) -> set:
             for m in op.get("marks") or op.get("slots") or [] if m in M["by"]}
 
 
+LEAD = re.compile(r"^\s*(?:<(?!i-icon|svg)[^>]+>\s*)*(?:<i-icon|<svg|[•●○▪■◆✓✔☑★→·\-–]\s)", re.I)
+
+
+def lead_marks(P: dict, M: dict, draft: np.ndarray) -> list[str]:
+    """DẤU ĐẦU DÒNG BỊ ĐÚP (người dùng 14/10: "● • Quét mã QR"): VLM viết một dấu ở đầu lệnh chữ mà mã chưa gắn dấu của nháp
+    vào dòng đó -> dấu cũ không được gỡ, nằm cạnh dấu mới. VLM viết dấu là bằng chứng thứ hai: dò lại bên trái đúng dòng đó với
+    luật nới (slots._draft_marks only=...), gắn vào dòng để bước gỡ chữ gỡ luôn. Dòng đầu của mỗi lệnh; sửa M tại chỗ."""
+    from . import slots
+    want = set()
+    for op in P.get("ops") or []:
+        mk = [m for m in op.get("marks") or [] if m in M["by"]]
+        if op.get("kind") != "text" or not mk:
+            continue
+        parts = re.split(r"<br\s*/?>|</div>|</p>|</li>", op.get("html") or "", flags=re.I)
+        parts = [p for p in parts if re.sub(r"<[^>]+>", "", p).strip() or "<i-icon" in p or "<svg" in p]
+        lines_ = sorted(mk, key=lambda m: M["by"][m]["box"][1])
+        for k, m in enumerate(lines_):   # lệnh nhiều dòng: dòng thứ k của html ứng với ô thứ k (khi số dòng khớp)
+            src = parts[k] if len(parts) == len(lines_) else (parts[0] if k == 0 and parts else "")
+            if LEAD.match(src) and not M["by"][m].get("mark"):
+                want.add(m)
+    if not want:
+        return []
+    _I, log = slots._draft_marks(M["L"], [], slots._lab(draft), draft, only=want)
+    return [x + " (VLM viết dấu ở dòng này)" for x in log]
+
+
 def fill_gaps(P: dict, M: dict, texts: list[dict]) -> tuple[dict, list[str]]:
     """KHÔNG ĐỂ TRỐNG DÒNG NÀO nháp đã vẽ (13/10, người dùng: "cố gắng bịa vào, đừng bỏ trống" -- mix1: mỗi dòng bị bỏ là một
     nút / huy hiệu trống). Dòng chưa có lệnh viết / giữ (VLM bỏ sót, VLM ghi skip, luật chặn đổi thành skip):
