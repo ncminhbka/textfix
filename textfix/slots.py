@@ -618,6 +618,19 @@ def attach_geo(M: dict, draft: np.ndarray, plate: np.ndarray, product: bool = Fa
     return log
 
 
+def mark_printed(M: dict, product_ocr: list | None) -> list[str]:
+    """CHỮ IN TRÊN SẢN PHẨM khách tải (13/10, người dùng: PHẢI GIỮ, không thay bằng bất cứ gì): dòng của nháp có chữ OCR gần
+    trùng một dòng chữ đọc được trên ẢNH SẢN PHẨM (FLUX chép sản phẩm vào nháp rất sát) -> l["printed"] = True. Dòng đó luôn
+    là "keep" (validate), VLM được báo trong bảng mô tả. -> id các dòng."""
+    words = [{"text": w} for w in product_ocr or [] if w and w.strip()]
+    out = []
+    for l in M["L"] if words else []:
+        if _client_like(l.get("ocr") or "", words) is not None:
+            l["printed"] = True
+            out.append(l["id"])
+    return out
+
+
 def _hex_lab(hx: str) -> np.ndarray:
     return _lab(np.uint8([[[int(hx[i:i + 2], 16) for i in (1, 3, 5)]]]))[0, 0]
 
@@ -1143,7 +1156,8 @@ def describe(M: dict) -> str:
                    + (f", {c['near']}" if c.get("near") else "") for c in M["I"]) or "(none)"
     tilt = lambda m: (_curve_note(m) if m.get("path") else f", drawn at {m['angle']:.0f} degrees" if abs(m.get("angle") or 0) >= 2   # noqa: E731
                       else "") + (", OCR missed this line: the letters read here are a guess" if m.get("missed") else "") \
-        + (", row mark in front (inside this slot)" if m.get("mark") else "")
+        + (", row mark in front (inside this slot)" if m.get("mark") else "") \
+        + (", PRINTED ON THE CLIENT'S PRODUCT: kind \"keep\"" if m.get("printed") else "")
     li = "\n".join(f"{m['id']}: \"{m['ocr']}\" (text ~{m['size']:.0f}px, ~{len(m['ocr'])} characters, color {m['color']}"
                    + (f", inside {m['shell']}" if m.get("shell") else "") + f"{tilt(m)}{_look(m)})" for m in M["L"]) or "(none)"
     return f"Shells:\n{sh}\n\nDetails:\n{de}\n\nText lines:\n{li}"
@@ -1212,8 +1226,10 @@ def _texts(texts: list[dict]) -> str:
 
 
 PRODUCT_NOTE = ("The client uploaded a photo of their product and the image model copied it into the draft. Text, logos and "
-                "graphics printed on that product (label, package, screen) are part of the photo: give every slot on them kind "
-                "\"keep\", never redraw or skip them.")
+                "graphics printed on that product (label, package, screen) are part of the photo and MUST stay exactly as they "
+                "are: give every slot on the product kind \"keep\" -- never rewrite, correct, translate, redraw or skip it, "
+                "and never write a client text there, even when the product's name is one of the client texts. Lines the list "
+                "marks PRINTED ON THE CLIENT'S PRODUCT were recognised by code as product text: they are always \"keep\".")
 
 
 VIEWS = {   # ảnh gửi designer (thử: scripts/vlm_probe.py). D nháp, S nháp đánh dấu ô, Q 4 góc phóng 2x, X bản xoá (nền dựng),
@@ -1277,8 +1293,10 @@ def _cluster_boxes(M: dict, W: int, H: int, n_max: int = 4) -> list[list[int]]:
 
 
 def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, product: bool = False, base: np.ndarray | None = None,
-         view: str | None = None, meta: dict | None = None) -> dict:
-    """base: bản xoá đã dọn (nền dựng) cho các cấu hình có X. meta: nhận số token / thời gian (llm.json_call)."""
+         view: str | None = None, meta: dict | None = None, system: str | None = None, desc: str | None = None,
+         base_label: str | None = None) -> dict:
+    """base: bản xoá đã dọn (nền dựng) cho các cấu hình có X. meta: nhận số token / thời gian (llm.json_call).
+    system / desc / base_label: lời dặn, bảng mô tả ô và nhãn ảnh nền khác mặc định (textfix/lonly.py)."""
     mk = marked_image(draft, M)
     W, H = mk.size
     v = VIEWS[view or VIEW]
@@ -1291,12 +1309,12 @@ def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, produ
         elif c == "Q":
             imgs += ["ZOOM (4 quarters of SLOTS, 2x):", *_quarters(mk)]
         elif c == "X" and base is not None:
-            imgs += ["BASE (erased poster, your slots are drawn on it):", _png(base)]
+            imgs += [base_label or "BASE (erased poster, your slots are drawn on it):", _png(base)]
         elif c == "Z":
             imgs += ["ZOOM (slot clusters of SLOTS, enlarged):", *_clusters(mk, M)]
     user = (f"PROMPT given to the image model:\n{prompt}\n\nClient texts (exact words):\n{_texts(texts)}\n\nPoster size: {W}x{H}px.\n\n"
-            + (PRODUCT_NOTE + "\n\n" if product else "") + f"{describe(M)}")
-    args = (_system(SYSTEM), [user, *imgs]) + ((meta,) if meta is not None else ())
+            + (PRODUCT_NOTE + "\n\n" if product else "") + f"{desc or describe(M)}")
+    args = (system or _system(SYSTEM), [user, *imgs]) + ((meta,) if meta is not None else ())
     return _to_marks(call(*args))
 
 
@@ -1388,9 +1406,19 @@ def validate(P: dict, M: dict, texts: list[dict] | None = None, product: bool = 
         if product and op.get("kind") == "skip" and PRINTED.search(op.get("why") or "") and                 not re.search(r"duplicat|junk|garbl", op.get("why") or "", re.I):
             log.append(f"{op.get('id')}: skip chữ in trên sản phẩm ({op.get('why')!r}) -> keep")
             op = {**op, "kind": "keep"}
+        # CHỮ IN TRÊN SẢN PHẨM KHÁCH TẢI (13/10): dòng mã nhận ra trên sản phẩm (mark_printed) luôn giữ nguyên điểm ảnh, VLM
+        # ghi gì cũng vậy; lệnh chữ gộp cả dòng đó thì dòng đó tách ra thành lệnh giữ riêng
+        pr = [m for m in mk if by[m].get("printed")]
+        if pr and op.get("kind") != "keep":
+            log.append(f"{op.get('id')}: {pr} là chữ in trên sản phẩm khách tải -> giữ nguyên (VLM ghi {op.get('kind')})")
+            ops.append({"id": f"{op.get('id')}p", "kind": "keep", "marks": pr, "slots": pr, "why": "guard: printed on the client's product"})
+            mk = [m for m in mk if m not in pr]
+            if not mk:
+                continue
         # KEEP CHỮ KHÁCH: ô giữ pixel nháp mà chữ OCR của nó gần trùng một câu khách = chữ poster model vẽ (thường sai chính tả)
-        # -> viết lại bằng câu khách (09/10 dev3 g15 v0: VLM keep "QUÀ TẶNG TRI ÂN" trên ruy băng)
-        if op.get("kind") == "keep" and texts:
+        # -> viết lại bằng câu khách (09/10 dev3 g15 v0: VLM keep "QUÀ TẶNG TRI ÂN" trên ruy băng). KHÔNG làm khi khách tải ảnh
+        # sản phẩm: tên sản phẩm in trên vỏ hộp trùng câu khách là chuyện thường, và chữ trên sản phẩm phải giữ
+        if op.get("kind") == "keep" and texts and not product:
             ocr = " ".join(by[m].get("ocr", "") for m in mk if m.startswith("L"))
             k = _client_like(ocr, texts)
             if k is not None:

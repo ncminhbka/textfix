@@ -95,6 +95,13 @@ khối chữ thẳng trong khung bao).
 | S | 0.842 -> 0.842 | 1.000 -> 1.000 |
 | I | 0.505 -> 0.681 | 0.419 -> 0.717 |
 
+### 3b. Chế độ chỉ dòng chữ (`lonly.py`, `TEXTFIX_LONLY=on`, mặc định tắt)
+
+Poster = nháp với chữ viết lại. VLM chỉ nhận ô L và phải viết mọi dòng nháp đã vẽ; không có ô vỏ S, ô chi tiết I. Nền dựng =
+nháp, trừ chỗ là chữ: dưới nét chữ cũ lấy bản xoá khi nền của dòng còn nguyên ở bản xoá, hoặc lấp nét bằng màu quanh nét khi
+bước xoá đã gỡ cả vỏ (vỏ của nháp được giữ). Chữ OCR bỏ sót (vùng chữ của bộ dò không thuộc ô dòng nào) lấy bản xoá. Dấu nhỏ
+đầu dòng bị xoá cùng chữ và VLM viết lại trong lệnh chữ; icon to, hoạ tiết, sao, avatar là điểm ảnh của nháp.
+
 ### 4. Designer (`slots.py`)
 
 Một lời gọi VLM: prompt FLUX, câu khách, danh sách ô kèm số đo, 3 ảnh: nháp, nháp đánh dấu ô, **bản xoá đã dọn** (nền thật sẽ dựng lên: vỏ nào còn, nền sau mỗi dòng). Chốt 07/10 bằng scripts/vlm_probe.py trên 23 ảnh dev, so 4 cấu hình (6 ảnh cũ / +bản xoá / 3 ảnh / vùng cắt quanh cụm ô): 3 ảnh ít lỗi nhất (56 so với 61-71), giữ chữ sản phẩm tốt nhất (29/30 ô P được keep), rẻ nhất (~12k token so với ~16k), giữ dáng chữ nháp tốt hơn; ảnh phóng 2× không giúp. VLM trả mỗi ô một

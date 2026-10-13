@@ -511,6 +511,38 @@ chạy server mới biết (a01, f03, f08, p02, g06); 3 để nguyên (a02 nháp
 - CHƯA đo (cần VLM): chạy lại accept1 là phép thử. So với bản cũ trên cùng seed: `export TEXTFIX_PROMPT=v1` rồi khởi động lại
   máy chủ, chạy `dev_batch.py bench/accept1.json --fresh` lần nữa -- bảng báo cáo tự so hai lượt.
 
+## 13/10 chiều: CHỈ DÒNG CHỮ -- poster = nháp với chữ viết lại (`TEXTFIX_LONLY=on`, mặc định TẮT)
+
+Người dùng chốt, thay quyết định 12/10 "giữ ô S và I": (1) không bỏ dòng nào nháp đã vẽ, thiếu câu khách thì VLM viết cho đủ;
+(2) icon nhỏ trước mỗi dòng vẽ lại; (3) mọi thứ còn lại -- vỏ, icon to, hoạ tiết, sao, avatar -- là điểm ảnh của nháp.
+Số đo dẫn tới quyết định (207 nháp): ô chi tiết I đo đúng ~0,7 và 88 / 163 ô là rác; bước xoá giữ avatar 8/8, icon tô đặc trong
+thẻ ~9/10, gỡ dấu nhỏ nét mảnh cạnh chữ; vỏ 1-2% ảnh bị gỡ 16/16, 2-4% 69%, 4-8% 48%, > 8% chỉ 2/22.
+
+- [mã] `textfix/lonly.py`. `view`: VLM và bộ dựng chỉ thấy ô L (dấu nhỏ đầu dòng đã nằm trong ô dòng). `draft_base`: nền dựng =
+  NHÁP, trừ chỗ là chữ. Mỗi dòng: màu nền của dòng = màu chiếm nhiều nhất trong vùng dòng trên nháp; nền đó ở bản xoá còn
+  nguyên (<= 8 ΔE) -> lấy điểm ảnh bản xoá trong vùng dòng; nền đổi (bước xoá gỡ cả vỏ) -> giữ vỏ của nháp, lấp nét chữ cũ
+  (inpaint); không có nền phẳng (chữ trên ảnh chụp) -> bản xoá. Dòng "keep" (chữ in trên vật): nguyên điểm ảnh nháp. Vùng chữ
+  của bộ dò có >= 25% nằm ngoài mọi ô dòng (chữ OCR bỏ sót) + các mảng bị gỡ chạm nó -> bản xoá, để chữ méo không hiện lại.
+  `fix_ops`: lệnh chữ không có nền / viền / đệm riêng; VLM lỡ bỏ dòng thì chữ cũ vẫn được xoá, chỗ đó trống.
+- [prompt VLM] `SYSTEM_L` (11.100 ký tự): chỉ ô L, kind text | keep; luật 2 "mọi dòng nháp vẽ đều được viết" -- dòng thừa lấp
+  bằng (a) câu khách chưa có chỗ, (b) cụm rút từ câu khác của khách, (c) cụm tự viết không mang sự thật / cam kết; các bước,
+  hàng tên - giá, ngày, liên hệ không bịa; không vẽ nền, viền, icon to; số bước và sao còn trên nền thì không viết lại.
+- [mã] `engine.design`: nhánh L_ONLY; plan.json ghi `"slots_mode": "L"` và dòng log "nền = nháp trừ chữ: ...".
+- Đo tại máy (`scripts/lonly_replay.py`, giữ lệnh chữ của VLM CŨ, chỉ đổi nền): xem bảng ở cuối mục khi có. Phép đo này chỉ trả
+  lời phần NỀN; VLM có viết tốt hơn khi chỉ còn dòng chữ hay không phải chạy server.
+- CHƯA đo (cần VLM): VLM có lấp đủ dòng không, chữ lấp có hợp không, có còn vẽ nền riêng cho chữ không.
+
+### 13/10 chiều: chữ in trên sản phẩm khách tải PHẢI GIỮ
+
+Người dùng: có ảnh sản phẩm thì LLM và VLM phải biết, chữ trên sản phẩm giữ nguyên, không thay bằng bất cứ gì.
+- [prompt LLM] gợi ý khi có ảnh sản phẩm: không tả / không xin chữ trên sản phẩm, chữ poster đặt quanh sản phẩm.
+- [mã] `engine.draw` đọc chữ trên ảnh sản phẩm (`product_ocr`); `slots.mark_printed`: dòng nháp có chữ OCR gần trùng một dòng
+  trên ảnh sản phẩm -> `printed`; bảng mô tả ghi "PRINTED ON THE CLIENT'S PRODUCT"; `validate`: dòng `printed` luôn `keep` dù
+  VLM ghi gì; luật "keep trùng câu khách thì viết lại" TẮT khi có ảnh sản phẩm (tên sản phẩm trên vỏ hộp trùng câu khách).
+  [prompt VLM] `PRODUCT_NOTE` nói rõ không viết lại, không sửa, không dịch, không đặt câu khách lên sản phẩm.
+- Đo 5 ca có ảnh sản phẩm (accept1 p01, p02; dev2 d13, d24, d31): mã nhận 13 dòng in trên sản phẩm (SAPPORO, PREMIUM BEER, Dove,
+  INTENSE, REPAIR...), 0 dòng poster bị nhận nhầm; 4 dòng méo nặng mã không nhận ("DEIN TAON", "moo.m"...) -- VLM cũ đều đã giữ.
+
 ## Lượt chạy server tiếp theo
 
 Cập nhật mã (docs/SERVER.md), khởi động lại máy chủ **và kernel**, rồi:
@@ -520,6 +552,15 @@ trang `output/runs/_reports/<tập>.html` (mở qua `.../proxy/8088/outputs/_rep
 `output/runs_zip/<tập>_report_<giờ>.zip` (HTML + ảnh thu nhỏ + plan / brief / request) để gửi Claude chấm. `--full` mới gói đầy đủ.
 Cờ nghi hỏng đo trên 39 poster accept1 chấm mắt: bộ kiểm hình học riêng bắt 6 / 15 poster hỏng, báo nhầm 6 / 24; gộp cờ bắt 11 / 15,
 báo nhầm 6 / 24 -- dùng để theo dõi xu hướng và chọn poster cần xem, chưa đủ để quyết định tự động.
+
+**So đường cũ với "chỉ dòng chữ" trên cùng seed (hai lượt, chạy từ terminal):**
+```
+source ~/textfix_env.sh; export TEXTFIX_GEO=on
+bash scripts/start_server.sh                                   # lượt 1: cờ tắt (đường cũ + các sửa 13/10)
+python scripts/dev_batch.py bench/accept1.json --fresh
+export TEXTFIX_LONLY=on; bash scripts/start_server.sh           # lượt 2: khởi động lại máy chủ với cờ bật
+python scripts/dev_batch.py bench/accept1.json --fresh         # bảng in ra so từng ca với lượt 1
+```
 
 **Sau cụm sửa 13/10 chiều:** chạy lại accept1 với `--fresh` (cùng seed) để so trước / sau trên đúng 42 nháp:
 `export TEXTFIX_GEO=on`, khởi động lại máy chủ + kernel, `%run scripts/dev_batch.py bench/accept1.json --fresh`.

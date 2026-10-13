@@ -129,7 +129,9 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
         hints.append(f"main brand color: {design['color']} (use it as the dominant accent color of the design)")
     if product_image:
         hints.append("the user uploaded a photo of their product, given to the image model as reference image 1: the poster must "
-                     "feature exactly that product (say 'the product from image 1' in prompt_en)")
+                     "feature exactly that product (say 'the product from image 1' in prompt_en). The product keeps its own "
+                     "printed label, logo and text exactly as in the photo: never describe, quote or ask for any text ON the "
+                     "product, and never place a poster text on it -- poster texts go around the product")
     if aspect in ORIENT:
         hints.append(f"canvas: {ORIENT[aspect]} -- compose the whole layout for this shape and describe it with words like "
                      "horizontal / vertical / square, never as a ratio")

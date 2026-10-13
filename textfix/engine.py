@@ -96,38 +96,67 @@ def draw(flux, B: dict, W: int, H: int, seed: int, product: np.ndarray | None = 
     fe = (lambda im: flux.edit(im, ERASE_PROMPT, seed)) if flux is not None else None   # noqa: E731
     plate, cinfo = cleanup.clean(draft, plate, erase=fe, strict=product is None)
     T["don"] = time.time() - t0
-    return {"draft": draft, "plate_raw": plate_raw, "plate": plate, "cinfo": cinfo, "timing": T}
+    out = {"draft": draft, "plate_raw": plate_raw, "plate": plate, "cinfo": cinfo, "timing": T}
+    if product is not None:   # chữ in trên sản phẩm khách tải: để bước thiết kế nhận ra các dòng đó trong nháp và GIỮ nguyên
+        from .ocr import read_lines
+        try:
+            out["product_ocr"] = [l["text"] for l in read_lines(product) if sum(ch.isalnum() for ch in l["text"]) >= 2]
+        except Exception:   # OCR ảnh sản phẩm hỏng: vẫn còn lời dặn + lựa chọn keep của VLM
+            out["product_ocr"] = []
+    return out
 
 
 def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -> dict:
     """TRẠM THIẾT KẾ (không GPU): ô (OCR + lớp phủ) -> VLM điền ô -> dựng -> kiểm -> vòng duyệt (slots.REVIEW_MODE).
     d = draw(...). -> {draft, plate_raw, plate, poster, poster_first, steps, plan, timing}."""
-    from . import render, slots
+    from . import lonly, render, slots
     draft, plate, cinfo, T = d["draft"], d["plate"], d["cinfo"], dict(d["timing"])
     t0 = time.time()
     progress("đo ô (OCR + lớp phủ)")
     M = slots.build(draft, plate, product=product)
+    printed = slots.mark_printed(M, d.get("product_ocr")) if product else []
+    # CHỈ DÒNG CHỮ (TEXTFIX_LONLY=on, lonly.py): VLM chỉ nhận ô L; nền dựng = nháp trừ chữ (vỏ, icon to, hoạ tiết là của nháp)
+    L_ONLY = lonly.LONLY
+    geo_log = list(M.get("geo_log") or [])
+    if L_ONLY:
+        M = lonly.view(M)
+
+    def base_of(p_):
+        return lonly.draft_base(draft, plate, M, p_) if L_ONLY else slots.base_image(draft, plate, M, p_)
+
+    def ask():
+        if L_ONLY:
+            return lonly.plan(draft, M, B["prompt_en"], B["texts"], vlm, product=product, base=lonly.draft_base(draft, plate, M))
+        return slots.plan(draft, M, B["prompt_en"], B["texts"], vlm, product=product, base=plate)
     T["o"] = time.time() - t0
     t0 = time.time()
     progress("VLM thiết kế")
-    raw = slots.plan(draft, M, B["prompt_en"], B["texts"], vlm, product=product, base=plate)
+    raw = ask()
     # KẾ HOẠCH RỖNG (13/10 accept1 f03: VLM trả về không một lệnh nào -> mọi ô bị bỏ, poster ra không chữ, 0 lỗi): có dòng chữ, có
     # câu khách mà không lệnh nào viết chữ -> gọi lại VLM một lần; vẫn rỗng thì ghi lỗi nặng "empty_plan"
     wrote = lambda p_: any(o.get("kind") == "text" and o.get("html") for o in p_.get("ops") or [])   # noqa: E731
     empty = bool(M["L"] and B["texts"]) and not wrote(raw)
     if empty:
         progress("VLM trả kế hoạch rỗng, gọi lại")
-        raw = slots.plan(draft, M, B["prompt_en"], B["texts"], vlm, product=product, base=plate)
+        raw = ask()
+    llog = []
+    if L_ONLY:
+        raw, llog = lonly.fix_ops(raw, M)
     P, log = slots.validate(raw, M, B["texts"], product=product)
+    log[:0] = llog
     if empty:
         log.insert(0, "VLM trả kế hoạch không có lệnh chữ nào -> gọi lại: " + ("được" if wrote(raw) else "VẪN RỖNG"))
     if cinfo["lines"]:
         log.insert(0, f"dọn chữ sót: inpaint {cinfo['inpaint']}, FLUX vùng cắt {cinfo['reerase']}")
-    log[:0] = list(M.get("geo_log") or [])   # vỏ giả, vùng chữ của bộ dò, ô chữ cong, dòng OCR sót
+    log[:0] = geo_log   # vỏ giả, vùng chữ của bộ dò, ô chữ cong, dòng OCR sót
+    if product:
+        log.insert(0, f"ảnh sản phẩm khách tải: chữ đọc được {d.get('product_ocr') or []} -> dòng nháp là chữ in trên sản phẩm {printed}")
     T["vlm"] = time.time() - t0
     t0 = time.time()
     progress("dựng + kiểm")
-    poster, res, rlog = render.render(page, slots.base_image(draft, plate, M, P), P, M)
+    if L_ONLY:
+        lonly.draft_base(draft, plate, M, P, log=log)
+    poster, res, rlog = render.render(page, base_of(P), P, M)
     errs = render.check(P, M, res)
     if empty and not wrote(raw):
         errs.append({"type": "empty_plan", "ops": []})
@@ -138,7 +167,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
         P2, flog = render.autofix(P, M, errs, res)
         if not flog:
             break
-        poster2, res2, rlog2 = render.render(page, slots.base_image(draft, plate, M, P2), P2, M)
+        poster2, res2, rlog2 = render.render(page, base_of(P2), P2, M)
         errs2 = render.check(P2, M, res2)
         ok = (sev(errs2), len(errs2)) < (sev(errs), len(errs))
         log += [f"-- sửa bằng code {k + 1} --"] + flog + [f"LỖI CÒN: {e}" for e in errs2] +             ["-> giữ bản sửa" if ok else "-> bản sửa không bớt lỗi, giữ bản trước"]
@@ -161,13 +190,13 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
         if not P2.get("review_patches"):
             log.append(f"vòng duyệt {k + 1}: không sửa gì ({P2.get('review_why')})")
             break
-        poster2, res2, rlog2 = render.render(page, slots.base_image(draft, plate, M, P2), P2, M)
+        poster2, res2, rlog2 = render.render(page, base_of(P2), P2, M)
         errs2 = render.check(P2, M, res2)
         log += [f"-- vòng duyệt {k + 1} --", f"VLM: {P2.get('review_why')}"] + vlog2 + rlog2 + [f"LỖI CÒN: {e}" for e in errs2]
         if not slots.accept(P, errs, P2, errs2):   # mất câu khách / thêm lỗi nặng: hoàn lại đúng các lệnh gây hỏng
             P3 = slots.salvage(P, errs, P2, errs2)
             if P3 is not None:
-                poster3, res3, rlog3 = render.render(page, slots.base_image(draft, plate, M, P3), P3, M)
+                poster3, res3, rlog3 = render.render(page, base_of(P3), P3, M)
                 errs3 = render.check(P3, M, res3)
                 log.append(f"-> hoàn lại {P3['salvaged']}, giữ các vá khác")
                 if slots.accept(P, errs, P3, errs3):
@@ -200,7 +229,9 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     plan["si"] = {k: n for k, n in sorted(((f"{m['id'][0]}:{kinds.get(m['id'], 'none')}", 0) for m in M["S"] + M["I"]))}
     for m in M["S"] + M["I"]:
         plan["si"][f"{m['id'][0]}:{kinds.get(m['id'], 'none')}"] += 1
-    steps = _row([draft, slots.marked_image(draft, M), plate, poster])
+    if L_ONLY:
+        plan["slots_mode"] = "L"
+    steps = _row([draft, slots.marked_image(draft, M), base_of(P) if L_ONLY else plate, poster])
     plan["errors_first"] = errs_first
     return {"draft": draft, "plate_raw": d["plate_raw"], "plate": plate, "poster": poster, "poster_first": poster_first,
             "steps": steps, "plan": plan,
