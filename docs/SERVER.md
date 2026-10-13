@@ -150,3 +150,9 @@ Thêm `--full` khi cần cả nháp / bản xoá cỡ gốc (các zip < 24 MB nh
 | Lỗi 803 / `cuInit` | `start_server.sh` và `check_server.py` tự bỏ `.../compat` khỏi `LD_LIBRARY_PATH`; chạy tay thì làm tương tự |
 | VLM `400` / `too many images` / `maximum context length` | Tăng `--limit-mm-per-prompt` / `--max-model-len` phía máy chủ VLM |
 | Poster thiếu câu (giao diện báo "Không vẽ") | Model không chừa chỗ cho câu đó, hoặc designer rút gọn cho vừa: đổi seed, thêm ảnh |
+
+## LaMa (gỡ chữ của chế độ chỉ dòng chữ)
+
+Tệp `big-lama.pt` (196 MB): `wget -O ~/persistent-data/lama/big-lama.pt https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt`.
+Mã tự dùng khi tệp có ở `~/persistent-data/lama/big-lama.pt`; đổi chỗ thì `export TEXTFIX_LAMA=<đường dẫn>`, tắt thì
+`export TEXTFIX_LAMA=off` (về đường luật cũ). plan.json ghi dòng log "nền = nháp trừ chữ (LaMa): ..." khi LaMa chạy.

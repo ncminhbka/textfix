@@ -624,6 +624,23 @@ chữ neon nhoè (VLM), t03 VLM tự viết "Gà giòn" thay giá combo; nhẹ: 
   con dấu, 18% ảnh), g05 huy hiệu (méo). => LaMa dùng được cho nhánh "nền không phẳng + bản xoá không đáng tin" KHI có mặt nạ nét
   chữ chặt; việc kế là mặt nạ, không phải model.
 
+**GỠ CHỮ VIẾT LẠI: một mặt nạ nét chữ + LaMa (13/10 đêm).** Người dùng: zip không phải để vá lỗi lẻ; muốn đưa hướng chỉ dòng chữ
+lên trần. Cây luật (nền phẳng? bản xoá tin được? ba cách lấp, hơn mười ngưỡng) thay bằng hai bước cho MỌI dòng:
+- [mã] `lonly.ink_mask`: nét chữ cũ = hợp của (1) mảng cùng MÀU MỰC của dòng chạm lõi dòng, >= 70% nằm trong vùng dòng; (2) chỗ
+  BẢN XOÁ khác nháp trong vùng dòng, khi bản xoá đổi < 60% vùng dòng (chỉ gỡ chữ); (3) mảng KHÁC MÀU NỀN của dòng chạm lõi, khi
+  phần đó <= 60% vùng dòng. Nới 0,12 cao dòng (`TEXTFIX_MASK_GROW`; nới 0,05 thì LaMa vẽ lại hình chữ từ viền còn sót). Không
+  bằng chứng nào: lõi dòng. + khung dấu đầu dòng, + chữ OCR bỏ sót.
+- [mã] `lonly.draft_base`: có `big-lama.pt` (`TEXTFIX_LAMA`, mặc định `~/persistent-data/lama/big-lama.pt`; `off` để tắt) thì
+  LaMa lấp mặt nạ trên NHÁP, ngoài mặt nạ nguyên điểm ảnh nháp, không điểm ảnh nào của bản xoá vào poster. Không có tệp / lỗi
+  khi chạy: đường luật cũ (`_base_rules`).
+- [đo] `scripts/erase_bench.py` (sót = ký tự OCR còn đọc được trên nền; đổi = % ảnh khác nháp; ngoài = đổi ngoài vùng dòng).
+  54 poster (nửa số của mix1, accept1, dev2), bản LaMa ĐẦU (chưa có (3), nới 0,05): luật 6 poster sót / 47 ký tự, LaMa 2 / 22;
+  đổi 7,19% và 7,51%. Hai số này KHÔNG bắt được nút bị khoét / bóng chữ mờ -- phải kèm xem mắt. CPU 12 s / poster.
+- Xem mắt 20 poster với bản cuối: sạch hơn luật ở nút vàng kim (a01, a03), nút cam bóng (v05), bốn nút pastel kể cả chữ trắng
+  trên nút kem (v06), giấy kraft (t01), cầu vồng (x04), homestay (f05). CHƯA được: con dấu (c01, vòng cùng màu mực bị gỡ cả),
+  vòm chữ plan cũ (g04, còn nửa tiêu đề), nút giá của nệm bị khuyết một góc (f02), vòm cầu vồng bị mờ (g03).
+  Bản cuối CHƯA đo lại bằng erase_bench (máy không GPU) -- xác nhận trên máy chủ.
+
 **Không để trống dòng (13/10 tối, người dùng: "cố gắng bịa vào, đừng bỏ trống"):** đọc lệnh của 34 poster mix1: 13 / 286 dòng
 bị bỏ, ở 5 poster -- và phần lớn KHÔNG phải VLM bỏ: 4 poster do luật "lặp chữ -> skip" của mã (i05 huy hiệu "Ưu đãi" nháp vẽ hai
 lần, VLM viết cả hai, mã xoá một), 1 poster do VLM trả lời cụt (p02: 1 lệnh cho 10 dòng, autofix đổi 9 dòng còn lại thành skip,

@@ -256,7 +256,151 @@ def _quad(ys: np.ndarray, xs: np.ndarray) -> np.ndarray:
     return np.c_[np.ones(len(xs)), xs, ys, xs * xs, xs * ys, ys * ys]
 
 
+LAMA_PATH = os.path.expanduser(os.environ.get("TEXTFIX_LAMA", "~/persistent-data/lama/big-lama.pt"))
+MASK_GROW = float(os.environ.get("TEXTFIX_MASK_GROW", "0.12"))   # nới mặt nạ nét chữ, theo cao dòng
+INK_IN = 0.7      # mảng cùng màu mực là nét chữ khi >= 70% của nó nằm trong vùng dòng (vòng con dấu, viền nút cùng màu: phần lớn ở ngoài)
+INK_SHARE = (0.03, 0.75)   # màu mực đo đúng khi phủ 3% - 75% lõi dòng; ngoài khoảng đó là đo nhầm (màu nền, hoặc không có điểm nào)
+_LAMA: dict = {}
+
+
+def lama_ready() -> bool:
+    return os.environ.get("TEXTFIX_LAMA", "") != "off" and os.path.exists(LAMA_PATH)
+
+
+def _lama(img: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """LaMa (big-lama.pt, TorchScript): vẽ lại phần trong mặt nạ theo nền xung quanh. Một lượt, không khuếch tán."""
+    import torch
+    if "net" not in _LAMA:
+        dev = "cuda" if torch.cuda.is_available() else "cpu"
+        _LAMA["net"], _LAMA["dev"] = torch.jit.load(LAMA_PATH, map_location=dev).eval(), dev
+    H, W = img.shape[:2]
+    ph, pw = (8 - H % 8) % 8, (8 - W % 8) % 8
+    im = np.pad(img, ((0, ph), (0, pw), (0, 0)), mode="reflect")
+    mk = np.pad(mask.astype(np.float32), ((0, ph), (0, pw)))
+    with torch.no_grad():
+        o = _LAMA["net"](torch.from_numpy(im).permute(2, 0, 1)[None].float().div(255).to(_LAMA["dev"]),
+                         torch.from_numpy(mk)[None, None].to(_LAMA["dev"]))
+    return (o[0].permute(1, 2, 0).float().cpu().numpy()[:H, :W] * 255).round().clip(0, 255).astype(np.uint8)
+
+
+def ink_mask(draft: np.ndarray, plate: np.ndarray, M: dict, kept: set, log: list | None = None) -> np.ndarray:
+    """MẶT NẠ NÉT CHỮ CŨ của mọi dòng không giữ -- thứ duy nhất quyết định chất lượng gỡ chữ (13/10: LaMa sạch khi mặt nạ ôm
+    sát nét, hỏng khi mặt nạ trùm cả nút). Hai bằng chứng, giống nhau cho mọi dòng, không hỏi nền phẳng hay không:
+      (1) MÀU MỰC của dòng (đo lúc dựng ô): các mảng cùng màu mực chạm lõi dòng và nằm phần lớn TRONG vùng dòng;
+      (2) BẢN XOÁ, khi nó đáng tin ở dòng đó (đổi < TRUST vùng dòng = chỉ gỡ chữ): những chỗ nó khác nháp trong vùng dòng --
+          bắt viền chữ, bóng, quầng sáng mà màu mực không bắt được.
+    Màu mực đo nhầm và bản xoá không đáng tin: lấy lõi dòng. Dấu nhỏ đầu dòng: cả khung dấu. Chữ OCR bỏ sót: mảng bị gỡ đọc ra chữ."""
+    import cv2
+    from . import ocr, slots
+    H, W = draft.shape[:2]
+    A, B = slots._lab(draft), slots._lab(plate)
+    e = np.linalg.norm(A - B, axis=2)
+    mask, every = np.zeros((H, W), bool), np.zeros((H, W), bool)
+    n = {"màu mực": 0, "bản xoá": 0, "cả hai": 0, "lõi dòng": 0}
+    for l in M["L"]:
+        R = _region(l, H, W, 0.3)
+        every |= R
+        if l["id"] in kept:
+            continue
+        R0, R2 = _region(l, H, W, 0.1), _region(l, H, W, 0.6)
+        ys, xs = np.nonzero(R2)
+        y0, y1, x0, x1 = int(ys.min()), int(ys.max()) + 1, int(xs.min()), int(xs.max()) + 1
+        r, r0, r2 = R[y0:y1, x0:x1], R0[y0:y1, x0:x1], R2[y0:y1, x0:x1]
+        hgt = float(l.get("size") or (l["box"][3] - l["box"][1]))
+        got = np.zeros(r.shape, bool)
+        by_ink = by_plate = False
+        if l.get("color"):
+            cand = r2 & (np.linalg.norm(A[y0:y1, x0:x1] - slots._hex_lab(l["color"]), axis=2) <= INK_SAME)
+            share = float((cand & r0).sum()) / max(1.0, float(r0.sum()))
+            if INK_SHARE[0] <= share <= INK_SHARE[1]:
+                k, cc, st, _c = cv2.connectedComponentsWithStats(cand.astype(np.uint8), 8)
+                core, inside = np.bincount(cc[r0], minlength=k), np.bincount(cc[r], minlength=k)
+                ok = [i for i in range(1, k) if core[i] and inside[i] >= INK_IN * st[i, cv2.CC_STAT_AREA]]
+                got |= np.isin(cc, ok)
+                by_ink = bool(ok)
+        if float((e[R] > DIFF_GONE).mean()) < TRUST:
+            ch = (e[y0:y1, x0:x1] > SAME_DE) & r
+            k, cc = cv2.connectedComponents(ch.astype(np.uint8), connectivity=8)
+            seed = np.unique(cc[(e[y0:y1, x0:x1] > DIFF_GONE) & r])
+            add = np.isin(cc, seed[seed > 0])
+            by_plate = bool(add.any())
+            got |= add
+        # (3) KHÁC MÀU NỀN CỦA DÒNG: nét chữ = điểm khác màu nhiều nhất của lõi dòng, chạm lõi, nằm trong vùng dòng. Bắt chữ mà
+        # bản xoá bỏ sót hoặc gỡ quá tay, chữ nhiều tông / có viền mà màu mực chỉ bắt một phần (v06, g04). Phần đó trùm quá
+        # COVER_MAX vùng dòng (chữ trên ảnh chụp, vỏ nhiều dải sáng) thì nền không phải một màu: không dùng.
+        q = (draft[y0:y1, x0:x1][r0] // 16).astype(np.int32)
+        key = q[:, 0] * 256 + q[:, 1] * 16 + q[:, 2]
+        cb = np.median(A[y0:y1, x0:x1][r0][key == np.bincount(key).argmax()], axis=0)
+        nb = r & (np.linalg.norm(A[y0:y1, x0:x1] - cb, axis=2) > FLAT_DE)
+        k, cc, st, _c = cv2.connectedComponentsWithStats(nb.astype(np.uint8), 8)
+        core = np.bincount(cc[r0], minlength=k)
+        add = np.isin(cc, [i for i in range(1, k) if core[i] >= INK_CORE * st[i, cv2.CC_STAT_AREA]])
+        if 0 < float(add.sum()) <= COVER_MAX * float(r.sum()):
+            got |= add
+            by_ink = True
+        if not got.any():
+            got = r0.copy()
+        n["cả hai" if by_ink and by_plate else "màu mực" if by_ink else "bản xoá" if by_plate else "lõi dòng"] += 1
+        k = 2 * max(3, int(round(MASK_GROW * hgt))) + 1   # viền khử răng cưa + bóng sát nét: còn sót viền là LaMa vẽ lại hình chữ
+        mask[y0:y1, x0:x1] |= cv2.dilate(got.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))).astype(bool) & r2
+        if l.get("mark"):
+            mx0, my0, mx1, my1 = (int(v) for v in l["mark"]["box"])
+            mask[max(0, my0 - 2):my1 + 2, max(0, mx0 - 2):mx1 + 2] = True
+    # CHỮ OCR BỎ SÓT: mảng bị gỡ chạm lõi một vùng chữ của bộ dò, phần lớn ngoài mọi ô dòng, không trùm tâm dòng nào, đọc ra chữ
+    n_miss = 0
+    gone = cv2.morphologyEx((e > DIFF_GONE).astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    _n, cc, st, _c = cv2.connectedComponentsWithStats(gone, 8)
+    anchors = [slots._anchor(l) for l in M["L"]]
+    done = set()
+    for Rg in ocr.regions(draft):
+        for i_ in (int(v) for v in np.unique(cc[Rg["mask"]]) if v > 0):
+            if i_ in done:
+                continue
+            done.add(i_)
+            x, y, w, h, area = (int(v) for v in st[i_])
+            blob = cc[y:y + h, x:x + w] == i_
+            cnts, _h = cv2.findContours(blob.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            solid = cv2.drawContours(np.zeros(blob.shape, np.uint8), cnts, -1, 1, cv2.FILLED).astype(bool)
+            if any(x <= ax < x + w and y <= ay < y + h and solid[int(ay - y), int(ax - x)] for ax, ay in anchors):
+                continue
+            if float(every[y:y + h, x:x + w][blob].mean()) >= 0.5:
+                continue
+            ys_, xs_ = np.nonzero(blob)
+            if not re.search(r"[A-Za-z0-9À-ỹ]", ocr.read_region(draft, cv2.minAreaRect(np.c_[xs_ + x, ys_ + y].astype(np.float32)))):
+                continue
+            mask[y:y + h, x:x + w] |= cv2.dilate(blob.astype(np.uint8), np.ones((7, 7), np.uint8)).astype(bool)
+            n_miss += 1
+    if log is not None:
+        log.append("nền = nháp trừ chữ (LaMa): mặt nạ nét chữ %.1f%% ảnh; dòng theo %s; %d vùng chữ OCR sót; %d dòng giữ nguyên"
+                   % (100 * mask.mean(), ", ".join(f"{k} {v}" for k, v in n.items() if v), n_miss, len(kept)))
+    return mask
+
+
 def draft_base(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = None, log: list | None = None) -> np.ndarray:
+    """NỀN DỰNG = NHÁP, trừ chỗ là chữ. Có LaMa (TEXTFIX_LAMA trỏ tới big-lama.pt): MỘT mặt nạ nét chữ (ink_mask) + MỘT cách
+    lấp cho mọi dòng -- không điểm ảnh nào của bản xoá vào poster, ngoài mặt nạ là nguyên điểm ảnh nháp. Không có LaMa (hoặc
+    lỗi khi chạy): đường luật cũ (_base_rules)."""
+    if lama_ready():
+        try:
+            import cv2
+            kept = {m for op in (P or {}).get("ops") or [] if op.get("kind") == "keep" for m in op.get("marks") or []}
+            sub = [] if log is not None else None
+            mask = ink_mask(draft, plate, M, kept, sub)
+            if not mask.any():
+                out = draft.copy()
+            else:
+                a = cv2.GaussianBlur(mask.astype(np.float32), (0, 0), 1.0)[..., None]
+                out = (_lama(draft, mask) * a + draft * (1 - a)).round().clip(0, 255).astype(np.uint8)
+            if log is not None:
+                log += sub
+            return out
+        except Exception as ex:   # thiếu torch / hết bộ nhớ / tệp hỏng: không để cả lượt chết
+            if log is not None:
+                log.append(f"LaMa lỗi ({type(ex).__name__}: {ex}) -> gỡ chữ bằng đường luật")
+    return _base_rules(draft, plate, M, P, log)
+
+
+def _base_rules(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = None, log: list | None = None) -> np.ndarray:
     """NỀN DỰNG = NHÁP, trừ chỗ là chữ. Với mỗi dòng không giữ (dòng "keep" = chữ in trên vật: nguyên điểm ảnh nháp):
       - dòng nằm trên NỀN PHẲNG / chuyển màu đều (lòng nút, thẻ, nền trơn): khớp một mặt màu nền từ chính nháp, TÔ ĐÈ đúng nét
         chữ cũ bằng mặt đó. Không dán gì từ bản xoá -> không có mép miếng dán, vỏ của nháp còn nguyên dù bước xoá gỡ hay giữ.
