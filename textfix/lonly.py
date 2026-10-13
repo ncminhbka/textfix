@@ -27,6 +27,12 @@ FIT_MIN = 0.9     # nền phẳng / chuyển màu đều: >= 90% số điểm c�
 INK_CORE = 0.3    # mảng khác màu nền là NÉT CHỮ khi >= 30% của nó nằm trong lõi dòng (viền nút, icon cạnh dòng: phần lớn ở ngoài)
 SAME_DE = 8.0     # bản xoá cách nháp <= 8 ΔE (trung vị) = thứ ở đó còn nguyên
 INK_SAME = 25.0   # điểm khác nền cùng màu mực: cách màu mực của dòng <= 25 ΔE (khác hơn = viền vỏ, bóng, icon cạnh dòng)
+GLYPH_MAX = 2.0   # mảng "chạm lõi, nằm trọn vùng nới" chỉ là nét chữ khi cạnh dài <= 2 cao dòng (một chữ cái / chữ số); dài hơn
+                  # là hình khác cùng màu mực: vòng con dấu quanh chữ chạy vòng (mix1 c01: cả vòng bị lau)
+SPILL = 0.1       # mảng nét chữ chạm mép vùng nới và >= 10% nằm ngoài vùng dòng = chữ DÍNH LIỀN một hình khác (mix1 x04: tiêu đề
+                  # đè lên cầu vồng -> cả khúc cầu vồng bị tô màu nền)
+COVER_MAX = 0.6   # phần tô trùm > 60% vùng dòng = đoán nền sai (mix1 f05: chữ trắng mờ trên sương -> một mảng trắng đục)
+TRUST = 0.6       # bản xoá ĐÁNG TIN ở một dòng khi nó đổi < 60% vùng dòng (chỉ gỡ chữ; gỡ cả vỏ thì đổi gần hết)
 INK_SMALL = 0.5   # ... hoặc mảng nhỏ (dấu thanh, chấm, mẩu nét) cạnh < 0,5 cao dòng nằm trong vùng dòng
 
 
@@ -270,6 +276,7 @@ def draft_base(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = N
     for r in regs.values():
         every |= r
     use_plate = np.zeros((H, W), bool)
+    from_plate = []   # (vùng dòng, vùng nới rộng) của các dòng lấy bản xoá
     paint = []   # (mặt nạ nét chữ, khung, màu nền tại khung) của các dòng trên nền phẳng
     n_plate = n_paint = 0
     why = []   # mỗi dòng lấy bản xoá: vì sao (để truy khi nút / thẻ bị khoét)
@@ -290,7 +297,7 @@ def draft_base(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = N
         inR = R[ys, xs]
         near = inR & (np.linalg.norm(A[ys, xs] - c, axis=1) <= FLAT_DE)
         if float(near.sum()) < FLAT_MIN * float(inR.sum()):   # không có màu nền rõ: chữ nằm trên ảnh chụp -> bản xoá
-            use_plate |= R
+            from_plate.append((R, R2))
             n_plate += 1
             why.append(f"{l['id']} không nền phẳng {float(near.sum()) / float(inR.sum()):.2f}")
             continue
@@ -304,7 +311,7 @@ def draft_base(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = N
         one = _n > 1 and float(_st[1:, cv2.CC_STAT_AREA].max()) >= 0.6 * float(_st[1:, cv2.CC_STAT_AREA].sum())
         if (dom.any() and not one and float(rest.sum()) >= 0.15 * float(R0.sum()) and float(np.median(e[dom])) > DIFF_GONE
                 and float(np.median(e[rest])) <= SAME_DE):
-            use_plate |= R
+            from_plate.append((R, R2))
             n_plate += 1
             why.append(f"{l['id']} màu nhiều nhất là nét chữ")
             continue
@@ -318,7 +325,7 @@ def draft_base(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = N
             bg = res <= 2 * FIT_DE
             flat = float((bg & inR).sum()) >= FIT_MIN * float(((res <= 4 * FIT_DE) & inR).sum())
         if not flat or float((bg & inR).sum()) < FLAT_MIN * float(inR.sum()):
-            use_plate |= R   # nền có vân, hoặc chữ có quầng mờ rộng: mặt màu không tả được nền
+            from_plate.append((R, R2))   # nền có vân, hoặc chữ có quầng mờ rộng: mặt màu không tả được nền
             n_plate += 1
             why.append(f"{l['id']} nền có vân {float((bg & inR).sum()) / max(1.0, float(((res <= 2 * FIT_DE) & inR).sum())):.2f}")
             continue
@@ -336,12 +343,25 @@ def draft_base(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = N
             hoặc mảng nhỏ nằm gọn trong vùng dòng (dấu thanh, chấm đầu dòng). strict: chỉ luật giữa."""
             n, cc, st, _c = cv2.connectedComponentsWithStats(mask.astype(np.uint8), 8)
             core, edge, inside = (np.bincount(cc[z], minlength=n) for z in (r0, rim, gut))
-            ok = [i for i in range(1, n) if (core[i] > 0 and edge[i] == 0) or (not strict and (
+            ok = [i for i in range(1, n) if (core[i] > 0 and edge[i] == 0
+                                             and max(st[i, cv2.CC_STAT_WIDTH], st[i, cv2.CC_STAT_HEIGHT]) <= GLYPH_MAX * hgt) or (not strict and (
                 core[i] >= INK_CORE * st[i, cv2.CC_STAT_AREA]
                 or (max(st[i, cv2.CC_STAT_WIDTH], st[i, cv2.CC_STAT_HEIGHT]) < INK_SMALL * hgt and inside[i] == st[i, cv2.CC_STAT_AREA])))]
             return np.isin(cc, ok)
 
         got = pick(ink > 0, False)
+        trust = float((e[R] > DIFF_GONE).mean()) < TRUST
+        # chữ dính liền một hình khác: bản xoá đáng tin thì lấy bản xoá (nó giữ hình đó, chỉ gỡ chữ); không thì bỏ mảng dính ra
+        n_, cc_, st_, _c = cv2.connectedComponentsWithStats(got.astype(np.uint8), 8)
+        out_ = st_[:, cv2.CC_STAT_AREA] - np.bincount(cc_[R[y0:y1, x0:x1]], minlength=n_)
+        bad = [i for i in range(1, n_) if np.bincount(cc_[rim], minlength=n_)[i] and out_[i] >= SPILL * st_[i, cv2.CC_STAT_AREA]]
+        if bad and trust:
+            from_plate.append((R, R2))
+            n_plate += 1
+            why.append(f"{l['id']} chữ dính liền hình khác")
+            continue
+        if bad:
+            got &= ~np.isin(cc_, bad)
         # NÉT CHỮ DÍNH LIỀN VIỀN VỎ khác màu (d07 chữ số "5" chạm viền bóng của vòng tròn): cả mảng bị coi là viền. Trong phần
         # chạm lõi mà chưa lấy, tách riêng các điểm CÙNG MÀU MỰC rồi xét lại.
         left = (ink > 0) & ~got
@@ -357,6 +377,11 @@ def draft_base(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = N
         if take:
             k = 2 * max(3, int(round(0.04 * hgt))) + 1   # viền khử răng cưa + bóng mờ sát nét
             m = cv2.dilate(got.astype(np.uint8), np.ones((k, k), np.uint8)).astype(bool)
+            if trust and float((m & R[y0:y1, x0:x1]).sum()) > COVER_MAX * float(inR.sum()):
+                from_plate.append((R, R2))
+                n_plate += 1
+                why.append(f"{l['id']} phần tô trùm vùng dòng")
+                continue
             col = np.zeros((y1 - y0, x1 - x0, 3), np.float32)
             okb = bg & inR
             col[ys - y0, xs - x0] = X @ np.linalg.lstsq(X[okb], draft[ys, xs][okb].astype(np.float64), rcond=None)[0]
@@ -371,6 +396,20 @@ def draft_base(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = N
             col += np.where(den[..., None] > 0.02, num / np.maximum(den[..., None], 1e-3), 0.0)
             paint.append((m & R2[y0:y1, x0:x1], (y0, y1, x0, x1), col))
         n_paint += 1
+    # LẤY BẢN XOÁ THEO HÌNH NÉT CHỮ, không cả khung dòng: chỉ những chỗ bản xoá KHÁC nháp (hạt giống > DIFF_GONE, lan tới > SAME_DE)
+    # chạm vùng dòng, nới 2 px -- miếng ghép nhỏ đi nhiều nên hết khung chữ nhật mờ / lệch vân (mix1 t01 giấy kraft, f05).
+    # Bản xoá đổi gần hết vùng dòng (ảnh chụp bị vẽ lại) thì lấy cả vùng dòng như trước.
+    lo = (e > SAME_DE).astype(np.uint8)
+    for R, R2 in from_plate:
+        ys, xs = np.nonzero(R2)
+        y0, y1, x0, x1 = int(ys.min()), int(ys.max()) + 1, int(xs.min()), int(xs.max()) + 1
+        n_, cc_ = cv2.connectedComponents(lo[y0:y1, x0:x1] * R2[y0:y1, x0:x1].astype(np.uint8), connectivity=8)
+        seed = np.unique(cc_[(e[y0:y1, x0:x1] > DIFF_GONE) & R[y0:y1, x0:x1]])
+        m = cv2.dilate(np.isin(cc_, seed[seed > 0]).astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool) & R[y0:y1, x0:x1]   # chỉ trong vùng dòng: vỏ của dòng bên cạnh không bị đụng (f05)
+        if float(m.sum()) > 0.85 * float(R.sum()):
+            use_plate |= R
+        else:
+            use_plate[y0:y1, x0:x1] |= m
     # CHỮ OCR BỎ SÓT (13/10 dựng lại accept1: b03 chữ số "2" to của tiêu đề, g04 vòm chữ thứ hai -- không thuộc ô dòng nào nên
     # hiện lại nguyên dạng méo cạnh chữ mới): MẢNG BỊ GỠ (nháp cách bản xoá > DIFF_GONE) mà (a) chạm lõi một vùng chữ của bộ dò,
     # (b) phần lớn nằm ngoài mọi ô dòng, (c) không phải vỏ của một dòng (không trùm tâm dòng nào), (d) bộ đọc đọc ra chữ / số
@@ -401,7 +440,7 @@ def draft_base(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = N
                 continue
             use_plate[y:y + h, x:x + w] |= cv2.dilate(blob.astype(np.uint8), np.ones((7, 7), np.uint8)).astype(bool)
             n_miss += 1
-    a = cv2.GaussianBlur(use_plate.astype(np.float32), (0, 0), 2.0)[..., None]
+    a = cv2.GaussianBlur(use_plate.astype(np.float32), (0, 0), 1.5)[..., None]
     out = plate * a + draft * (1 - a)
     for m, (y0, y1, x0, x1), col in paint:
         al = cv2.GaussianBlur(m.astype(np.float32), (0, 0), 1.0)[..., None]

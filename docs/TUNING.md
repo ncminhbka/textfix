@@ -607,6 +607,23 @@ ngày / buổi học (VLM bỏ dòng). Nhẹ hơn: v05 nút "Trả góp 0%" có 
 quanh chữ trên nền có vân, i05 huy hiệu trống, i04 / f02 chữ co quá nhỏ. Lỗi chia gần đều giữa GỠ CHỮ và VLM BỎ DÒNG (mỗi dòng
 bỏ = một nút trống).
 
+**mix1 lượt hai (bản 6476222, cùng seed; chấm thô 34 poster):** hết nút bị lau giữa (m03), mảng mờ quanh "THỰC ĐƠN" (t01), nhãn
+tai nghe co nhỏ (i04); p02 VLM trả đủ lệnh nên đủ chữ và giữ nhãn gói. Còn hỏng: c01 con dấu mất vòng, x04 cầu vồng bị cắt, x03
+chữ neon nhoè (VLM), t03 VLM tự viết "Gà giòn" thay giá combo; nhẹ: v05 nút có khối đen, f05 / i05 một nút trống (đã có
+`fill_gaps`), f02 chữ trong nút đỏ bị đúp viền, t02 ngày dính liền tên lớp.
+- [mã] `lonly.draft_base`, ba sửa đo trên zip mix1: (1) mảng "chạm lõi, nằm trọn vùng nới" chỉ là nét chữ khi cạnh dài <= 2 cao
+  dòng (`GLYPH_MAX`) -- vòng con dấu không còn bị lau (c01); (2) nét chữ DÍNH LIỀN hình khác (mảng chạm mép vùng nới, >= 10% nằm
+  ngoài vùng dòng, `SPILL`) hoặc phần tô trùm > 60% vùng dòng (`COVER_MAX`): bản xoá ĐÁNG TIN (đổi < 60% vùng dòng, `TRUST`) thì
+  lấy bản xoá, không thì bỏ mảng dính ra -- x04 cầu vồng nguyên, f05 hết mảng trắng đục trên sương; (3) LẤY BẢN XOÁ THEO HÌNH NÉT
+  CHỮ: chỉ điểm bản xoá khác nháp (hạt giống > 20 ΔE, lan tới > 8) trong vùng dòng, nới 2 px; đổi > 85% vùng dòng mới lấy cả
+  vùng -- t01 giấy kraft sạch, vỏ của dòng bên cạnh không bị đụng. Kiểm 15 poster ba tập: không ca nào xấu đi.
+- CÒN: v05 nút có ánh mà bản xoá gỡ (không nền phẳng + bản xoá không đáng tin) vẫn bị khoét -> việc của LaMa; c01 con dấu do
+  chính bản xoá phá một nửa; v06 chữ trắng trên nút kem (chữ gần trùng màu nền) còn bóng mờ; d12 như cũ.
+- [thử LaMa, CPU 6,5 s / ảnh 1024, big-lama.pt 196 MB] mặt nạ = `textmask.text_mask` nới 2 px. v05 nút cam bóng: nút nguyên, chữ
+  hết, sạch; x03 chữ neon: sạch. HỎNG vì MẶT NẠ chứ không vì LaMa: a01 nút vàng kim (mặt nạ nuốt cả nút), c01 con dấu (nuốt cả
+  con dấu, 18% ảnh), g05 huy hiệu (méo). => LaMa dùng được cho nhánh "nền không phẳng + bản xoá không đáng tin" KHI có mặt nạ nét
+  chữ chặt; việc kế là mặt nạ, không phải model.
+
 **Không để trống dòng (13/10 tối, người dùng: "cố gắng bịa vào, đừng bỏ trống"):** đọc lệnh của 34 poster mix1: 13 / 286 dòng
 bị bỏ, ở 5 poster -- và phần lớn KHÔNG phải VLM bỏ: 4 poster do luật "lặp chữ -> skip" của mã (i05 huy hiệu "Ưu đãi" nháp vẽ hai
 lần, VLM viết cả hai, mã xoá một), 1 poster do VLM trả lời cụt (p02: 1 lệnh cho 10 dòng, autofix đổi 9 dòng còn lại thành skip,
