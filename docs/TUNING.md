@@ -521,6 +521,7 @@ thẻ ~9/10, gỡ dấu nhỏ nét mảnh cạnh chữ; vỏ 1-2% ảnh bị g�
 - [mã] `textfix/lonly.py`. `view`: VLM và bộ dựng chỉ thấy ô L (dấu nhỏ đầu dòng đã nằm trong ô dòng). `draft_base`: nền dựng =
   NHÁP, trừ chỗ là chữ. Mỗi dòng: màu nền của dòng = màu chiếm nhiều nhất trong vùng dòng trên nháp; nền đó ở bản xoá còn
   nguyên (<= 8 ΔE) -> lấy điểm ảnh bản xoá trong vùng dòng; nền đổi (bước xoá gỡ cả vỏ) -> giữ vỏ của nháp, lấp nét chữ cũ
+  [ĐÃ THAY 13/10 tối, xem mục "viền gai mờ" bên dưới: nền phẳng thì tô đè nét chữ bằng màu nền của nháp, không dán bản xoá]
   (inpaint); không có nền phẳng (chữ trên ảnh chụp) -> bản xoá. Dòng "keep" (chữ in trên vật): nguyên điểm ảnh nháp. Vùng chữ
   Chữ OCR bỏ sót: mảng bị gỡ chạm lõi một vùng chữ của bộ dò, phần lớn nằm ngoài mọi ô dòng, không trùm tâm dòng nào, bộ đọc
   đọc ra chữ / số -> bản xoá, để chữ méo không hiện lại (b03 chữ số "2"); icon bộ dò nhận nhầm là chữ thì giữ (b04 icon ngân
@@ -533,6 +534,40 @@ thẻ ~9/10, gỡ dấu nhỏ nét mảnh cạnh chữ; vỏ 1-2% ảnh bị g�
 - Đo tại máy (`scripts/lonly_replay.py`, giữ lệnh chữ của VLM CŨ, chỉ đổi nền): xem bảng ở cuối mục khi có. Phép đo này chỉ trả
   lời phần NỀN; VLM có viết tốt hơn khi chỉ còn dòng chữ hay không phải chạy server.
 - CHƯA đo (cần VLM): VLM có lấp đủ dòng không, chữ lấp có hợp không, có còn vẽ nền riêng cho chữ không.
+
+### 13/10 tối: "viền gai mờ" quanh chữ ở chế độ chỉ dòng chữ -> nền phẳng thì TÔ ĐÈ nét chữ, không dán bản xoá
+
+Người dùng xem lượt server đầu của chế độ mới: icon to của nháp giữ tốt, nhưng nhiều chỗ có viền gai mờ. Soi 6 nền (accept1 a01,
+b01, b04, f02, f04, s03), ba kiểu vết đều do bước ghép nền:
+- miếng bản xoá dán vào vùng dòng lệch tông nhẹ so với nháp -> lộ khung chữ nhật mờ (s03 tiêu đề, giá);
+- vỏ bị bước xoá gỡ: lấp nét bằng inpaint với mặt nạ >= 25 ΔE, viền khử răng cưa còn sót và loang thành bóng chữ lốm đốm (f02 thẻ);
+- chữ có quầng tối trên ảnh chụp bị coi là nền phẳng rồi lấp nét -> mảng vỡ hạt (f02 khối liên hệ); màu nền lấy trên vùng dòng
+  đã nới nên nút ôm sát chữ bị coi là nét chữ, lau trắng phần giữa (b01 nút "Đặt lịch ngay").
+- [mã] `lonly.draft_base` viết lại. Màu nền của dòng lấy trong LÕI dòng (nới 0,1). Khớp mặt bậc hai qua các điểm nền; nền phẳng =
+  >= 90% điểm gần mặt (<= 12 ΔE) thì sát mặt (<= 6) (`FIT_MIN`; đo: chữ trong nút / thẻ / nền trơn 0,92-0,99, chữ trên gối, sàn
+  gỗ có quầng 0,83-0,86). Nền phẳng -> nét chữ = mảng khác mặt nền có >= 30% nằm trong lõi dòng (viền nút, icon cạnh dòng nằm
+  ngoài lõi nên không bị đụng) hoặc mảng nhỏ trong vùng dòng (dấu thanh, chấm đầu dòng); tô các mảng đó + viền 3 px bằng MẶT MÀU
+  NỀN khớp từ nháp. Không phẳng -> bản xoá như trước. Bỏ hẳn inpaint và bước lau nét sót sau khi ghép.
+- [mã] hai chốt đoán nhầm nền -> bản xoá: màu nhiều nhất trong lõi là nét chữ (các điểm màu đó đổi hẳn ở bản xoá, phần còn lại
+  nguyên: chữ trắng đậm trên vòm cầu vồng, g03); nét chữ + viền trùm > 60% vùng dòng (`INK_MAX`).
+- [mã] người dùng: "không được lem nhem, một số pill có dấu hiệu lem". Soi mọi nút / thẻ có chữ ở cỡ gốc: (1) nút có vệt sáng
+  (a02 nút cam, nền tối có quầng đèn) -- mặt bậc hai lệch nền vài ΔE nên chỗ tô hiện hình chữ mờ -> BÙ CỤC BỘ: cộng trung bình có
+  trọng số (Gauss 0,35 cao dòng) của (nháp - mặt) trên các điểm nền quanh nét; (2) nút vàng kim có ánh mà bước xoá gỡ (a03): không
+  đạt `FIT_MIN` nên dán bản xoá = khoét một lỗ thấy mặt nước trong nút -> khi nền của dòng đã ĐỔI ở bản xoá, thử lại với ngưỡng
+  gấp đôi (nền <= 12, lưng chừng 12-24 phải ít): nút có ánh qua, chữ có quầng mờ trên sàn gỗ (f02) vẫn về bản xoá; (3) mẩu nền
+  ngoài nút bị mép vùng dòng cắt ra không còn tính là "mảng nhỏ" (phải nằm gọn trong vùng dòng đã co 2 px).
+- Đã thử và gỡ: "bước xoá đổi >= 70% vùng dòng thì ép tô trên nháp" -- không cứu được huy hiệu chữ vòng nhỏ (g05) mà làm khối
+  liên hệ có quầng tối trên sàn gỗ (f02) vỡ hạt trở lại.
+- Đã thử và gỡ: "lan dần nền chuyển màu" (khớp mặt, nhận thêm điểm sát mặt, khớp lại) cho nút vàng kim nhiều dải sáng trải ngang
+  poster (a01: một màu chỉ phủ 10% vùng dòng) -- không cứu được nút đó mà làm khối liên hệ trên sàn gỗ (f02) lem trở lại.
+- GIỚI HẠN còn: nút kim loại nhiều dải sáng bị bước xoá gỡ (a01) mất phần dưới dòng chữ, chỉ còn hai đầu nút;
+  huy hiệu nhỏ có chữ chạy vòng (g05) -- vùng dòng cong trùm cả huy hiệu, bản xoá đã gỡ huy hiệu nên dán bản xoá
+  khoét mất một góc; vỏ có vân / chuyển màu gắt bị bước xoá gỡ thì mất phần dưới dòng chữ.
+- [công cụ] `batch_report.py` ghi thêm TỜ ẢNH GHÉP `output/runs/_reports/<tập>/sheets/<tập>_NN.jpg` (mỗi tờ 3 ca, nháp | poster):
+  bấm đúp trong cây thư mục JupyterLab là xem, không cần mở cổng máy chủ; zip nhẹ kèm các tờ này + poster cạnh dài 1024.
+- [tập thử] `bench/mix1.json` (35 ca mới, seed 8001-8035): m đề dài, v vỏ / huy hiệu / thẻ, i icon / các bước, t bảng / thực đơn,
+  c chữ cong / nghiêng / viết tay, p ảnh sản phẩm (3 ảnh chưa dùng ở accept1), f chỉ form, x đề mơ hồ / chữ trên ảnh chụp.
+  Chạy MỘT lượt với `TEXTFIX_LONLY=on`, chấm bằng mắt, không so đường cũ (người dùng: không muốn bật tắt máy chủ).
 
 ### 13/10 chiều: chữ in trên sản phẩm khách tải PHẢI GIỮ
 
@@ -554,6 +589,15 @@ trang `output/runs/_reports/<tập>.html` (mở qua `.../proxy/8088/outputs/_rep
 `output/runs_zip/<tập>_report_<giờ>.zip` (HTML + ảnh thu nhỏ + plan / brief / request) để gửi Claude chấm. `--full` mới gói đầy đủ.
 Cờ nghi hỏng đo trên 39 poster accept1 chấm mắt: bộ kiểm hình học riêng bắt 6 / 15 poster hỏng, báo nhầm 6 / 24; gộp cờ bắt 11 / 15,
 báo nhầm 6 / 24 -- dùng để theo dõi xu hướng và chọn poster cần xem, chưa đủ để quyết định tự động.
+
+**Lượt kế (13/10 tối): tập mới `mix1`, chỉ chế độ chỉ dòng chữ, xem mắt:**
+```
+source ~/textfix_env.sh; export TEXTFIX_GEO=on TEXTFIX_LONLY=on
+bash scripts/start_server.sh
+python scripts/dev_batch.py bench/mix1.json
+```
+Xem: bấm đúp các tệp `output/runs/_reports/mix1/sheets/mix1_01.jpg` ... trong JupyterLab. Muốn Claude chấm: tải MỘT tệp
+`output/runs_zip/mix1_report_<giờ>.zip` về gốc repo.
 
 **So đường cũ với "chỉ dòng chữ" trên cùng seed (hai lượt, chạy từ terminal):**
 ```

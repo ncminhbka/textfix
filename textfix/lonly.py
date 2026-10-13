@@ -18,10 +18,16 @@ import numpy as np
 
 LONLY = os.environ.get("TEXTFIX_LONLY", "off") == "on"
 
-SAME_DE = 8.0     # vành quanh dòng: bản xoá cách nháp <= 8 ΔE (trung vị) = nền / vỏ ở đó còn nguyên (nền không vỏ 1-4, vỏ nhạt bị gỡ 10-18)
 DIFF_GONE = 20.0  # nháp cách bản xoá > 20 ΔE = bước xoá đã gỡ thứ ở đó (cùng số với overlay.DIFF)
 FLAT_DE = 12.0    # điểm thuộc nền của dòng: cách màu nền <= 12 ΔE
 FLAT_MIN = 0.3    # ... và nền chiếm >= 30% vùng dòng; ít hơn = không có nền phẳng (chữ trên ảnh chụp)
+FIT_DE = 6.0      # điểm khớp MẶT MÀU NỀN (mặt bậc hai khớp từ các điểm nền của dòng): cách mặt <= 6 ΔE
+FIT_MIN = 0.9     # nền phẳng / chuyển màu đều: >= 90% số điểm cách mặt <= 12 thì cách mặt <= 6 (đo 13/10: chữ trong nút, thẻ,
+                  # trên nền trơn 0,92-0,99; chữ trên gối, trên sàn gỗ có quầng tối 0,83-0,86)
+INK_CORE = 0.3    # mảng khác màu nền là NÉT CHỮ khi >= 30% của nó nằm trong lõi dòng (viền nút, icon cạnh dòng: phần lớn ở ngoài)
+INK_MAX = 0.6     # nét chữ + viền của nó trùm > 60% vùng dòng = đoán nền sai (huy hiệu chữ vòng, g05) -> lấy bản xoá
+SAME_DE = 8.0     # bản xoá cách nháp <= 8 ΔE (trung vị) = thứ ở đó còn nguyên
+INK_SMALL = 0.5   # ... hoặc mảng nhỏ (dấu thanh, chấm, mẩu nét) cạnh < 0,5 cao dòng nằm trong vùng dòng
 
 
 def view(M: dict) -> dict:
@@ -200,12 +206,17 @@ def _region(l: dict, H: int, W: int, grow: float) -> np.ndarray:
     return cv2.dilate(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * k + 1, 2 * int(1.6 * k) + 1))).astype(bool)
 
 
+def _quad(ys: np.ndarray, xs: np.ndarray) -> np.ndarray:
+    return np.c_[np.ones(len(xs)), xs, ys, xs * xs, xs * ys, ys * ys]
+
+
 def draft_base(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = None, log: list | None = None) -> np.ndarray:
     """NỀN DỰNG = NHÁP, trừ chỗ là chữ. Với mỗi dòng không giữ (dòng "keep" = chữ in trên vật: nguyên điểm ảnh nháp):
-      - vành sát quanh dòng ở bản xoá gần giống nháp (nền / vỏ còn nguyên) -> trong vùng dòng lấy điểm ảnh BẢN XOÁ (FLUX đã vẽ
-        lại phần dưới chữ, khít với xung quanh);
-      - vành khác hẳn (bước xoá gỡ cả vỏ) và vành trên nháp phẳng màu -> giữ vỏ của nháp, LẤP nét chữ cũ (điểm khác màu vành)
-        bằng màu quanh nét; vành không phẳng (ảnh chụp bị vẽ lại khác) -> lấy bản xoá.
+      - dòng nằm trên NỀN PHẲNG / chuyển màu đều (lòng nút, thẻ, nền trơn): khớp một mặt màu nền từ chính nháp, TÔ ĐÈ đúng nét
+        chữ cũ bằng mặt đó. Không dán gì từ bản xoá -> không có mép miếng dán, vỏ của nháp còn nguyên dù bước xoá gỡ hay giữ.
+        (13/10 người dùng xem lượt đầu: "viền gai mờ" -- miếng bản xoá lệch tông lộ khung chữ nhật, lấp nét bằng inpaint để
+        lại bóng chữ lốm đốm.)
+      - dòng nằm trên ảnh chụp / nền có vân / chữ có quầng: lấy vùng dòng từ BẢN XOÁ (FLUX đã vẽ lại phần dưới chữ).
     Vùng chữ của bộ dò mà OCR không trả dòng nào (chữ méo OCR bỏ sót) -> bản xoá, để chữ sai không hiện lại.
     Dấu nhỏ đầu dòng nằm trong ô dòng: xoá cùng chữ (VLM vẽ lại trong lệnh chữ)."""
     import cv2
@@ -218,33 +229,80 @@ def draft_base(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = N
     every = np.zeros((H, W), bool)
     for r in regs.values():
         every |= r
-    use_plate, fill = np.zeros((H, W), bool), np.zeros((H, W), bool)
-    n_plate = n_fill = 0
-    flat = []    # (vùng dòng, màu nền của dòng) của các dòng nằm trên nền phẳng: sau khi ghép, lau mọi nét còn sót trong vùng dòng
-    marks = []   # (khung dấu đầu dòng, màu nền quanh dòng): bước xoá có khi GIỮ dấu -- lau nốt, VLM vẽ dấu mới trong lệnh chữ
+    use_plate = np.zeros((H, W), bool)
+    paint = []   # (mặt nạ nét chữ, khung, màu nền tại khung) của các dòng trên nền phẳng
+    n_plate = n_paint = 0
     for l in M["L"]:
         if l["id"] in kept:
             continue
-        R = regs[l["id"]]
-        # NỀN CỦA DÒNG = màu chiếm nhiều nhất trong vùng dòng trên nháp (lòng vỏ, hoặc nền phẳng; nét chữ là phần còn lại).
-        # Không lấy vành ngoài dòng: pill ôm sát chữ thì vành đã nằm ngoài pill.
-        q = (draft[R] // 16).astype(np.int32)
+        R, R0, R2 = regs[l["id"]], _region(l, H, W, 0.1), _region(l, H, W, 0.6)
+        # NỀN CỦA DÒNG = màu chiếm nhiều nhất trong LÕI dòng trên nháp (lòng vỏ, hoặc nền phẳng; nét chữ là phần còn lại).
+        # Không lấy vành ngoài dòng, cũng không lấy cả vùng nới: nút ôm sát chữ thì phần nới đã nằm ngoài nút (b01 nút "Đặt
+        # lịch ngay": màu nhiều nhất của vùng nới là nền kem ngoài nút -> cả nút bị coi là nét chữ).
+        q = (draft[R0] // 16).astype(np.int32)
         key = q[:, 0] * 256 + q[:, 1] * 16 + q[:, 2]
-        c = np.median(A[R][key == np.bincount(key).argmax()], axis=0)
-        near = R & (np.linalg.norm(A - c, axis=2) <= FLAT_DE)
-        if float(near.sum()) < FLAT_MIN * float(R.sum()):   # không có màu nền rõ: chữ nằm trên ảnh chụp -> bản xoá
+        c = np.median(A[R0][key == np.bincount(key).argmax()], axis=0)
+        ys, xs = np.nonzero(R2)
+        y0, y1, x0, x1 = int(ys.min()), int(ys.max()) + 1, int(xs.min()), int(xs.max()) + 1
+        sc = float(max(y1 - y0, x1 - x0))
+        X = _quad((ys - y0) / sc, (xs - x0) / sc)
+        inR = R[ys, xs]
+        near = inR & (np.linalg.norm(A[ys, xs] - c, axis=1) <= FLAT_DE)
+        if float(near.sum()) < FLAT_MIN * float(inR.sum()):   # không có màu nền rõ: chữ nằm trên ảnh chụp -> bản xoá
             use_plate |= R
             n_plate += 1
             continue
-        flat.append((R, c))
-        if l.get("mark"):
-            marks.append(([int(v) for v in l["mark"]["box"]], c))
-        if float(np.median(e[near])) <= SAME_DE:   # nền của dòng còn nguyên ở bản xoá (vỏ được giữ, hoặc không có vỏ)
+        # MÀU NHIỀU NHẤT LÀ NÉT CHỮ, không phải nền (chữ đậm trắng trên vòm cầu vồng, g03): ở bản xoá các điểm màu đó đã đổi
+        # hẳn còn phần còn lại của lõi dòng thì nguyên -> nền là phần còn lại, không phẳng -> bản xoá
+        dom = R0 & (np.linalg.norm(A - c, axis=2) <= FLAT_DE)
+        rest = R0 & ~dom
+        if dom.any() and float(rest.sum()) >= 0.15 * float(R0.sum()) and float(np.median(e[dom])) > DIFF_GONE and float(np.median(e[rest])) <= SAME_DE:
             use_plate |= R
             n_plate += 1
-        else:                                       # bước xoá gỡ cả vỏ: giữ vỏ của nháp, lấp nét chữ cũ
-            fill |= R & (np.linalg.norm(A - c, axis=2) >= slots.INK_IN_SHELL)
-            n_fill += 1
+            continue
+        res = np.linalg.norm(A[ys, xs] - X @ np.linalg.lstsq(X[near], A[ys, xs][near], rcond=None)[0], axis=1)
+        bg = res <= FIT_DE
+        flat = float((bg & inR).sum()) >= FIT_MIN * float(((res <= 2 * FIT_DE) & inR).sum())
+        if not flat and float(np.median(e[ys, xs][near])) > SAME_DE:
+            # VỎ CÓ ÁNH / CHUYỂN MÀU mà bước xoá đã GỠ (a03 nút vàng kim: dán bản xoá là khoét một lỗ thấy mặt nước trong nút):
+            # nới gấp đôi -- nền = cách mặt <= 12, và nét chữ phải TÁCH HẲN khỏi nền (ít điểm lưng chừng 12-24; chữ có quầng
+            # mờ trên ảnh chụp thì lưng chừng nhiều -> vẫn lấy bản xoá). Phần lệch khỏi mặt được bù cục bộ khi tô.
+            bg = res <= 2 * FIT_DE
+            flat = float((bg & inR).sum()) >= FIT_MIN * float(((res <= 4 * FIT_DE) & inR).sum())
+        if not flat or float((bg & inR).sum()) < FLAT_MIN * float(inR.sum()):
+            use_plate |= R   # nền có vân, hoặc chữ có quầng mờ rộng: mặt màu không tả được nền
+            n_plate += 1
+            continue
+        ink = np.zeros((y1 - y0, x1 - x0), np.uint8)
+        ink[ys[~bg] - y0, xs[~bg] - x0] = 1
+        n, cc, st, _c = cv2.connectedComponentsWithStats(ink, 8)
+        hgt = float(l.get("size") or (l["box"][3] - l["box"][1]))
+        core = np.bincount(cc[R0[y0:y1, x0:x1]], minlength=n)
+        # mảng nhỏ phải nằm GỌN trong vùng dòng: mẩu nền ngoài nút bị mép vùng dòng cắt ra (b01, dưới góc nút) không phải nét chữ
+        inside = np.bincount(cc[cv2.erode(R[y0:y1, x0:x1].astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool)], minlength=n)
+        take = [i for i in range(1, n) if core[i] >= INK_CORE * st[i, cv2.CC_STAT_AREA]
+                or (max(st[i, cv2.CC_STAT_WIDTH], st[i, cv2.CC_STAT_HEIGHT]) < INK_SMALL * hgt and inside[i] == st[i, cv2.CC_STAT_AREA])]
+        if take:
+            k = 2 * max(3, int(round(0.04 * hgt))) + 1   # viền khử răng cưa + bóng mờ sát nét
+            m = cv2.dilate(np.isin(cc, take).astype(np.uint8), np.ones((k, k), np.uint8)).astype(bool)
+            if float((m & R[y0:y1, x0:x1]).sum()) > INK_MAX * float(inR.sum()):   # "nét chữ" trùm gần hết vùng dòng: đoán nền sai
+                use_plate |= R
+                n_plate += 1
+                continue
+            col = np.zeros((y1 - y0, x1 - x0, 3), np.float32)
+            okb = bg & inR
+            col[ys - y0, xs - x0] = X @ np.linalg.lstsq(X[okb], draft[ys, xs][okb].astype(np.float64), rcond=None)[0]
+            # mặt bậc hai không tả hết nền (nút có vệt sáng, nền tối có quầng đèn): chỗ tô lệch nền vài ΔE, nhìn ra hình chữ mờ
+            # ("lem", a02 nút cam). Bù phần lệch: trung bình có trọng số của (nháp - mặt) trên các điểm NỀN quanh nét.
+            wb = np.zeros((y1 - y0, x1 - x0), np.float32)
+            wb[ys[okb] - y0, xs[okb] - x0] = 1.0
+            wb[cv2.dilate(m.astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool)] = 0.0
+            sg = max(4.0, 0.35 * hgt)
+            den = cv2.GaussianBlur(wb, (0, 0), sg)
+            num = cv2.GaussianBlur((draft[y0:y1, x0:x1].astype(np.float32) - col) * wb[..., None], (0, 0), sg)
+            col += np.where(den[..., None] > 0.02, num / np.maximum(den[..., None], 1e-3), 0.0)
+            paint.append((m & R2[y0:y1, x0:x1], (y0, y1, x0, x1), col))
+        n_paint += 1
     # CHỮ OCR BỎ SÓT (13/10 dựng lại accept1: b03 chữ số "2" to của tiêu đề, g04 vòm chữ thứ hai -- không thuộc ô dòng nào nên
     # hiện lại nguyên dạng méo cạnh chữ mới): MẢNG BỊ GỠ (nháp cách bản xoá > DIFF_GONE) mà (a) chạm lõi một vùng chữ của bộ dò,
     # (b) phần lớn nằm ngoài mọi ô dòng, (c) không phải vỏ của một dòng (không trùm tâm dòng nào), (d) bộ đọc đọc ra chữ / số
@@ -276,20 +334,12 @@ def draft_base(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = N
             use_plate[y:y + h, x:x + w] |= cv2.dilate(blob.astype(np.uint8), np.ones((7, 7), np.uint8)).astype(bool)
             n_miss += 1
     a = cv2.GaussianBlur(use_plate.astype(np.float32), (0, 0), 2.0)[..., None]
-    out = (plate * a + draft * (1 - a)).round().clip(0, 255).astype(np.uint8)
-    Lo = slots._lab(out) if flat or marks else None
-    for R, c in flat:   # chữ cũ còn sót trên bản xoá (bước xoá gỡ không sạch; trước đây nền riêng VLM vẽ che mất): lau nốt
-        ys_, xs_ = np.nonzero(R)
-        y0, y1, x0, x1 = ys_.min(), ys_.max() + 1, xs_.min(), xs_.max() + 1
-        fill[y0:y1, x0:x1] |= R[y0:y1, x0:x1] & (np.linalg.norm(Lo[y0:y1, x0:x1] - c, axis=2) >= slots.INK_IN_SHELL)
-    if marks:
-        for (x0, y0, x1, y1), c in marks:
-            x0, y0, x1, y1 = max(0, x0 - 2), max(0, y0 - 2), min(W, x1 + 2), min(H, y1 + 2)
-            fill[y0:y1, x0:x1] |= np.linalg.norm(Lo[y0:y1, x0:x1] - c, axis=2) >= slots.INK_IN_SHELL
-    if fill.any():
-        k = 2 * slots.KEEP_HALO + 1
-        out = cv2.inpaint(out, cv2.dilate(fill.astype(np.uint8), np.ones((k, k), np.uint8)), 3, cv2.INPAINT_TELEA)
+    out = plate * a + draft * (1 - a)
+    for m, (y0, y1, x0, x1), col in paint:
+        al = cv2.GaussianBlur(m.astype(np.float32), (0, 0), 1.0)[..., None]
+        out[y0:y1, x0:x1] = col * al + out[y0:y1, x0:x1] * (1 - al)
+    out = out.round().clip(0, 255).astype(np.uint8)
     if log is not None:
-        log.append(f"nền = nháp trừ chữ: {n_plate} dòng lấy bản xoá, {n_fill} dòng lấp nét trong vỏ bị gỡ, {n_miss} vùng chữ OCR sót "
-                   f"lấy bản xoá, {len(kept)} dòng giữ nguyên")
+        log.append(f"nền = nháp trừ chữ: {n_paint} dòng tô đè nét chữ bằng màu nền của nháp, {n_plate} dòng lấy bản xoá, {n_miss} vùng chữ "
+                   f"OCR sót lấy bản xoá, {len(kept)} dòng giữ nguyên")
     return out

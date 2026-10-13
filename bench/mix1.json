@@ -1,0 +1,614 @@
+[
+ {
+  "id": "m01",
+  "tags": [
+   "long_prompt",
+   "list",
+   "icons"
+  ],
+  "why": "danh sách 4 ý có icon đầu dòng + nút ưu đãi. Xem: icon nhỏ đầu dòng vẽ lại sạch, nút của nháp còn nguyên, không viền gai quanh chữ",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "prompt": "Tạo ảnh quảng cáo máy lọc không khí cho phòng ngủ. Tiêu đề: \"Hít thở trong lành, ngủ ngon mỗi đêm\". Tên sản phẩm: \"AirPure Mini 360\". Điểm nổi bật: \"Lọc bụi mịn PM2.5, khử mùi than hoạt tính, chạy êm 22dB, tiết kiệm điện\". Ưu đãi: \"Giảm 15% đến hết 30/11\". Liên hệ: \"Hotline 1900 6868\".",
+   "num_images": 1,
+   "seed": 8001
+  }
+ },
+ {
+  "id": "m02",
+  "tags": [
+   "long_prompt",
+   "list",
+   "desc"
+  ],
+  "why": "mô tả dài + 3 ý. Xem: câu dài được viết gọn, không dòng nào bị bỏ trống",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "1:1",
+   "prompt": "Tạo ảnh quảng cáo dịch vụ giặt sấy lấy liền. Tiêu đề: \"Quần áo thơm tho, nhận lại trong 3 giờ\". Tên tiệm: \"Giặt Sấy Bông Mây\". Mô tả ngắn: \"Giặt riêng từng khách, sấy khô diệt khuẩn, gấp gọn và giao tận nhà trong bán kính 3km\". Điểm nổi bật: \"Giặt riêng, sấy diệt khuẩn, giao tận nhà\". Giá: \"Chỉ từ 15.000đ/kg\".",
+   "num_images": 1,
+   "seed": 8002
+  }
+ },
+ {
+  "id": "m03",
+  "tags": [
+   "long_prompt",
+   "9:16",
+   "list"
+  ],
+  "why": "poster dọc nhiều tầng chữ. Xem: thứ tự đọc từ trên xuống, chữ nhỏ ở đáy còn đọc được",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "9:16",
+   "prompt": "Tạo ảnh quảng cáo phòng tập yoga buổi sáng. Tiêu đề: \"Khởi đầu ngày mới thật nhẹ nhàng\". Tên phòng tập: \"An Yoga Studio\". Lịch tập: \"Thứ 2 - Thứ 7, 5:30 - 7:00\". Điểm nổi bật: \"Lớp nhỏ 8 người, giáo viên Ấn Độ, phòng tập view hồ\". Ưu đãi: \"Tập thử miễn phí buổi đầu\". Địa chỉ: \"12 Trích Sài, Tây Hồ, Hà Nội\".",
+   "num_images": 1,
+   "seed": 8003
+  }
+ },
+ {
+  "id": "m04",
+  "tags": [
+   "long_prompt",
+   "16:9",
+   "two_columns"
+  ],
+  "why": "poster ngang hai cột. Xem: chữ hai cột không lẫn sang nhau",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "16:9",
+   "prompt": "Banner ngang quảng cáo tour Đà Lạt 3 ngày 2 đêm. Bên trái ảnh đồi thông và hồ, bên phải khối chữ: tiêu đề \"Đà Lạt mùa hoa dã quỳ\", dòng phụ \"Tour 3 ngày 2 đêm, khởi hành thứ Sáu hằng tuần\", giá \"2.890.000đ/khách\", nút \"Đặt chỗ ngay\", cuối cùng \"Du lịch Mây Ngàn - 0283 777 8899\".",
+   "num_images": 1,
+   "seed": 8004
+  }
+ },
+ {
+  "id": "v01",
+  "tags": [
+   "shells",
+   "badges"
+  ],
+  "why": "ba huy hiệu tròn + nút giá. Xem: huy hiệu và nút là của nháp, lòng sạch không bóng chữ cũ",
+  "request": {
+   "category": "product_intro",
+   "aspect_ratio": "1:1",
+   "prompt": "Ảnh quảng cáo mật ong rừng trên nền vàng nhạt. Tên \"Mật Ong Rừng U Minh\" chữ to phía trên. Dưới hũ mật có ba huy hiệu tròn viền nâu xếp hàng ngang ghi \"Nguyên chất\", \"Không đường\", \"Hũ 500ml\". Đáy poster có nút bo tròn màu nâu ghi giá \"220.000đ\".",
+   "num_images": 1,
+   "seed": 8005
+  }
+ },
+ {
+  "id": "v02",
+  "tags": [
+   "shells",
+   "cards"
+  ],
+  "why": "ba thẻ gói dịch vụ có giá. Xem: ba thẻ cùng kiểu chữ, thẻ của nháp còn nguyên viền",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "16:9",
+   "prompt": "Bảng giá ba gói rửa xe trên nền xanh đậm. Tiêu đề \"BẢNG GIÁ RỬA XE\". Ba thẻ trắng bo góc xếp hàng ngang: thẻ một \"Cơ bản\" - \"60.000đ\" - \"Rửa ngoài, hút bụi\"; thẻ hai \"Tiêu chuẩn\" - \"120.000đ\" - \"Thêm phủ bóng\"; thẻ ba \"Cao cấp\" - \"250.000đ\" - \"Vệ sinh nội thất\". Dưới cùng: \"Rửa xe Sạch Bóng - 0935 111 222\".",
+   "num_images": 1,
+   "seed": 8006
+  }
+ },
+ {
+  "id": "v03",
+  "tags": [
+   "shells",
+   "ribbon",
+   "starburst"
+  ],
+  "why": "ruy băng + nhãn nổ giảm giá. Xem: chữ trên ruy băng và nhãn nổ nằm đúng trong hình, không lòi nền riêng",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "title": "XẢ KHO CUỐI MÙA",
+   "discount": "GIẢM ĐẾN 70%",
+   "applied_product": "giày thể thao nam nữ",
+   "date_start": "01/12",
+   "date_end": "07/12",
+   "store_name": "Giày Bước Chân",
+   "style_pref": "rực rỡ, có ruy băng và nhãn nổ",
+   "num_images": 1,
+   "seed": 8007
+  }
+ },
+ {
+  "id": "v04",
+  "tags": [
+   "shells",
+   "speech_bubble",
+   "feedback"
+  ],
+  "why": "bong bóng thoại + hàng sao + avatar. Xem: avatar và sao là của nháp, lời khen nằm gọn trong bong bóng",
+  "request": {
+   "category": "feedback",
+   "aspect_ratio": "1:1",
+   "feedback_target": "Tiệm cắt tóc nam Barber Phố",
+   "feedback_quote": "Cắt đúng kiểu mình muốn, thợ tư vấn kỹ, không phải chờ lâu",
+   "customer_name": "Anh Quang Huy",
+   "feedback_highlights": "đúng hẹn, giá hợp lý",
+   "store_name": "Barber Phố",
+   "num_images": 1,
+   "seed": 8008
+  }
+ },
+ {
+  "id": "v05",
+  "tags": [
+   "shells",
+   "dark",
+   "gradient"
+  ],
+  "why": "nền tối, nút chuyển màu. Xem: nút chuyển màu không bị bệt một màu sau khi gỡ chữ",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "prompt": "Poster nền đen sang trọng quảng cáo đồng hồ nam. Tiêu đề chữ vàng kim \"Thời gian của riêng anh\". Tên \"Đồng hồ Orion Classic\". Một nút bo tròn chuyển màu từ vàng sang cam ghi \"Trả góp 0%\". Giá \"3.650.000đ\". Đáy: \"Orion Watch - orionwatch.vn\".",
+   "num_images": 1,
+   "seed": 8009
+  }
+ },
+ {
+  "id": "v06",
+  "tags": [
+   "shells",
+   "tight_pill"
+  ],
+  "why": "nhiều nút nhỏ ôm sát chữ. Xem: nút nhỏ không bị lau mất phần giữa",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "1:1",
+   "prompt": "Ảnh quảng cáo quán trà sữa, nền hồng pastel. Tiêu đề \"Trà sữa nhà làm\". Bốn nút nhỏ bo tròn nhiều màu xếp hai hàng ghi tên vị: \"Trân châu đường đen\", \"Matcha đậu đỏ\", \"Khoai môn\", \"Ô long sữa\". Dưới cùng \"Đồng giá 25.000đ\" và \"Trà Sữa Mộc - 0977 123 456\".",
+   "num_images": 1,
+   "seed": 8010
+  }
+ },
+ {
+  "id": "i01",
+  "tags": [
+   "steps",
+   "big_icons"
+  ],
+  "why": "4 bước có icon to. Xem: icon to của nháp giữ nguyên, số bước không bị viết hai lần",
+  "request": {
+   "category": "guide",
+   "aspect_ratio": "4:5",
+   "title": "4 BƯỚC ĐẶT BÁNH SINH NHẬT",
+   "guide_steps": [
+    "Chọn mẫu bánh",
+    "Nhắn kích cỡ và lời chúc",
+    "Chuyển khoản đặt cọc",
+    "Nhận bánh tại nhà"
+   ],
+   "store_name": "Tiệm Bánh Hạt Dẻ",
+   "num_images": 1,
+   "seed": 8011
+  }
+ },
+ {
+  "id": "i02",
+  "tags": [
+   "steps",
+   "9:16",
+   "numbers"
+  ],
+  "why": "5 bước xếp dọc có số trong vòng tròn. Xem: vòng số của nháp còn, chữ bước thẳng hàng",
+  "request": {
+   "category": "guide",
+   "aspect_ratio": "9:16",
+   "title": "CÁCH PHA CÀ PHÊ PHIN NGON",
+   "guide_steps": [
+    "Tráng phin bằng nước sôi",
+    "Cho 20g cà phê vào phin",
+    "Ủ 30 giây với ít nước",
+    "Rót đầy nước 95 độ",
+    "Chờ 5 phút và thưởng thức"
+   ],
+   "store_name": "Cà phê Hạt Mộc",
+   "num_images": 1,
+   "seed": 8012
+  }
+ },
+ {
+  "id": "i03",
+  "tags": [
+   "contact_icons",
+   "opening"
+  ],
+  "why": "địa chỉ / điện thoại / web có icon nhỏ đầu dòng. Xem: icon liên hệ vẽ lại rõ, cùng cỡ",
+  "request": {
+   "category": "opening",
+   "aspect_ratio": "4:5",
+   "title": "KHAI TRƯƠNG NHA KHOA NỤ CƯỜI",
+   "opening_date": "05/12/2026",
+   "opening_promo": "Miễn phí cạo vôi răng tuần đầu",
+   "store_name": "Nha khoa Nụ Cười",
+   "phone": "0988 765 432",
+   "address": "27 Lê Lợi, TP. Huế",
+   "website_link": "nhakhoanucuoi.vn",
+   "num_images": 1,
+   "seed": 8013
+  }
+ },
+ {
+  "id": "i04",
+  "tags": [
+   "feature_icons",
+   "product"
+  ],
+  "why": "hàng icon tính năng dưới sản phẩm, mỗi icon một nhãn ngắn. Xem: icon to giữ của nháp, nhãn nằm đúng dưới icon",
+  "request": {
+   "category": "product_intro",
+   "aspect_ratio": "1:1",
+   "prompt": "Ảnh giới thiệu tai nghe không dây trên nền xanh navy. Tên \"SoundBean Air 3\". Dưới tai nghe có hàng bốn icon tròn với nhãn bên dưới: \"Pin 30 giờ\", \"Chống ồn\", \"Chống nước IPX5\", \"Sạc nhanh\". Giá \"890.000đ\" ở đáy.",
+   "num_images": 1,
+   "seed": 8014
+  }
+ },
+ {
+  "id": "i05",
+  "tags": [
+   "checklist",
+   "recruitment"
+  ],
+  "why": "tuyển dụng có danh sách dấu tích. Xem: dấu tích vẽ lại đều nhau, các mục cùng kiểu chữ",
+  "request": {
+   "category": "recruitment",
+   "aspect_ratio": "4:5",
+   "job_position": "Nhân viên bán hàng siêu thị",
+   "job_desc": "Sắp xếp hàng lên kệ, tư vấn khách, làm ca 8 tiếng, không cần kinh nghiệm",
+   "special_offer": "Lương 7 - 9 triệu, thưởng tháng 13",
+   "apply_deadline": "15/12/2026",
+   "apply_method": "Nộp hồ sơ tại quầy hoặc gọi 0909 888 777",
+   "store_name": "Siêu thị Mini Phúc An",
+   "num_images": 1,
+   "seed": 8015
+  }
+ },
+ {
+  "id": "t01",
+  "tags": [
+   "menu",
+   "leader_dots"
+  ],
+  "why": "thực đơn tên - giá có chấm nối. Xem: hàng chấm nối của nháp còn, giá thẳng cột",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "prompt": "Thực đơn quán bún chả trên nền giấy kraft. Tiêu đề \"THỰC ĐƠN\". Các món kèm giá, có hàng chấm nối giữa tên và giá: \"Bún chả Hà Nội\" - \"45.000đ\", \"Nem cua bể\" - \"15.000đ\", \"Bún chả đặc biệt\" - \"60.000đ\", \"Trà đá\" - \"5.000đ\". Đáy: \"Bún Chả Cô Tâm - 36 Hàng Mành\".",
+   "num_images": 1,
+   "seed": 8016
+  }
+ },
+ {
+  "id": "t02",
+  "tags": [
+   "schedule",
+   "table"
+  ],
+  "why": "lịch học dạng bảng. Xem: các hàng của bảng không lệch cột",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "1:1",
+   "prompt": "Poster lịch khai giảng trung tâm tiếng Anh. Tiêu đề \"LỊCH KHAI GIẢNG THÁNG 12\". Bảng ba hàng: \"Giao tiếp cơ bản\" - \"02/12\" - \"Tối 2-4-6\"; \"IELTS 6.5\" - \"05/12\" - \"Tối 3-5-7\"; \"Tiếng Anh trẻ em\" - \"07/12\" - \"Sáng Chủ nhật\". Dưới cùng: \"Anh ngữ Sao Mai - 0243 555 6677\".",
+   "num_images": 1,
+   "seed": 8017
+  }
+ },
+ {
+  "id": "t03",
+  "tags": [
+   "combo",
+   "price_multi"
+  ],
+  "why": "ba combo có giá cũ - giá mới. Xem: mọi con số đúng nguyên văn",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "prompt": "Poster combo gà rán. Tiêu đề \"COMBO NO NÊ\". Ba combo: \"Combo 1 người\" - \"59.000đ\"; \"Combo 2 người\" - \"109.000đ\"; \"Combo gia đình\" - \"199.000đ\". Một nhãn đỏ ghi \"Tặng Pepsi\". Đáy: \"Gà Rán Giòn Tan - Giao hàng 1800 1234\".",
+   "num_images": 1,
+   "seed": 8018
+  }
+ },
+ {
+  "id": "c01",
+  "tags": [
+   "curved",
+   "seal"
+  ],
+  "why": "con dấu tròn có chữ chạy vòng. Xem: chữ vòng theo đường cong, không có chữ méo của nháp hiện lại",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "1:1",
+   "prompt": "Poster quảng cáo cà phê rang xay nền kem. Giữa trên có con dấu tròn màu nâu với chữ \"RANG MỘC 100%\" chạy vòng quanh và hình hạt cà phê ở giữa. Tên \"Cà Phê Buôn Hồ\" chữ to. Dòng phụ \"Đậm vị cao nguyên\". Giá \"95.000đ / 250g\".",
+   "num_images": 1,
+   "seed": 8019
+  }
+ },
+ {
+  "id": "c02",
+  "tags": [
+   "arch",
+   "opening"
+  ],
+  "why": "tiêu đề uốn vòm. Xem: vòm chữ đều, không chồng lên dòng dưới",
+  "request": {
+   "category": "opening",
+   "aspect_ratio": "4:5",
+   "prompt": "Poster khai trương tiệm kem, phong cách hoạt hình vui nhộn. Tiêu đề \"KHAI TRƯƠNG\" uốn cong hình vòm phía trên, dưới là tên \"Kem Tuyết Hồng\". Ngày \"Thứ Bảy 12/12\". Ưu đãi \"Mua 1 tặng 1\" trong một nhãn tròn. Địa chỉ \"5 Phan Chu Trinh, Đà Nẵng\".",
+   "title": "KHAI TRƯƠNG",
+   "store_name": "Kem Tuyết Hồng",
+   "num_images": 1,
+   "seed": 8020
+  }
+ },
+ {
+  "id": "c03",
+  "tags": [
+   "tilted",
+   "sale"
+  ],
+  "why": "chữ nghiêng và nhãn xéo góc. Xem: chữ nghiêng đúng góc nháp",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "1:1",
+   "prompt": "Poster sale chớp nhoáng phong cách năng động, nền vàng đen. Chữ \"FLASH SALE\" to, nghiêng. Một dải xéo ở góc trên phải ghi \"CHỈ 3 NGÀY\". Dòng \"Giảm 50% toàn bộ phụ kiện điện thoại\". Đáy: \"Phụ kiện Táo Xanh - 18 - 20/12\".",
+   "num_images": 1,
+   "seed": 8021
+  }
+ },
+ {
+  "id": "c04",
+  "tags": [
+   "script_font",
+   "wedding"
+  ],
+  "why": "chữ viết tay bay bướm. Xem: kiểu chữ gần với nháp, dấu tiếng Việt không vỡ",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "prompt": "Poster studio ảnh cưới, tông trắng hồng nhẹ nhàng. Tiêu đề chữ viết tay bay bướm \"Ngày chung đôi\". Tên \"Mây Wedding Studio\". Dòng \"Gói chụp ngoại cảnh Đà Lạt chỉ từ 12.900.000đ\". Liên hệ \"0905 246 810\".",
+   "num_images": 1,
+   "seed": 8022
+  }
+ },
+ {
+  "id": "p01",
+  "tags": [
+   "product_image",
+   "keep_printed"
+  ],
+  "why": "khách tải ảnh lon nước ngọt. Xem: chữ trên lon giữ nguyên, chữ poster viết lại quanh lon",
+  "image": "bench/refs/coca_cola_can.jpg",
+  "request": {
+   "category": "promo",
+   "title": "GIẢI KHÁT NGÀY HÈ",
+   "discount": "Mua 12 lon giảm 10%",
+   "applied_product": "nước ngọt lon 500ml",
+   "store_name": "Tạp hoá Cô Ba",
+   "phone": "0914 222 333",
+   "aspect_ratio": "1:1",
+   "num_images": 1,
+   "seed": 8023
+  }
+ },
+ {
+  "id": "p02",
+  "tags": [
+   "product_image",
+   "keep_printed",
+   "list"
+  ],
+  "why": "khách tải ảnh hũ cà phê hoà tan + 3 ý. Xem: nhãn hũ giữ nguyên, danh sách cùng kiểu",
+  "image": "bench/refs/nescafe_classic.jpg",
+  "request": {
+   "category": "product_intro",
+   "product_name": "Cà phê hoà tan hũ 200g",
+   "product_desc": "Tỉnh táo cả buổi sáng",
+   "highlights": "pha nhanh, vị đậm, hũ thuỷ tinh tái sử dụng",
+   "price": "145.000đ",
+   "store_name": "Siêu thị Nhà Mình",
+   "aspect_ratio": "4:5",
+   "num_images": 1,
+   "seed": 8024
+  }
+ },
+ {
+  "id": "p03",
+  "tags": [
+   "product_image",
+   "keep_printed",
+   "prompt"
+  ],
+  "why": "khách tải ảnh bánh pía + prompt. Xem: chữ trên bao bì giữ nguyên, không đặt câu khách lên bao bì",
+  "image": "bench/refs/banh_pia.jpg",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "prompt": "Poster quà Tết đặc sản Sóc Trăng với hộp bánh trong ảnh. Tiêu đề \"Quà quê đậm vị, Tết thêm sum vầy\". Dòng phụ \"Bánh pía sầu riêng trứng muối\". Ưu đãi \"Mua 5 hộp tặng 1 hộp\". Liên hệ \"Đặc sản Miền Tây - 0939 456 789\".",
+   "num_images": 1,
+   "seed": 8025
+  }
+ },
+ {
+  "id": "f01",
+  "tags": [
+   "form_only",
+   "few_texts"
+  ],
+  "why": "rất ít chữ (2 câu). Xem: nháp vẽ thừa dòng thì VLM lấp bằng cụm hợp ngữ cảnh, không bịa số / liên hệ",
+  "request": {
+   "category": "promo",
+   "title": "HÈ RỰC RỠ",
+   "store_name": "Thời trang Nắng",
+   "aspect_ratio": "1:1",
+   "num_images": 1,
+   "seed": 8026
+  }
+ },
+ {
+  "id": "f02",
+  "tags": [
+   "form_only",
+   "many_texts"
+  ],
+  "why": "form điền gần hết các ô. Xem: đủ ý, chữ nhỏ còn đọc được",
+  "request": {
+   "category": "promo",
+   "title": "TUẦN LỄ VÀNG",
+   "discount": "Giảm 30% + freeship",
+   "applied_product": "toàn bộ mỹ phẩm chăm sóc da",
+   "date_start": "10/12",
+   "date_end": "17/12",
+   "store_name": "Mỹ phẩm Lá Xanh",
+   "phone": "0966 010 203",
+   "address": "102 Cầu Giấy, Hà Nội",
+   "website_link": "laxanh.vn",
+   "aspect_ratio": "4:5",
+   "num_images": 1,
+   "seed": 8027
+  }
+ },
+ {
+  "id": "f03",
+  "tags": [
+   "form_only",
+   "no_diacritics"
+  ],
+  "why": "khách gõ không dấu. Xem: giữ nguyên chữ khách",
+  "request": {
+   "category": "opening",
+   "title": "khai truong quan pho bo",
+   "opening_date": "20/12",
+   "opening_promo": "tang 1 quay cho moi to pho",
+   "store_name": "pho bo ong sau",
+   "address": "14 ly thuong kiet",
+   "aspect_ratio": "1:1",
+   "num_images": 1,
+   "seed": 8028
+  }
+ },
+ {
+  "id": "f04",
+  "tags": [
+   "form_plus_prompt",
+   "english_mix"
+  ],
+  "why": "tên tiếng Anh lẫn tiếng Việt. Xem: chữ tiếng Anh giữ nguyên, không dịch",
+  "request": {
+   "category": "product_intro",
+   "product_name": "Serum Vitamin C Glow Up 30ml",
+   "product_desc": "Sáng da, mờ thâm sau 14 ngày",
+   "highlights": "15% vitamin C, không cồn, hợp da nhạy cảm",
+   "price": "349.000đ",
+   "store_name": "Skin Lab Việt",
+   "prompt": "phong cách tối giản kiểu Hàn, nền be, thêm chữ \"Best Seller 2026\"",
+   "aspect_ratio": "4:5",
+   "num_images": 1,
+   "seed": 8029
+  }
+ },
+ {
+  "id": "f05",
+  "tags": [
+   "form_only",
+   "feedback",
+   "long_quote"
+  ],
+  "why": "lời khen dài. Xem: lời khen được viết gọn cho vừa, tên khách giữ nguyên",
+  "request": {
+   "category": "feedback",
+   "feedback_target": "Homestay Đồi Thông",
+   "feedback_quote": "Phòng sạch, chủ nhà dễ thương, buổi sáng mở cửa là thấy cả thung lũng mây, nhà mình ở ba đêm mà vẫn chưa muốn về",
+   "customer_name": "Gia đình chị Ngọc Lan",
+   "feedback_highlights": "view đẹp, yên tĩnh, bữa sáng ngon",
+   "store_name": "Homestay Đồi Thông",
+   "aspect_ratio": "4:5",
+   "num_images": 1,
+   "seed": 8030
+  }
+ },
+ {
+  "id": "f06",
+  "tags": [
+   "form_only",
+   "16:9",
+   "recruitment"
+  ],
+  "why": "tuyển dụng banner ngang. Xem: bố cục ngang không dồn chữ một góc",
+  "request": {
+   "category": "recruitment",
+   "job_position": "Tài xế giao hàng xe máy",
+   "job_desc": "Giao hàng nội thành, tự chủ thời gian, có xe và điện thoại thông minh",
+   "special_offer": "Thu nhập 10 - 15 triệu",
+   "apply_deadline": "31/12/2026",
+   "apply_method": "Đăng ký tại giaonhanh.vn/tuyendung",
+   "store_name": "Giao Nhanh 24h",
+   "aspect_ratio": "16:9",
+   "num_images": 1,
+   "seed": 8031
+  }
+ },
+ {
+  "id": "x01",
+  "tags": [
+   "vague_prompt"
+  ],
+  "why": "đề một câu. Xem: chữ phụ trợ tiếng Việt hợp ngữ cảnh, không bịa số",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "1:1",
+   "prompt": "làm poster quảng cáo tiệm hoa tươi Hoa Của Mẹ dịp 20/11",
+   "num_images": 1,
+   "seed": 8032
+  }
+ },
+ {
+  "id": "x02",
+  "tags": [
+   "photo_bg",
+   "text_on_photo"
+  ],
+  "why": "chữ đè thẳng lên ảnh chụp, không có vỏ. Xem: chỗ gỡ chữ cũ trên ảnh không lộ vết vá",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "prompt": "Poster nhà hàng hải sản, ảnh chụp bàn tiệc hải sản phủ kín poster, chữ trắng đè trực tiếp lên ảnh: tiêu đề \"Tiệc hải sản tươi sống\", dòng phụ \"Tôm hùm, cua hoàng đế, hàu nướng\", giá \"Buffet 499.000đ/người\", đáy \"Hải Sản Biển Đông - 0258 399 8877\".",
+   "num_images": 1,
+   "seed": 8033
+  }
+ },
+ {
+  "id": "x03",
+  "tags": [
+   "photo_bg",
+   "glow_text"
+  ],
+  "why": "chữ có bóng / quầng trên ảnh. Xem: quầng cũ không còn sót quanh chữ mới",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "16:9",
+   "prompt": "Banner ngang phòng gym, ảnh người tập tạ trong phòng tối có đèn neon. Chữ neon phát sáng \"KHÔNG LÝ DO\" thật to. Dòng phụ \"Tập không giới hạn chỉ 299.000đ/tháng\". Góc dưới: \"Iron Gym - 55 Võ Văn Tần\".",
+   "num_images": 1,
+   "seed": 8034
+  }
+ },
+ {
+  "id": "x04",
+  "tags": [
+   "kids",
+   "colorful"
+  ],
+  "why": "poster trẻ em nhiều màu, nhiều hình trang trí. Xem: hình trang trí của nháp giữ nguyên, không hình nào bị vá nhầm",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "1:1",
+   "prompt": "Poster lớp vẽ thiếu nhi cuối tuần, phong cách hoạt hình nhiều màu, có bút màu, cầu vồng, ngôi sao trang trí. Tiêu đề \"Bé vui học vẽ\". Dòng \"Lớp cuối tuần cho bé 5 - 10 tuổi\". Nhãn \"Học thử miễn phí\". Đáy \"CLB Mỹ Thuật Cầu Vồng - 0912 000 111\".",
+   "num_images": 1,
+   "seed": 8035
+  }
+ }
+]

@@ -98,8 +98,9 @@ khối chữ thẳng trong khung bao).
 ### 3b. Chế độ chỉ dòng chữ (`lonly.py`, `TEXTFIX_LONLY=on`, mặc định tắt)
 
 Poster = nháp với chữ viết lại. VLM chỉ nhận ô L và phải viết mọi dòng nháp đã vẽ; không có ô vỏ S, ô chi tiết I. Nền dựng =
-nháp, trừ chỗ là chữ: dưới nét chữ cũ lấy bản xoá khi nền của dòng còn nguyên ở bản xoá, hoặc lấp nét bằng màu quanh nét khi
-bước xoá đã gỡ cả vỏ (vỏ của nháp được giữ). Chữ OCR bỏ sót (vùng chữ của bộ dò không thuộc ô dòng nào) lấy bản xoá. Dấu nhỏ
+nháp, trừ chỗ là chữ: dòng nằm trên nền phẳng / chuyển màu đều (lòng nút, thẻ, nền trơn) thì khớp một mặt màu nền từ chính
+nháp và tô đè đúng nét chữ cũ -- không dán gì từ bản xoá, vỏ của nháp còn nguyên; dòng nằm trên ảnh chụp / nền có vân / chữ có
+quầng thì lấy vùng dòng từ bản xoá. Chữ OCR bỏ sót (vùng chữ của bộ dò không thuộc ô dòng nào) lấy bản xoá. Dấu nhỏ
 đầu dòng bị xoá cùng chữ và VLM viết lại trong lệnh chữ; icon to, hoạ tiết, sao, avatar là điểm ảnh của nháp.
 
 ### 4. Designer (`slots.py`)
