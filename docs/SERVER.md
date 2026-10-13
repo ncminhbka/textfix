@@ -128,6 +128,19 @@ FLUX lên card của nó. `--gpus 1` để chạy một tiến trình như cũ (
 
 `probe.py` ra `output/probe/<key>.jpg` (nháp | ô | bản xoá | poster | lệnh), `<key>_plan.json`, `<key>_poster.png`.
 
+## Chạy một tập dev từ terminal và xem kết quả tại chỗ
+
+```bash
+source ~/textfix_env.sh
+python scripts/dev_batch.py bench/accept1.json --fresh    # chạy lại cả tập (seed cố định), giữ manifest cũ để so
+```
+
+Chạy xong, terminal in bảng từng ca và dòng tổng "so lượt trước: tốt lên / xấu đi / như cũ". Xem ảnh: mở
+`https://<địa-chỉ-jupyter>/user/<tên>/proxy/8088/outputs/_reports/accept1.html` (nháp cạnh poster, cờ nghi hỏng, poster lượt trước).
+Cần gửi kết quả về máy cá nhân: tải MỘT tệp `output/runs_zip/accept1_report_<giờ>.zip` (vài MB) từ cây thư mục JupyterLab.
+Thêm `--full` khi cần cả nháp / bản xoá cỡ gốc (các zip < 24 MB như trước). Lập lại báo cáo mà không chạy lại:
+`python scripts/batch_report.py bench/accept1.json`.
+
 ## Sự cố
 
 | Hiện tượng | Xử lý |

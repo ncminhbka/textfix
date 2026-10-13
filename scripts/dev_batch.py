@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """MÁY CHỦ: chạy một TẬP DEV (bench/dev2.json: yêu cầu như người dùng điền trên UI) qua máy chủ đang chạy -- đủ đường đi thật:
 LLM brief -> nháp -> xoá -> dọn -> ô -> VLM -> dựng -> sửa bằng code -- rồi gói ĐẦY ĐỦ kết quả (request, brief, ảnh sản phẩm, nháp,
-bản xoá thô / đã dọn, lượt đầu, poster, plan.json) thành zip < 24 MB và tự tải về.
+bản xoá thô / đã dọn, lượt đầu, poster, plan.json). Xong thì BÁO CÁO TẠI CHỖ (scripts/batch_report.py): bảng kết quả ra terminal
+(có so với lượt trước), một trang HTML xem qua máy chủ, một zip nhẹ vài MB. Thêm --full để gói đầy đủ thành các zip < 24 MB.
 
   bash scripts/start_server.sh                    # máy chủ phải chạy sẵn (cổng TEXTFIX_PORT, mặc định 8088)
   %run scripts/dev_batch.py                       # bench/dev2.json, gửi hết một lần (máy chủ tự xếp hàng, 2 GPU gối đầu)
@@ -51,6 +52,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--fresh", action="store_true", help="CHẠY LẠI các ca được chọn dù manifest ghi đã xong (sau khi cập nhật mã): "
                                                          "manifest cũ lưu thành <tên>_manifest_<giờ>.json, lượt chạy cũ vẫn còn trong output/runs")
     ap.add_argument("--no-ship", action="store_true")
+    ap.add_argument("--full", action="store_true", help="gói thêm ĐẦY ĐỦ kết quả (nháp, bản xoá cỡ gốc) thành các zip < 24 MB như trước")
     a = ap.parse_args(argv)
     cases = json.loads(a.set.read_text(encoding="utf-8"))
     if a.only:
@@ -137,6 +139,12 @@ def main(argv: list[str] | None = None) -> int:
     print("trạng thái:", st)
     if a.no_ship:
         return 0
+    # BÁO CÁO TẠI CHỖ (mặc định): bảng ra terminal + một trang HTML xem qua máy chủ + MỘT zip nhẹ (scripts/batch_report.py)
+    from scripts.batch_report import main as light   # noqa: E402
+    rc = light([str(a.set)])
+    if not a.full:
+        print("(gói đầy đủ nháp / bản xoá cỡ gốc -- chỉ khi cần đo lại ô: thêm --full)")
+        return rc
     runs = sorted({m["run_id"] for cid, m in M.items() if m.get("run_id") and cid in {c["id"] for c in cases}})
     from scripts.runs_report import main as report   # noqa: E402
     return report(["--only", ",".join(runs), "--again", "--jpg", "--extra", str(mf), "--name", name])

@@ -501,6 +501,13 @@ chạy server mới biết (a01, f03, f08, p02, g06); 3 để nguyên (a02 nháp
 ## Lượt chạy server tiếp theo
 
 Cập nhật mã (docs/SERVER.md), khởi động lại máy chủ **và kernel**, rồi:
+**Xem kết quả không cần tải các zip đầy đủ (13/10):** `dev_batch.py` chạy xong tự gọi `scripts/batch_report.py`: in bảng từng ca
+ra terminal (lỗi còn, chữ co, câu mất, cờ nghi hỏng của `textfix/audit.py`, so với lượt trước: tốt lên / xấu đi / như cũ), ghi
+trang `output/runs/_reports/<tập>.html` (mở qua `.../proxy/8088/outputs/_reports/<tập>.html`) và MỘT zip nhẹ vài MB ở
+`output/runs_zip/<tập>_report_<giờ>.zip` (HTML + ảnh thu nhỏ + plan / brief / request) để gửi Claude chấm. `--full` mới gói đầy đủ.
+Cờ nghi hỏng đo trên 39 poster accept1 chấm mắt: bộ kiểm hình học riêng bắt 6 / 15 poster hỏng, báo nhầm 6 / 24; gộp cờ bắt 11 / 15,
+báo nhầm 6 / 24 -- dùng để theo dõi xu hướng và chọn poster cần xem, chưa đủ để quyết định tự động.
+
 **Sau cụm sửa 13/10 chiều:** chạy lại accept1 với `--fresh` (cùng seed) để so trước / sau trên đúng 42 nháp:
 `export TEXTFIX_GEO=on`, khởi động lại máy chủ + kernel, `%run scripts/dev_batch.py bench/accept1.json --fresh`.
 
