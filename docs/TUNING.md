@@ -476,7 +476,7 @@ rỗng 3, không vẽ 2 -- **nửa đạt**. Luật "chữ chệch" 1a của 13/
 
 | Bước | Poster hỏng | Sửa |
 |---|---|---|
-| B0 brief | f08: form + prompt, LLM khai price / highlights bị prompt đè -> giá mất, nút giá trống | [mã] chỉ ô lời quảng cáo mới bị đè (`brief.OVERRIDABLE`); ô sự thật / danh sách luôn giữ. Chưa đo với LLM thật |
+| B0 brief | f08: form + prompt, LLM khai price / highlights bị prompt đè -> giá mất, nút giá trống | người dùng chốt 13/10: PROMPT LUÔN THẮNG FORM -> gỡ luật "ô sự thật luôn giữ" của Claude. [prompt LLM] chỉ xung đột thật (prompt ghi giá trị khác cho CÙNG ô) mới đè, prompt chỉ thêm chữ thì không đè ô nào; [mã] giá trị form có nguyên văn trong prompt thì không tính là bị đè. Chưa đo với LLM thật |
 | B1 nháp | a02 chữ đáy quá nhỏ; danh sách ít hàng hơn số ý (a01, a04, b02, b05, f06, c03...) | chấp nhận (giới hạn model, quyết định 13/10) |
 | B2.5 ô | c03: hàng chấm nối làm OCR gộp tên + giá | [mã] `_split_gaps`: dòng OCR có >= 3 chấm liền -> cột chỉ có nét thấp (<= 0.3 cao dòng) là khoảng trống. Đo ô lại: tách đúng "Trà đào cam sả" / "35.000đ" |
 | | g04: hai vòm lồng nhau, vòm sau nuốt vòm trước | [mã] `apply_arcs` không gộp ô đã là ô cung. Đo ô lại: hai ô cung |

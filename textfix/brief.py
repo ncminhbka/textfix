@@ -72,7 +72,9 @@ Input: the user's poster form (category + filled fields, JSON) and/or a free pro
      text already says. Only for intent "poster"; when the user's texts already make a complete poster, add none.
    - Prompt and form disagree (a different value for the same thing: discount 20% in the form, "GIẢM 30%" in the prompt; another
      headline): the PROMPT wins -- use the prompt's text, leave that form value out of texts and prompt_en, and put the form field
-     name in "overridden".
+     name in "overridden". ONLY a real conflict overrides: the prompt must state another value for THAT SAME field. A prompt
+     that adds something new ("ghi thêm ...", an extra offer, a scene description) overrides nothing: every filled form field
+     it does not contradict stays in texts (a form price stays when the prompt only adds a combo discount).
 3. variants -- ALTERNATIVE DESIGN DIRECTIONS for the same poster, exactly as many as asked below (empty list when none are asked).
    Each: name (2-4 words, e.g. "big type centered", "split photo / text", "card layout", "dark premium") and its own complete
    prompt_en following every rule of 1. Same subject, same product, same texts (every text in double quotes, exactly the same),
@@ -103,9 +105,6 @@ CATEGORIES = {"promo": "promotion / advertising poster", "product_intro": "produ
 
 def _norm(s: str) -> str:
     return " ".join(s.split())
-
-
-OVERRIDABLE = {"title", "discount", "applied_product", "opening_promo", "special_offer", "product_desc", "feedback_quote", "job_desc"}
 
 
 def make_brief(llm, prompt: str | None = None, form: dict | None = None, design: dict | None = None,
@@ -147,10 +146,12 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
     vals = [v for v in vals if len(v) >= 3]
     out, log, seen = [], {"dropped": [], "added": []}, set()
     # PROMPT THẮNG (09/10, d23): trường form mà prompt ghi giá trị khác -> bỏ giá trị form khỏi câu khách, không thêm lại
-    # ... nhưng chỉ các ô LỜI QUẢNG CÁO; ô SỰ THẬT (giá, ngày, liên hệ, tên, danh sách điểm nổi bật, các bước) luôn được giữ --
-    # prompt chỉ thêm, không làm mất (13/10 accept1 f08: prompt "ghi thêm Mua 2 túi giảm 20.000đ", LLM khai price + highlights
-    # bị đè -> giá 185.000đ không vào câu khách, bộ chặn số xoá nó, nút giá trống)
-    over = {k for k in raw.get("overridden") or [] if k in form and k in OVERRIDABLE} if prompt else set()
+    # PROMPT LUÔN THẮNG FORM (người dùng chốt 13/10): mọi ô form đều có thể bị prompt đè. Việc "có đè thật không" là của LLM --
+    # lời dặn nói rõ prompt chỉ THÊM chữ thì không đè ô nào (13/10 accept1 f08: prompt "ghi thêm Mua 2 túi giảm 20.000đ", LLM
+    # khai price + highlights bị đè -> giá 185.000đ mất). Mã chỉ chặn một ca chắc chắn sai: giá trị form có nguyên văn trong
+    # prompt thì không thể là "bị prompt đè".
+    over = {k for k in raw.get("overridden") or [] if k in form and k != "category"
+            and not all(_norm(str(x)).casefold() in _norm(prompt).casefold() for x in (form[k] if isinstance(form[k], list) else [form[k]]))}         if prompt else set()
     gone_vals = {_norm(str(x)).casefold() for k in over for x in (form[k] if isinstance(form[k], list) else [form[k]])}
     if over:
         log["overridden"] = sorted(over)
