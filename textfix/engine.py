@@ -110,8 +110,17 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     T["o"] = time.time() - t0
     t0 = time.time()
     progress("VLM thiết kế")
-    P, log = slots.validate(slots.plan(draft, M, B["prompt_en"], B["texts"], vlm, product=product, base=plate), M, B["texts"],
-                             product=product)
+    raw = slots.plan(draft, M, B["prompt_en"], B["texts"], vlm, product=product, base=plate)
+    # KẾ HOẠCH RỖNG (13/10 accept1 f03: VLM trả về không một lệnh nào -> mọi ô bị bỏ, poster ra không chữ, 0 lỗi): có dòng chữ, có
+    # câu khách mà không lệnh nào viết chữ -> gọi lại VLM một lần; vẫn rỗng thì ghi lỗi nặng "empty_plan"
+    wrote = lambda p_: any(o.get("kind") == "text" and o.get("html") for o in p_.get("ops") or [])   # noqa: E731
+    empty = bool(M["L"] and B["texts"]) and not wrote(raw)
+    if empty:
+        progress("VLM trả kế hoạch rỗng, gọi lại")
+        raw = slots.plan(draft, M, B["prompt_en"], B["texts"], vlm, product=product, base=plate)
+    P, log = slots.validate(raw, M, B["texts"], product=product)
+    if empty:
+        log.insert(0, "VLM trả kế hoạch không có lệnh chữ nào -> gọi lại: " + ("được" if wrote(raw) else "VẪN RỖNG"))
     if cinfo["lines"]:
         log.insert(0, f"dọn chữ sót: inpaint {cinfo['inpaint']}, FLUX vùng cắt {cinfo['reerase']}")
     log[:0] = list(M.get("geo_log") or [])   # vỏ giả, vùng chữ của bộ dò, ô chữ cong, dòng OCR sót
@@ -120,6 +129,8 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     progress("dựng + kiểm")
     poster, res, rlog = render.render(page, slots.base_image(draft, plate, M, P), P, M)
     errs = render.check(P, M, res)
+    if empty and not wrote(raw):
+        errs.append({"type": "empty_plan", "ops": []})
     log += rlog + [f"LỖI: {e}" for e in errs]
     poster_first, errs_first = poster, errs   # bản lượt đầu (debug: so trước / sau vòng duyệt)
     sev = lambda E: sum(e["type"] in slots.SEVERE for e in E)   # noqa: E731

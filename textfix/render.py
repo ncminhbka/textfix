@@ -361,7 +361,7 @@ async (o) => {
     // thẻ nào): khung là flex nên mỗi mẩu chữ / mỗi span thành một CỘT xếp ngang -> tràn, co còn 0.32. Có mẩu chữ trần ở cấp
     // ngoài = nội dung chảy theo dòng -> bọc một span (một con flex). Bố cục cột thật (các span, không chữ trần) giữ nguyên.
     if (d.childNodes.length > 1 && [...d.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) &&
-        ![...d.children].some(x => /flex/.test(x.getAttribute('style') || ''))) {
+        ![...d.children].some(x => /display\s*:\s*(inline-)?flex/.test(x.getAttribute('style') || ''))) {
       const w = document.createElement('span');
       while (d.firstChild) w.appendChild(d.firstChild);
       d.appendChild(w);
@@ -369,7 +369,10 @@ async (o) => {
     // CỘT FLEX trong thẻ font: VLM viết <i-font><span style="flex:1">tên</span><span style="flex:0 0 30%">giá</span></i-font> --
     // span bọc font (inline) là con flex duy nhất, tên và giá dính liền "Bún bò tái40.000đ" (09/10 dev2 d05) -> bọc font
     // display:contents, các span flex thành con flex thật của khung (vẫn thừa hưởng font)
+    // (icon / sao là SVG có "flex:none" trong style -- không phải cột flex: 13/10 accept1 a04, ba dòng có icon đầu dòng bị trải
+    // thành ba cột hẹp)
     for (const x of d.querySelectorAll('[style*="flex"]')) {
+      if (x instanceof SVGElement) continue;
       // (con trực tiếp của khung flex bị "blockify": display tính ra là block, không phải inline -- xét theo thẻ span)
       for (let p = x.parentElement; p && p !== d && p.tagName === 'SPAN' && !/flex|grid/.test(getComputedStyle(p).display);
            p = p.parentElement)
@@ -568,7 +571,9 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         # TIÊU ĐỀ không phải đoạn văn (12/10 run 38ef: tiêu đề 10 chữ / 3 dòng bị ngắt lại thành 2 dòng, gãy "kỹ / sư"): dòng cỡ
         # tiêu đề giữ cách ngắt dòng VLM viết
         head = bool(med and Ls and float(np.median([m["size"] for m in Ls])) >= HEAD * med)
-        if op.get("kind") == "text" and len(lm) >= 3 and not head and len(re.sub(r"<[^>]+>", " ", h).split()) >= PARA_WORDS \
+        # DANH SÁCH viết trong một lệnh (13/10 accept1 a04: ba ý, mỗi ý một dòng có icon đầu dòng) không phải đoạn văn: giữ <br>
+        listy = op.get("group_kind") == "list" or bool(re.search(r"(^|<br\s*/?>)\s*(<i-icon|<svg|[•\-–✓✔])", h, flags=re.I))
+        if op.get("kind") == "text" and len(lm) >= 3 and not head and not listy and len(re.sub(r"<[^>]+>", " ", h).split()) >= PARA_WORDS \
                 and re.search(r"<br", h, flags=re.I) and not re.search(r"<(div|p|li|ul|ol)\b", h, flags=re.I):
             h = re.sub(r"\s*<\s*br\b[^>]*>\s*", " ", h, flags=re.I)
             bs = "text-wrap:pretty;" + bs
@@ -841,8 +846,17 @@ def declared_groups(P: dict, els: list[dict]) -> dict:
     # nhóm có dòng NGHIÊNG, hoặc có lệnh viết chữ vào ô chi tiết I (dev3 g01_v0: VLM gom 15 mẩu chữ của một tiêu đề cung, mỗi mẩu
     # một ô I, thành nhóm "arc") không phải danh sách / câu xuống dòng của các DÒNG chữ: ép một cỡ / một lề làm vỡ -> bỏ cả nhóm
     line = lambda o: any(m.startswith("L") for m in o.get("marks") or [])   # noqa: E731
-    return {k: v for k, v in G.items()
-            if len(v) >= 2 and all(line(o) and not by_el[o["id"]]["angle"] and not by_el[o["id"]].get("path") for o in v)}
+    G = {k: v for k, v in G.items()
+         if len(v) >= 2 and all(line(o) and not by_el[o["id"]]["angle"] and not by_el[o["id"]].get("path") for o in v)}
+    # NHÁP THẮNG LỜI KHAI (13/10 accept1 g10: VLM khai "GIẢM" 34 px và "50%" 229 px là một nhóm -> ép cùng cỡ, "GIẢM" to còn
+    # "50%" nhỏ): lệnh có cỡ nháp lệch quá GROUP_SIZE lần so với trung vị nhóm không thuộc nhóm; còn dưới 2 lệnh thì bỏ nhóm
+    out = {}
+    for k, v in G.items():
+        med = float(np.median([by_el[o["id"]]["size"] for o in v]))
+        core = [o for o in v if med / GROUP_SIZE <= by_el[o["id"]]["size"] <= med * GROUP_SIZE]
+        if len(core) >= 2:
+            out[k] = core
+    return out
 
 
 def _group_frames(P: dict, M: dict, els: list[dict], res: list, W: int) -> tuple[list[str], list[str]]:
@@ -1118,6 +1132,7 @@ def autofix(P: dict, M: dict, errs: list[dict], res: list[dict]) -> tuple[dict, 
     return P2, log
 
 
+GROUP_SIZE = 1.4   # nhóm VLM khai: chỉ các lệnh có cỡ nháp trong khoảng trung vị / 1.4 .. x 1.4 (cùng số với geo.RUN_SIZE)
 UNEVEN = 1.25   # cùng cụm (model vẽ cùng cỡ, thẳng cột / cùng hàng, gần nhau) mà cỡ dựng lệch > 25% = lỗi uneven_size
 
 
@@ -1176,9 +1191,14 @@ def _role_groups(P: dict, M: dict, res: list, same_font: bool = True) -> list[li
     # NHÓM DO VLM KHAI ("group" của lệnh: cùng vai theo nghĩa -- mục danh sách, tên món, giá...): gộp thẳng, không cần đoán
     # (cùng font thì mới so được cỡ px)
     grp = {}
+    dsz = {t[0]: t[1] for t in T}
     for op in P["ops"]:
         if op.get("group") and op["id"] in par:
             grp.setdefault(str(op["group"]).strip().lower(), []).append(op["id"])
+    for k, ids in list(grp.items()):   # cỡ nháp lệch xa trung vị nhóm: không cùng vai (xem declared_groups)
+        med = float(np.median([dsz[i] for i in ids]))
+        grp[k] = [i for i in ids if med / GROUP_SIZE <= dsz[i] <= med * GROUP_SIZE]
+    grp = {k: v for k, v in grp.items() if len(v) >= 2}
     for ids in grp.values():
         for b in ids[1:]:
             if not (same_font and ff[ids[0]] != ff[b]):

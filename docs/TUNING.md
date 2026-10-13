@@ -462,9 +462,48 @@ xếp chồng (g07_v0, g09_v1), chữ vòng quanh huy hiệu (g12), chữ trên 
 - Chấp nhận cho bản 1 (đề nghị): chữ nhỏ vòng quanh huy hiệu, chữ trên ruy băng 3D. g06_v0: OCR sót hẳn dòng "MỚI" của sticker,
   bản xoá còn chữ cũ -> chữ mới đè lên chữ sót; chờ xem với GEO bật.
 
+## Bộ accept1 (13/10, 42 ca, mã 95edeef, GEO bật) -- chấm và sửa; từ đây accept1 là tập DEV
+
+42 / 42 chạy xong. Lỗi cuối (bộ kiểm): too_small 13, boxes_overlap 5, low_contrast 1, content_overlap 1. Xem mắt 100%: trên 39
+poster (bỏ 1 ảnh thường, 2 giới hạn đã biết g05 / g12): đẹp 15, dùng được 9, HỎNG 15 (38%). Bộ kiểm chỉ báo lỗi ở 6 / 15 poster
+hỏng; f03 (không một chữ) báo 0 lỗi.
+
+Chấm lượt trước: số ô theo khối -- **đạt** (0 lệnh gộp hai cột / 41 poster; c01, c02, a01 đúng). Nhóm list cùng kiểu -- **đạt**.
+"nghìn" giữ nguyên, uneven_size không báo nhầm -- **đạt**. Chữ cong: g01, g02, g03 **đạt**; g04, g06 hỏng do mã. Nghiêng: g07,
+g08, b03 **đạt** (không còn xoay hai lần). FLASH / SALE: **đạt** (g09). Vỏ keep răng cưa (s02), chữ trên lon (p01): **đạt**.
+FIT (câu dài viết ngắn): **nửa đạt** -- 8 poster còn lệnh co < 0.7. Dấu đầu dòng: mã nhập ở 7 poster, VLM vẽ đúng 3, vẽ vòng
+rỗng 3, không vẽ 2 -- **nửa đạt**. Luật "chữ chệch" 1a của 13/10: **không đạt** (a01 thay bừa ba chữ).
+
+| Bước | Poster hỏng | Sửa |
+|---|---|---|
+| B0 brief | f08: form + prompt, LLM khai price / highlights bị prompt đè -> giá mất, nút giá trống | [mã] chỉ ô lời quảng cáo mới bị đè (`brief.OVERRIDABLE`); ô sự thật / danh sách luôn giữ. Chưa đo với LLM thật |
+| B1 nháp | a02 chữ đáy quá nhỏ; danh sách ít hàng hơn số ý (a01, a04, b02, b05, f06, c03...) | chấp nhận (giới hạn model, quyết định 13/10) |
+| B2.5 ô | c03: hàng chấm nối làm OCR gộp tên + giá | [mã] `_split_gaps`: dòng OCR có >= 3 chấm liền -> cột chỉ có nét thấp (<= 0.3 cao dòng) là khoảng trống. Đo ô lại: tách đúng "Trà đào cam sả" / "35.000đ" |
+| | g04: hai vòm lồng nhau, vòm sau nuốt vòm trước | [mã] `apply_arcs` không gộp ô đã là ô cung. Đo ô lại: hai ô cung |
+| | g06: hai dòng nghiêng xếp chồng nhận nhầm là vòm (võng 0.30, dài 2.8 cao dòng) | [mã] `geo.ARC_SPAN` = 3.2: 18 vùng võng của accept1 / dev2 / dev3, 17 cung thật dài 3.7 - 12.3, ca nhầm 2.8. Đo ô lại: không còn ô cung; ba mẩu thành chi tiết I (bộ đọc không đọc được vùng xiên 51 độ) |
+| | f02, a05: vỏ đo được một nửa (nửa kia khác bản xoá < DIFF) | [mã] `overlay`: nới vỏ ra điểm liền kề cùng màu lòng mà bản xoá có đổi (SOFT_DIFF). 109 vỏ / 187 nháp: 7 vỏ đổi khung, xem mắt cả 7 đều ôm đúng hơn (f02, a05, s02, dev2 07fe, dev3 0319 / 8c94 / 97f6), 0 vỏ xấu đi |
+| | b03: mảnh chữ số "2" thành vỏ; s03: 2 / 3 huy hiệu tròn viền không thành vỏ | theo dõi (mỗi loại 1 poster; thử "vỏ nằm trong vùng chữ của bộ dò": bộ dò chỉ phủ 32% mảnh đó, không đủ tách) |
+| B3 VLM | f03: kế hoạch rỗng | [mã] `engine.design`: không lệnh chữ nào -> gọi lại một lần; vẫn rỗng -> lỗi nặng `empty_plan`. Chưa đo (cần VLM) |
+| | b05: hai lệnh cho một ô (chữ + keep) -> hai lớp chữ đè | [mã] `validate`: một ô một lệnh, viết chữ > vẽ > giữ > bỏ. Dựng lại: hết đè |
+| | f06: đổi thứ tự bước cho khớp hình nháp | [mã] `_list_order`: danh sách một cột theo thứ tự câu khách. Dựng lại: đúng thứ tự |
+| | g10: khai "GIẢM" 34 px và "50%" 229 px một nhóm | [mã] `render.GROUP_SIZE` 1.4: lệnh có cỡ nháp lệch xa trung vị nhóm không thuộc nhóm. Dựng lại: đúng tỉ lệ nháp |
+| | p02: tên sản phẩm viết vào hàng danh sách, luật chống lặp bỏ tiêu đề thật | [mã] nhiều ô cùng giống câu -> giữ ô chữ to nhất. Chưa dựng lại được (plan lưu sau bước chặn) |
+| | b06, c01, f02: chấm đầu dòng vẽ bằng icon vòng tròn / "○" | [mã] `validate`: vòng tròn đầu dòng -> "•". Dựng lại: b06, f02 đúng; c01 còn chấm đôi (nền còn chấm, VLM vẫn thêm) |
+| | s03: VLM gộp ô vỏ vào lệnh chữ, vẽ nền cho từng dòng | chấp nhận (VLM) |
+| B3 mã | a01: luật 1a thay chữ không liên quan | [mã] chỉ thay khi giống >= 0.6 và cùng chữ đầu. Thử: "ngàn" -> "nghìn" vẫn thay; câu a01 ra "Cơm chín đều, mềm dẻo / giữ vị bữa cơm nhà" |
+| B4 dựng | a04: danh sách ba dòng có icon trong MỘT lệnh thành ba cột hẹp | [mã] luật đoạn văn bỏ qua danh sách; SVG icon ("flex:none") không tính là cột flex. Dựng lại: ba dòng |
+
+Đo chung: dựng lại accept1 (41) + dev2 (62) + dev3 (58) + form1 (19) mã cũ / mới: danh sách lỗi đổi ở 2 poster (b06, f02: bớt
+lỗi), 0 poster thêm lỗi; luật mới chạm 2 poster cũ (dev3 p04 chấm đầu dòng, p06 ô hai lệnh).
+Sau cụm sửa, đếm lại 15 poster hỏng: 8 sửa được bằng mã và đã thấy đúng khi dựng / đo lại (a04, b05, c03, f06, g04, g10, b06
+chuyển lên đẹp, f02 nửa); 4 cần server mới biết (a01, f03, f08, p02, g06); 3 để nguyên (a02 nháp, b03, s03).
+
 ## Lượt chạy server tiếp theo
 
 Cập nhật mã (docs/SERVER.md), khởi động lại máy chủ **và kernel**, rồi:
+**Sau cụm sửa 13/10 chiều:** chạy lại accept1 với `--fresh` (cùng seed) để so trước / sau trên đúng 42 nháp:
+`export TEXTFIX_GEO=on`, khởi động lại máy chủ + kernel, `%run scripts/dev_batch.py bench/accept1.json --fresh`.
+
 **Bộ nghiệm thu toàn hệ thống: `bench/accept1.json` (42 ca mới, seed cố định, 1 ảnh mỗi ca).** Chạy với chữ cong BẬT:
 `export TEXTFIX_GEO=on`, khởi động lại máy chủ và kernel, rồi `%run scripts/dev_batch.py bench/accept1.json`.
 Nhóm: a (5) đề bài dài -- FIT, khối, danh sách; b (6) danh sách cùng kiểu, dấu đầu dòng, icon to; c (4) hai cột, bảng giá, hai

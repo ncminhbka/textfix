@@ -105,6 +105,9 @@ def _norm(s: str) -> str:
     return " ".join(s.split())
 
 
+OVERRIDABLE = {"title", "discount", "applied_product", "opening_promo", "special_offer", "product_desc", "feedback_quote", "job_desc"}
+
+
 def make_brief(llm, prompt: str | None = None, form: dict | None = None, design: dict | None = None,
                product_image: bool = False, n_variants: int = 0, aspect: str | None = None) -> dict:
     """llm = llm.json_call(..., schema=SCHEMA). -> {mode, prompt_en, texts: [{text, role}], variants: [{name, prompt_en}], log}.
@@ -144,7 +147,10 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
     vals = [v for v in vals if len(v) >= 3]
     out, log, seen = [], {"dropped": [], "added": []}, set()
     # PROMPT THẮNG (09/10, d23): trường form mà prompt ghi giá trị khác -> bỏ giá trị form khỏi câu khách, không thêm lại
-    over = {k for k in raw.get("overridden") or [] if k in form and k != "category"} if prompt else set()
+    # ... nhưng chỉ các ô LỜI QUẢNG CÁO; ô SỰ THẬT (giá, ngày, liên hệ, tên, danh sách điểm nổi bật, các bước) luôn được giữ --
+    # prompt chỉ thêm, không làm mất (13/10 accept1 f08: prompt "ghi thêm Mua 2 túi giảm 20.000đ", LLM khai price + highlights
+    # bị đè -> giá 185.000đ không vào câu khách, bộ chặn số xoá nó, nút giá trống)
+    over = {k for k in raw.get("overridden") or [] if k in form and k in OVERRIDABLE} if prompt else set()
     gone_vals = {_norm(str(x)).casefold() for k in over for x in (form[k] if isinstance(form[k], list) else [form[k]])}
     if over:
         log["overridden"] = sorted(over)

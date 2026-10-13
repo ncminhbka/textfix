@@ -27,6 +27,8 @@ MARK_H = 0.4         # mảnh thấp hơn 0.4 cao trung vị chuỗi = dấu tha
 ARC_MIN_PARTS = 5    # chuỗi >= 5 mảnh mới khớp cung
 ARC_FIT = 0.15       # lệch khớp đường tròn (trung vị khoảng cách tâm mảnh tới đường tròn) <= 0.15 cao chữ
 ARC_SAG = 0.3        # độ võng của cung (dây cung^2 / 8R) >= 0.3 cao chữ: thấp hơn là dòng thẳng / nghiêng (OCR lo)
+ARC_SPAN = 3.2       # vùng chữ của bộ dò chỉ là cung khi dài >= 3.2 cao dòng. 18 vùng võng >= 0.3 của accept1 / dev2 / dev3 (13/10):
+                     # 17 cung thật dài 3.7 - 12.3 cao dòng; 1 vùng dài 2.8 là hai dòng nghiêng xếp chồng ("GIẢM" / "30%", g06)
 ARC_LINE = 0.18      # và đường thẳng khớp tệ: lệch trung vị >= 0.18 cao chữ
 ARC_BLIND = 7        # cung >= 7 mảnh mà OCR không đọc được chữ nào vẫn là chữ (OCR hay trượt hẳn chữ cong)
 RUN_SIZE = 1.4       # một dòng nhiều cỡ: hai ô liền nhau cỡ lệch >= 1.4 lần ...
@@ -335,7 +337,8 @@ def apply_arcs(L: list[dict], I: list[dict], found: list[dict], cap_em: float) -
             x0, y0, x1, y1 = (int(max(0, v)) for v in b)
             sub = mk[y0:min(H, y1), x0:min(W, x1)]
             return sub.size > 0 and sub.mean() >= 0.08
-        cov_L = [l for l in L if on(l["box"])]
+        # ô đã là ô cung của vùng khác không gộp lần nữa (13/10 accept1 g04: hai vòm chữ lồng nhau, vòm sau nuốt vòm trước)
+        cov_L = [l for l in L if not l.get("path") and on(l["box"])]
         cov_I = [c for c in I if on(c["box"])]
         # MẨU Ở HAI ĐẦU CUNG (12/10 g01: chữ cái đầu / cuối vòm không nối được vào chuỗi nét, còn lại thành ô rời; g02: mẩu OCR
         # "NHA GAO" nghiêng 42 độ nằm ngay trên vòng con dấu; 13/10 run ba93: bộ dò thấy vòm "TIỆM BÁNH NHÀ" và mẩu "GẠO" là hai

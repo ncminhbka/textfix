@@ -63,6 +63,10 @@ SOFT_EDGE = 0.6         # bản xoá CÒN mép vỏ (độ sắc mép bản xoá
                         # vỏ bị xoá 0.01-0.39 (dev2), pill bản xoá giữ chỉ nhạt màu 1.05 (gt m03_s1)
 
 
+GROW_DE = 12.0          # nới vỏ: điểm cùng màu lòng vỏ (ΔE <= 12, cùng thang với ngưỡng lòng phẳng) ...
+GROW_MIN, GROW_MAX = 1.15, 4.0   # ... vỏ sau nới to hơn 15% mới đáng đổi, quá 4 lần là tràn sang nền
+
+
 def _edge_kept(A, B, mask, text) -> float:
     """Độ sắc mép (Sobel trên L) của bản xoá / của nháp, dọc dải 5 px quanh đường viền vỏ (trừ chữ)."""
     import cv2
@@ -226,6 +230,35 @@ def overlay(draft: np.ndarray, plate: np.ndarray, lines: list[dict]) -> dict:
                       "fill": "#%02x%02x%02x" % tuple(int(v) for v in fill), "radius": round(_radius(filled), 1),
                       "_mask": sm, "_fill_lab": _lab(fill.reshape(1, 1, 3).astype(np.uint8))[0, 0]})
             shell_mask |= sm
+    # VỎ ĐO ĐƯỢC MỘT NỬA (13/10 accept1 f02, a05: thẻ trắng trên nền phòng sáng -- nửa thẻ nằm trên rèm trắng chỉ khác bản xoá ΔE
+    # 8-18, dưới ngưỡng DIFF, nên ô vỏ chỉ ôm nửa còn lại; VLM vẽ lại đúng nửa đó): nới vỏ ra các điểm LIỀN KỀ cùng màu lòng mà
+    # bản xoá có đổi (ngưỡng thấp SOFT_DIFF; ngoài vỏ thật thì nháp = bản xoá, vùng nới tự dừng ở mép vỏ). Chỉ nhận khi vẫn là
+    # một hình gọn, lòng phẳng màu, và to ra rõ rệt.
+    for s in S:
+        same = (e > SOFT_DIFF) & (np.linalg.norm(A - s["_fill_lab"], axis=2) <= GROW_DE)
+        g = cv2.morphologyEx((same | s["_mask"]).astype(np.uint8), cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))
+        g = cv2.morphologyEx(g, cv2.MORPH_OPEN, np.ones((OPEN, OPEN), np.uint8)) | s["_mask"].astype(np.uint8)
+        _n, cc2, st2, _c = cv2.connectedComponentsWithStats(g, 8)
+        ys0, xs0 = np.nonzero(s["_mask"])
+        k = int(cc2[ys0[len(ys0) // 2], xs0[len(xs0) // 2]])
+        x, y, w, h, _a = st2[k]
+        comp = (cc2[y:y + h, x:x + w] == k).astype(np.uint8)
+        cnts, _h = cv2.findContours(comp, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        filled = cv2.drawContours(np.zeros_like(comp), cnts, -1, 1, cv2.FILLED).astype(bool)
+        a0 = float(s["_mask"].sum())
+        if not (GROW_MIN * a0 <= filled.sum() <= GROW_MAX * a0) or filled.sum() / float(w * h) < SHELL_SOLID \
+                or x == 0 or y == 0 or x + w >= W or y + h >= H:
+            continue
+        sm = np.zeros((H, W), bool)
+        sm[y:y + h, x:x + w] = filled
+        if any(o is not s and (o["_mask"] & sm).any() for o in S):   # chạm vỏ khác: hai vỏ cùng màu đứng sát nhau, không nới
+            continue
+        body = sm & ~text
+        if body.sum() < 50 or np.linalg.norm(A[body] - s["_fill_lab"], axis=1).std() > SOFT_STD:
+            continue
+        s.update(box=[float(x), float(y), float(x + w), float(y + h)], radius=round(_radius(filled), 1), _mask=sm, grown=True)
+        shell_mask |= sm
+        ov |= sm.astype(np.uint8)
     for s in _soft_shells(draft, A, B, lines, text, shell_mask):
         s["id"] = f"S{len(S) + 1}"
         S.append(s)

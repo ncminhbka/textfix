@@ -25,6 +25,7 @@ X_EM = 0.53          # cao chữ thường (x-height) / em
 INK_IN_SHELL = 25.0  # trong vỏ: nét chữ = khác màu lòng vỏ >= 25 ΔE (cả lòng vỏ đều thuộc lớp phủ)
 GAP_SPLIT = 1.0      # trong một dòng OCR, khoảng KHÔNG nét rộng >= 1 cao dòng = hai mục riêng (khoảng cách từ ~0.3 cao dòng;
                      # OCR gộp "địa chỉ [icon] website" ở chân trang thành một dòng)
+LEADER_H = 0.3       # hàng chấm nối: cột có nét cao <= 0.3 cao dòng là chấm / gạch nối, coi như khoảng trống
 GAP_MIN = 0.4        # khoảng không nét quanh chỗ OCR chèn dấu cách kép: >= 0.4 cao dòng (khoảng cách từ thường ~0.3)
 ICON_W = 1.6         # khối kẹp giữa hai khoảng không ở chỗ cắt, rộng <= 1.6 cao dòng = icon giữa hai mục
 INK_DE = 25.0        # điểm nét = khác màu nền khung dòng (trung vị viền khung) >= 25 ΔE
@@ -143,7 +144,14 @@ def _split_gaps(img: np.ndarray, l: dict) -> list[dict]:
         return [l]
     lab = _lab(np.ascontiguousarray(img[max(0, y0):y1, max(0, x0):x1]))
     border = np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]])
-    ink = (np.linalg.norm(lab - np.median(border, 0), axis=2) >= INK_DE).any(0)
+    ink2 = np.linalg.norm(lab - np.median(border, 0), axis=2) >= INK_DE
+    ink = ink2.any(0)
+    # HÀNG CHẤM NỐI "tên ........ giá" (13/10 accept1 c03: 4 hàng OCR tách tên / giá, hàng thứ 5 chấm nối liền nên thành một
+    # dòng, VLM viết tên, giá mất): OCR đọc ra >= 3 dấu chấm / gạch liền nhau -> các cột chỉ có nét THẤP (<= 0.3 cao dòng: chấm,
+    # gạch dưới) là khoảng trống, không phải chữ
+    if re.search(r"[.·•_…]{3,}|(?:[.·•] ?){4,}", l["text"]):
+        ext = ink2.sum(0)
+        ink = ink & (ext > LEADER_H * h)
     cols = np.flatnonzero(ink)
     if len(cols) < 2:
         return [l]
@@ -194,7 +202,7 @@ def _split_gaps(img: np.ndarray, l: dict) -> list[dict]:
         return [l]
     out = []
     for (a, b), part in zip(spans, parts):
-        part = part.strip()
+        part = part.strip().strip(".·•_… ").strip()
         if not part or b - a < 2:
             continue
         bx = [float(x0 + a), float(y0), float(x0 + b), float(y1)]
@@ -486,7 +494,12 @@ def _geo_lines(L: list, I: list, draft: np.ndarray, A: np.ndarray, Bp: np.ndarra
             ext = float(np.clip(hi - lo, 0.35 * g["h"], 1.0 * g["h"]))
             cen = cen + nrm * ((lo + hi) / 2)   # tâm dải nét (lõi vùng của bộ dò có thể lệch khỏi tâm chữ)
         on = [l for l in L if cen_in(l["box"], near)]
-        if g["sag"] >= geo.ARC_SAG:
+        # HAI DÒNG NGHIÊNG XẾP CHỒNG dính một vùng (13/10 accept1 g06: "GIẢM" / "30%" trên ruy băng chéo) cũng "võng" như một vòm
+        # -> vùng tách được thành các dòng bằng khe không nét thì không phải vòm; đi tiếp nhánh dòng OCR sót
+        # ... và vùng NGẮN (dài < ARC_SPAN cao dòng, vài chữ cái) không đủ để nói là cong: đường tâm đi theo hình chữ
+        curved = g["sag"] >= geo.ARC_SAG and g["span"] >= geo.ARC_SPAN * g["h"]
+        stack = _stacked(near, ink, g["tilt"], ext) if curved else [0]
+        if curved and len(stack) == 1:
             found.append({"box": box, "geo": "arc", "path": geo._baseline(cen, np.full(len(cen), ext / 2)), "scale": None, "h": ext,
                           "mask": near, "parts": geo.ARC_BLIND, "sag": round(g["sag"], 2), **geo.circle_of(cen, ext)})
             continue
@@ -1133,6 +1146,7 @@ def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, produ
 
 
 STAR_WORDS = re.compile(r"(>)[\s(]*\d+(?:[.,]\d+)?\s*(?:sao|stars?)[\s)]*(<)", re.I)   # mẩu chữ CHỈ ghi số sao, giữa hai thẻ
+SWAP_SIM = 0.6      # chữ VLM viết chệch được thay bằng chữ khách khi giống >= 0.6 và cùng chữ cái đầu
 CLIENT_LIKE = 0.6   # chữ OCR của ô giống câu khách >= 0.6 (bỏ dấu, chữ thường) = chữ poster chứa câu khách
 PRINTED = re.compile(r"\b(printed|on (the )?(product|package|packaging|label|can|bottle|jar|box|screen))\b", re.I)
 
@@ -1160,12 +1174,36 @@ def validate(P: dict, M: dict, texts: list[dict] | None = None, product: bool = 
     product: khách tải ảnh sản phẩm (chữ in trên sản phẩm có thật)."""
     log, ops = [f"bỏ lệnh sai khuôn: {d}" for d in P.get("dropped") or []], []
     by = M["by"]
-    for op in P.get("ops", []):
+    # MỘT Ô, MỘT LỆNH (13/10 accept1 b05: VLM ghi thêm lệnh keep / skip cho ô đã có lệnh chữ -> chữ nháp dán lại nằm dưới chữ mới,
+    # hai lớp chữ đè nhau): ô nằm ở nhiều lệnh thuộc về lệnh "nặng" nhất -- viết chữ > vẽ (vỏ, icon) > giữ > bỏ; ngang nhau: lệnh
+    # đứng trước. Các lệnh kia mất ô đó.
+    rank = {"text": 0, "shape": 1, "icon": 1, "stars": 1, "keep": 2, "skip": 3}
+    src, owner = list(P.get("ops", [])), {}
+    for i, op in enumerate(src):
+        for m in op.get("marks") or []:
+            k = (rank.get(op.get("kind"), 3) if op.get("kind") != "text" or op.get("html") else 3, i)
+            if m in by and (m not in owner or k < owner[m]):
+                owner[m] = k
+    for i, op in enumerate(src):
+        lost = [m for m in op.get("marks") or [] if m in owner and owner[m][1] != i]
+        if lost:
+            log.append(f"{op.get('id')}: ô {lost} đã thuộc lệnh {[src[owner[m][1]].get('id') for m in lost]} -> bỏ khỏi lệnh này")
+            src[i] = {**op, "marks": [m for m in op["marks"] if m not in lost], "slots": [m for m in op["marks"] if m not in lost]}
+    for op in src:
         mk = [m for m in op.get("marks") or [] if m in by]
         if len(mk) < len(op.get("marks") or []):
             log.append(f"{op.get('id')}: bỏ id không có {sorted(set(op.get('marks') or []) - set(mk))}")
         if not mk:
             continue
+        # CHẤM ĐẦU DÒNG VẼ BẰNG ICON VÒNG TRÒN (13/10 accept1 b06, c01, f02: <i-icon name="circle"> / "○" đầu dòng thành vòng rỗng
+        # to trước chữ dù lời dặn cấm): trong lệnh chữ, icon tròn / ký tự vòng tròn đứng đầu dòng -> "• "
+        if op.get("kind") == "text" and op.get("html"):
+            h2 = re.sub(r"(^|<br\s*/?>)(\s*)<i-icon\b[^>]*\bname=[\"'](?:circle|dot|circle-dot|circle-small)[\"'][^>]*>(?:\s*</i-icon>)?\s*",
+                        lambda m: m.group(1) + "• ", op["html"], flags=re.I)
+            h2 = re.sub(r"(^|<br\s*/?>|>)(\s*)[○◯◦⚪⭕●⬤]\s*", lambda m: m.group(1) + "• ", h2)
+            if h2 != op["html"]:
+                log.append(f"{op.get('id')}: vòng tròn đầu dòng -> chấm '•'")
+                op = {**op, "html": h2}
         # DÒNG TRỐNG TRONG LỆNH GỘP (dev3 g09_v1: "CƠM<br>NGON<br><br>TẬN<br><br>NƠI" -- VLM để trống dòng nó bỏ, khối chữ thủng lỗ):
         # các dòng của một lệnh chữ luôn liền nhau
         if op.get("kind") == "text" and re.search(r"(<br\s*/?>\s*){2,}", op.get("html") or "", re.I):
@@ -1238,6 +1276,8 @@ def validate(P: dict, M: dict, texts: list[dict] | None = None, product: bool = 
         ops, lg = _guard(ops, M, texts)
         log += lg
     log += _pack_lists(ops, by)
+    if texts:
+        log += _list_order(ops, by)
     # ICON / CHẤM ĐẦU DÒNG TRƠ: chi tiết đi kèm một dòng (near "left of L5") mà dòng đó bị skip -> bỏ luôn chi tiết (09/10 dev3
     # p08, p11: icon / chấm đầu dòng không có chữ). Chạy SAU chặn chữ và dồn hàng: dòng bị bỏ ở hai bước đó cũng tính.
     dead = {m for op in ops if op.get("kind") == "skip" for m in op["marks"] if m.startswith("L")}
@@ -1269,6 +1309,33 @@ def _lists(ops: list[dict], by: dict) -> dict:
         lm = [m for m in ops[i]["marks"] if m.startswith("L")]
         return bool(lm) and all(abs(by[m].get("angle") or 0) < 2 for m in lm)
     return {g: idx for g, idx in G.items() if len(idx) >= 2 and all(ok(i) for i in idx)}
+
+
+def _list_order(ops: list[dict], by: dict) -> list[str]:
+    """THỨ TỰ KHÁCH CHO (13/10 accept1 f06: VLM xếp bước 4 trước bước 3 cho khớp hình minh hoạ của nháp): các hàng của một danh
+    sách VLM khai, xếp một cột, mỗi hàng viết một câu khách khác nhau -> từ trên xuống phải tăng dần theo thứ tự câu khách. Sai
+    thì hoán nội dung giữa các hàng (chữ + câu khách), ô và kiểu của từng hàng giữ nguyên."""
+    log = []
+    for name, idx in _lists(ops, by).items():
+        ks = [_tid(ops[i].get("client")) for i in idx]
+        if any(k is None for k in ks) or len(set(ks)) != len(ks):
+            continue
+        top = lambda i: min(by[m]["box"][1] for m in ops[i]["marks"] if m.startswith("L"))   # noqa: E731
+        bot = lambda i: max(by[m]["box"][3] for m in ops[i]["marks"] if m.startswith("L"))   # noqa: E731
+        rows = sorted(idx, key=top)
+        if any(top(b) < (top(a) + bot(a)) / 2 for a, b in zip(rows, rows[1:])):   # không phải một cột (lưới, hàng ngang)
+            continue
+        cur = [_tid(ops[i].get("client")) for i in rows]
+        if cur == sorted(cur):
+            continue
+        if any(len([m for m in ops[i]["marks"] if m.startswith("L")]) != len([m for m in ops[rows[0]]["marks"] if m.startswith("L")])
+               for i in rows):
+            continue   # hàng một dòng và hàng hai dòng: hoán chữ làm lệch số dòng
+        content = sorted(((_tid(ops[i].get("client")), ops[i]["html"], ops[i].get("client")) for i in rows), key=lambda t: t[0])
+        for i, (k, html, cl) in zip(rows, content):
+            ops[i] = {**ops[i], "html": html, "client": cl}
+        log.append(f"danh sách '{name}': thứ tự {['T%d' % k for k in cur]} -> theo thứ tự khách {['T%d' % c[0] for c in content]}")
+    return log
 
 
 def _pack_lists(ops: list[dict], by: dict) -> list[str]:
@@ -1467,7 +1534,10 @@ def _guard(ops: list[dict], M: dict, texts: list[dict]) -> tuple[list[dict], lis
                 if tag == "replace" and i2 - i1 == j2 - j1:
                     for a, b in zip(range(i1, i2), range(j1, j2)):
                         w = mine[a]
-                        if _fold(w) not in fv and not any(ch.isdigit() for ch in w + theirs[b]):
+                        # chỉ khi hai chữ GẦN GIỐNG nhau (ngàn / nghìn: 0.67; 13/10 accept1 a01: VLM viết lại câu cho ngắn,
+                        # luật thay bừa "nguyên" -> "giúp", "hương" -> "việc", câu thành vô nghĩa)
+                        if _fold(w) not in fv and not any(ch.isdigit() for ch in w + theirs[b]) and _fold(w)[:1] == _fold(theirs[b])[:1] \
+                                and SequenceMatcher(None, _fold(w), _fold(theirs[b])).ratio() >= SWAP_SIM:
                             c = theirs[b]
                             swap[a] = c.upper() if w.isupper() else (c[:1].upper() + c[1:]) if w[:1].isupper() and a == 0 else c
             if swap:
@@ -1508,7 +1578,12 @@ def _guard(ops: list[dict], M: dict, texts: list[dict]) -> tuple[list[dict], lis
         if len(idx) <= allowed:
             continue
         ocr = lambda i: _fold(" ".join(M["by"][m].get("ocr", "") for m in out[i]["marks"] if m.startswith("L")))   # noqa: E731
-        idx = sorted(idx, key=lambda i: -SequenceMatcher(None, ocr(i), f).ratio())
+        # ô nào nháp vẽ đúng câu đó thì giữ; NHIỀU ô cùng giống (>= 0.5) -> giữ ô chữ TO nhất (13/10 accept1 p02: tên sản phẩm
+        # nháp vẽ cả ở tiêu đề lẫn hàng đầu danh sách; giữ hàng danh sách thì vùng tiêu đề trống)
+        big = lambda i: max((M["by"][m].get("size") or 0.0) for m in out[i]["marks"] if m.startswith("L")) if any(   # noqa: E731
+            m.startswith("L") for m in out[i]["marks"]) else 0.0
+        sim = {i: SequenceMatcher(None, ocr(i), f).ratio() for i in idx}
+        idx = sorted(idx, key=lambda i: (-(sim[i] >= 0.5), -big(i) if sim[i] >= 0.5 else 0.0, -sim[i]))
         for i in idx[allowed:]:
             log.append(f"{out[i].get('id')}: lặp chữ {_plain(out[i]['html'])!r} (giữ {out[idx[0]].get('id')}) -> skip")
             out[i] = {**out[i], "kind": "skip", "html": "", "why": "guard: duplicate"}
@@ -1659,7 +1734,7 @@ def review_needed(errs: list[dict]) -> bool:
     if REVIEW_MODE == "off":
         return False
     return REVIEW_MODE == "full" or any(e["type"] in SEVERE for e in errs)
-SEVERE = ("unassigned", "content_overlap", "boxes_overlap", "overflow", "low_contrast", "mark_twice")
+SEVERE = ("empty_plan", "unassigned", "content_overlap", "boxes_overlap", "overflow", "low_contrast", "mark_twice")
 
 
 JUDGE = """You are an art director choosing which of two finished renders of the same poster to send to the client. The DRAFT \
