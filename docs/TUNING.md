@@ -495,8 +495,8 @@ rỗng 3, không vẽ 2 -- **nửa đạt**. Luật "chữ chệch" 1a của 13/
 
 Đo chung: dựng lại accept1 (41) + dev2 (62) + dev3 (58) + form1 (19) mã cũ / mới: danh sách lỗi đổi ở 2 poster (b06, f02: bớt
 lỗi), 0 poster thêm lỗi; luật mới chạm 2 poster cũ (dev3 p04 chấm đầu dòng, p06 ô hai lệnh).
-Sau cụm sửa, đếm lại 15 poster hỏng: 8 sửa được bằng mã và đã thấy đúng khi dựng / đo lại (a04, b05, c03, f06, g04, g10, b06
-chuyển lên đẹp, f02 nửa); 4 cần server mới biết (a01, f03, f08, p02, g06); 3 để nguyên (a02 nháp, b03, s03).
+Sau cụm sửa, đếm lại 15 poster hỏng: 7 đã thấy đúng khi dựng / đo ô lại tại máy (a04, b05, c03, f06, g04, g10, f02); 5 phải
+chạy server mới biết (a01, f03, f08, p02, g06); 3 để nguyên (a02 nháp vẽ chữ quá nhỏ, b03, s03).
 
 ## Lượt chạy server tiếp theo
 
