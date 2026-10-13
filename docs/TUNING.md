@@ -702,6 +702,16 @@ overlay.py (base_image, SYSTEM, describe, ô S / I) chưa cắt khỏi main -- c
 - LƯU Ý ĐO: VLM được gọi KHÔNG đặt nhiệt độ / seed -> hai lượt cùng đề có thể khác nhau chỉ vì VLM (cache theo nội dung câu hỏi
   chỉ khoá khi câu hỏi y hệt). So trước / sau bằng số lượt chạy lại là chưa công bằng cho tới khi khoá (chờ người dùng quyết).
 
+**TẬP NGHIỆM THU `bench/final1.json` (32 ca mới, seed 9501-9532):** a đề dài (4), b nút / thẻ / bảng (6), c icon / danh sách (5),
+d chữ khó gồm vòm, con dấu, nghiêng, DỌC, viết tay, viền (6), e nền khó (4), p ảnh sản phẩm (3), r form thường gặp (5). Chạy
+MỘT lượt trên main, không cờ; chấm đẹp / dùng được / hỏng. Ngưỡng nghiệm thu đã đề xuất: hỏng <= 10%, không mất chữ sản phẩm,
+không số / giá / liên hệ bịa. Người dùng quyết KHÔNG khoá nhiệt độ VLM.
+- [mã] `audit.flags` thêm cờ của đường chỉ dòng chữ: dòng xoá trống, mã tự lấp >= 2 dòng, VLM viết thiếu phải gọi lại, gỡ chữ
+  không dùng LaMa.
+- Giới hạn đã biết, KHÔNG sửa trước nghiệm thu (đã thử, hoặc cần phép đo bóng chữ): chữ chạy vòng trên con dấu, vòng tròn mảnh
+  cùng màu quanh chữ bị gỡ, nút rất nhỏ, cầu vồng / hình nằm dưới tiêu đề nhoè; VLM đặt câu dài vào ô ngắn (lời dặn đã có, VLM
+  không theo); VLM chồng chữ / lẫn cột trong bảng.
+
 **Bộ thi `bench/accept2.json` (30 ca, seed 9001-9030):** e nút / thẻ / huy hiệu (6), h nền khó (5), k chữ khó (5), l danh sách /
 bảng / các bước (5), q ảnh sản phẩm (3), r form thường gặp (6). CHỈ chạy và chấm, không sửa mã theo từng ca của bộ này; lỗi
 thấy ở đây chỉ sửa khi nó hiện thành một con số trên tập luyện (mix1, accept1, dev2, dev3, form1).

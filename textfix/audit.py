@@ -32,4 +32,15 @@ def flags(plan: dict) -> list[str]:
         out.append(f"bộ chặn chữ can thiệp {len(guard)} lệnh")
     if any("VẪN RỖNG" in l for l in log):
         out.append("VLM trả kế hoạch rỗng")
+    # ---- đường chỉ dòng chữ (lonly): những lần MÃ phải làm thay VLM, và bước gỡ chữ rơi về đường dự phòng
+    blank = sum("xoá trống" in l for l in log)
+    if blank:
+        out.append(f"{blank} dòng nháp xoá trống (không còn câu nào để viết)")
+    fill = sum("dòng bị bỏ" in l and "viết câu khách" in l for l in log)
+    if fill >= 2:
+        out.append(f"mã tự lấp {fill} dòng VLM bỏ")
+    if any("gọi lại" in l and "dòng" in l for l in log):
+        out.append("VLM viết thiếu dòng, đã gọi lại")
+    if any("LaMa lỗi" in l for l in log) or (plan.get("slots_mode") == "L" and not any("(LaMa)" in l for l in log)):
+        out.append("gỡ chữ không dùng LaMa (đường luật dự phòng)")
     return out
