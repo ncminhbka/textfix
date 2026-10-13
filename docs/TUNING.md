@@ -498,6 +498,19 @@ lỗi), 0 poster thêm lỗi; luật mới chạm 2 poster cũ (dev3 p04 chấm 
 Sau cụm sửa, đếm lại 15 poster hỏng: 7 đã thấy đúng khi dựng / đo ô lại tại máy (a04, b05, c03, f06, g04, g10, f02); 5 phải
 chạy server mới biết (a01, f03, f08, p02, g06); 3 để nguyên (a02 nháp vẽ chữ quá nhỏ, b03, s03).
 
+### 13/10: lời dặn designer viết lại gọn (41.200 -> 15.400 ký tự), `TEXTFIX_PROMPT=v1` để dùng bản cũ
+
+- Danh mục icon: trước gửi cả 1544 tên Lucide (19.900 ký tự, 48% lời dặn). 207 poster đã lưu: 26 poster dùng icon, 67 thẻ, 26 tên
+  khác nhau, 20 tên phủ 91%; tên dùng nhiều nhất là `circle` (15 lần -- cái vòng rỗng đầu dòng). Nay gửi 123 tên theo 10 chủ đề
+  (`slots.ICON_HINTS`) + câu "tên Lucide khác vẫn dùng được" (bộ dựng tự tìm tên gần nhất).
+- Thân lời dặn 19.000 -> 11.900 ký tự: sáu luật hay bị vi phạm nhất đưa lên đầu (nhìn theo nháp / chữ theo khách, FIT, sự thật,
+  một ô một lệnh + không trả kế hoạch rỗng, mỗi câu một lần, danh sách giống nhau đúng thứ tự); gộp các đoạn lặp (FIT nằm ba
+  chỗ, "cùng vai cùng kiểu" hai chỗ, vỏ lồng vỏ hai chỗ); bỏ lời giải thích đã có mã lo (xoay chữ, vòng tròn đầu dòng).
+  Các từ khoá mà bảng mô tả ô dùng giữ nguyên ("CURVED LINE", "drawn at N degrees", "OCR missed this line", "row mark in front",
+  "OURS").
+- CHƯA đo (cần VLM): chạy lại accept1 là phép thử. So với bản cũ trên cùng seed: `export TEXTFIX_PROMPT=v1` rồi khởi động lại
+  máy chủ, chạy `dev_batch.py bench/accept1.json --fresh` lần nữa -- bảng báo cáo tự so hai lượt.
+
 ## Lượt chạy server tiếp theo
 
 Cập nhật mã (docs/SERVER.md), khởi động lại máy chủ **và kernel**, rồi:
