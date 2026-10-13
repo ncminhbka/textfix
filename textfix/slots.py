@@ -1767,6 +1767,9 @@ def _guard(ops: list[dict], M: dict, texts: list[dict]) -> tuple[list[dict], lis
             m.startswith("L") for m in out[i]["marks"]) else 0.0
         sim = {i: SequenceMatcher(None, ocr(i), f).ratio() for i in idx}
         idx = sorted(idx, key=lambda i: (-(sim[i] >= 0.5), -big(i) if sim[i] >= 0.5 else 0.0, -sim[i]))
+        if M.get("lonly"):   # chế độ chỉ dòng chữ: nháp vẽ câu đó hai chỗ thì viết cả hai, bỏ một là một nút trống (mix1 i05)
+            log.append(f"lặp chữ {f!r} ở {[out[i].get('id') for i in idx]}: giữ cả (chế độ chỉ dòng chữ, nháp vẽ nhiều chỗ)")
+            continue
         for i in idx[allowed:]:
             log.append(f"{out[i].get('id')}: lặp chữ {_plain(out[i]['html'])!r} (giữ {out[idx[0]].get('id')}) -> skip")
             out[i] = {**out[i], "kind": "skip", "html": "", "why": "guard: duplicate"}

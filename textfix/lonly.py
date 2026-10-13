@@ -33,7 +33,47 @@ INK_SMALL = 0.5   # ... hoặc mảng nhỏ (dấu thanh, chấm, mẩu nét) c�
 def view(M: dict) -> dict:
     """Ô để VLM và bộ dựng làm việc: chỉ dòng chữ (dấu nhỏ đầu dòng đã nằm trong ô dòng, slots._row_marks)."""
     L = [{**l, "shell": None} for l in M["L"]]
-    return {**M, "L": L, "S": [], "I": [], "shells": {}, "by": {l["id"]: l for l in L}}
+    return {**M, "L": L, "S": [], "I": [], "shells": {}, "by": {l["id"]: l for l in L}, "lonly": True}
+
+
+COVER_MIN = 0.6   # VLM trả lệnh cho < 60% số dòng = câu trả lời bị cụt (mix1 p02: 1 lệnh / 10 dòng) -> gọi lại một lần
+
+
+def covered(P: dict, M: dict) -> set:
+    """Các dòng đã có lệnh VIẾT (có chữ) hoặc GIỮ."""
+    return {m for op in (P or {}).get("ops") or [] if op.get("kind") == "keep" or (op.get("kind") == "text" and op.get("html"))
+            for m in op.get("marks") or op.get("slots") or [] if m in M["by"]}
+
+
+def fill_gaps(P: dict, M: dict, texts: list[dict]) -> tuple[dict, list[str]]:
+    """KHÔNG ĐỂ TRỐNG DÒNG NÀO nháp đã vẽ (13/10, người dùng: "cố gắng bịa vào, đừng bỏ trống" -- mix1: mỗi dòng bị bỏ là một
+    nút / huy hiệu trống). Dòng chưa có lệnh viết / giữ (VLM bỏ sót, VLM ghi skip, luật chặn đổi thành skip):
+      - chữ in trên sản phẩm khách tải -> GIỮ (mix1 p02: VLM bỏ sót, nhãn trên gói bị xoá);
+      - chữ nháp ở đó gần trùng một câu khách -> viết câu khách đó;
+      - không thì GIỮ nguyên chữ nháp của dòng (có thể sai chính tả, nhưng vỏ không trống)."""
+    import html as _html
+    from . import slots
+    have, log, ops = covered(P, M), [], []
+    gaps = [l for l in M["L"] if l["id"] not in have]
+    if not gaps:
+        return P, log
+    gone = {l["id"] for l in gaps}
+    for op in P.get("ops") or []:   # gỡ các dòng này khỏi lệnh skip cũ
+        mk = [m for m in op.get("marks") or op.get("slots") or [] if m not in gone]
+        if op.get("kind") == "skip" and not mk:
+            continue
+        ops.append({**op, "marks": mk, "slots": mk} if op.get("kind") == "skip" else op)
+    for l in gaps:
+        k = None if l.get("printed") else slots._client_like(l.get("ocr") or "", texts)
+        if k is not None:
+            ops.append({"id": f"fill_{l['id']}", "kind": "text", "marks": [l["id"]], "slots": [l["id"]], "client": f"T{k}",
+                        "html": _html.escape(texts[k]["text"]), "box_style": "", "why": "fill: dòng bị bỏ, chữ nháp giống câu khách"})
+            log.append(f"{l['id']}: dòng bị bỏ ({l.get('ocr')!r}) -> viết câu khách T{k} {texts[k]['text']!r}")
+        else:
+            ops.append({"id": f"fill_{l['id']}", "kind": "keep", "marks": [l["id"]], "slots": [l["id"]],
+                        "why": "fill: chữ in trên sản phẩm" if l.get("printed") else "fill: dòng bị bỏ, giữ chữ nháp"})
+            log.append(f"{l['id']}: dòng bị bỏ ({l.get('ocr')!r}) -> giữ nguyên chữ nháp" + (" (chữ in trên sản phẩm)" if l.get("printed") else ""))
+    return {**P, "ops": ops}, log
 
 
 def describe_l(M: dict) -> str:

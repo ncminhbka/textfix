@@ -439,14 +439,15 @@
    "form_only",
    "few_texts"
   ],
-  "why": "rất ít chữ (2 câu). Xem: nháp vẽ thừa dòng thì VLM lấp bằng cụm hợp ngữ cảnh, không bịa số / liên hệ",
+  "why": "rất ít chữ (3 câu). Xem: nháp vẽ thừa dòng thì VLM lấp bằng cụm hợp ngữ cảnh, không bịa số / liên hệ",
   "request": {
    "category": "promo",
    "title": "HÈ RỰC RỠ",
    "store_name": "Thời trang Nắng",
    "aspect_ratio": "1:1",
    "num_images": 1,
-   "seed": 8026
+   "seed": 8026,
+   "discount": "Giảm 20%"
   }
  },
  {

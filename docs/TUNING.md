@@ -607,6 +607,16 @@ ngày / buổi học (VLM bỏ dòng). Nhẹ hơn: v05 nút "Trả góp 0%" có 
 quanh chữ trên nền có vân, i05 huy hiệu trống, i04 / f02 chữ co quá nhỏ. Lỗi chia gần đều giữa GỠ CHỮ và VLM BỎ DÒNG (mỗi dòng
 bỏ = một nút trống).
 
+**Không để trống dòng (13/10 tối, người dùng: "cố gắng bịa vào, đừng bỏ trống"):** đọc lệnh của 34 poster mix1: 13 / 286 dòng
+bị bỏ, ở 5 poster -- và phần lớn KHÔNG phải VLM bỏ: 4 poster do luật "lặp chữ -> skip" của mã (i05 huy hiệu "Ưu đãi" nháp vẽ hai
+lần, VLM viết cả hai, mã xoá một), 1 poster do VLM trả lời cụt (p02: 1 lệnh cho 10 dòng, autofix đổi 9 dòng còn lại thành skip,
+kể cả dòng chữ in trên gói sản phẩm). t02 / t03 không bỏ dòng nào: lỗi là VLM đặt sai nội dung.
+- [mã] chế độ chỉ dòng chữ: luật "lặp chữ" không bỏ nữa (`M["lonly"]`); `engine.design` gọi lại VLM một lần khi lệnh phủ < 60%
+  số dòng (`lonly.COVER_MIN`); `lonly.fill_gaps` sau `validate`: dòng chưa có lệnh viết / giữ -> chữ in trên sản phẩm thì GIỮ;
+  chữ nháp gần trùng một câu khách thì viết câu đó; không thì GIỮ chữ nháp (vỏ không trống). Thử trên lệnh thật: p02 1 -> 10 / 10
+  dòng (5 dòng viết câu khách, 4 dòng giữ chữ nháp trong đó 1 dòng sản phẩm), i05 10 -> 11, m03 12 -> 13.
+- [tập thử] mix1 f01 thiếu ô bắt buộc `discount` (HTTP 422, không chạy) -> thêm "Giảm 20%".
+
 **Zip báo cáo (13/10 tối, người dùng: tải ít zip nhất, đủ thông tin):** `batch_report.py` gói MỘT tệp
 `output/runs_zip/<tập>_report_<giờ>.zip` = mỗi ca nháp + bản xoá + poster (JPG chất lượng 92, tự hạ nếu vượt 23 MB) + plan /
 brief / request + manifest; trang HTML / tờ ảnh ghép không gói (xem trên máy chủ). 42 poster accept1: 20,9 MB.
