@@ -20,7 +20,6 @@ LONLY = os.environ.get("TEXTFIX_LONLY", "off") == "on"
 
 SAME_DE = 8.0     # vành quanh dòng: bản xoá cách nháp <= 8 ΔE (trung vị) = nền / vỏ ở đó còn nguyên (nền không vỏ 1-4, vỏ nhạt bị gỡ 10-18)
 DIFF_GONE = 20.0  # nháp cách bản xoá > 20 ΔE = bước xoá đã gỡ thứ ở đó (cùng số với overlay.DIFF)
-MISS_FRAC = 0.25  # vùng chữ của bộ dò có >= 25% diện tích nằm ngoài mọi ô dòng = có chữ OCR bỏ sót ở đó
 FLAT_DE = 12.0    # điểm thuộc nền của dòng: cách màu nền <= 12 ΔE
 FLAT_MIN = 0.3    # ... và nền chiếm >= 30% vùng dòng; ít hơn = không có nền phẳng (chữ trên ảnh chụp)
 
@@ -221,6 +220,7 @@ def draft_base(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = N
         every |= r
     use_plate, fill = np.zeros((H, W), bool), np.zeros((H, W), bool)
     n_plate = n_fill = 0
+    flat = []    # (vùng dòng, màu nền của dòng) của các dòng nằm trên nền phẳng: sau khi ghép, lau mọi nét còn sót trong vùng dòng
     marks = []   # (khung dấu đầu dòng, màu nền quanh dòng): bước xoá có khi GIỮ dấu -- lau nốt, VLM vẽ dấu mới trong lệnh chữ
     for l in M["L"]:
         if l["id"] in kept:
@@ -236,6 +236,7 @@ def draft_base(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = N
             use_plate |= R
             n_plate += 1
             continue
+        flat.append((R, c))
         if l.get("mark"):
             marks.append(([int(v) for v in l["mark"]["box"]], c))
         if float(np.median(e[near])) <= SAME_DE:   # nền của dòng còn nguyên ở bản xoá (vỏ được giữ, hoặc không có vỏ)
@@ -245,28 +246,43 @@ def draft_base(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = N
             fill |= R & (np.linalg.norm(A - c, axis=2) >= slots.INK_IN_SHELL)
             n_fill += 1
     # CHỮ OCR BỎ SÓT (13/10 dựng lại accept1: b03 chữ số "2" to của tiêu đề, g04 vòm chữ thứ hai -- không thuộc ô dòng nào nên
-    # hiện lại nguyên dạng méo cạnh chữ mới): vùng chữ của bộ dò mà một phần đáng kể (>= MISS_FRAC) nằm ngoài mọi ô dòng -> phần
-    # ngoài đó lấy bản xoá. Vùng nới gấp đôi `pad`: chữ to có viền / bóng rộng hơn vùng bộ dò khoanh.
-    n_miss, cc = 0, None
+    # hiện lại nguyên dạng méo cạnh chữ mới): MẢNG BỊ GỠ (nháp cách bản xoá > DIFF_GONE) mà (a) chạm lõi một vùng chữ của bộ dò,
+    # (b) phần lớn nằm ngoài mọi ô dòng, (c) không phải vỏ của một dòng (không trùm tâm dòng nào), (d) bộ đọc đọc ra chữ / số
+    # -> lấy bản xoá. Icon bộ dò nhận nhầm là chữ thì bộ đọc không ra chữ: giữ nguyên của nháp.
+    n_miss = 0
+    gone = cv2.morphologyEx((e > DIFF_GONE).astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    _n, cc, st, _c = cv2.connectedComponentsWithStats(gone, 8)
+    anchors = [slots._anchor(l) for l in M["L"]]
+    done = set()
     for Rg in ocr.regions(draft):
-        k = max(1, int(round(2 * Rg["pad"])))
-        near = cv2.dilate(Rg["mask"].astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * k + 1, 2 * k + 1))) > 0
-        out_ = near & ~every
-        if float(out_.sum()) < MISS_FRAC * float(near.sum()):
-            continue
-        # ... kèm trọn các mảng bước xoá đã gỡ chạm vùng đó (nét viền / bóng của chữ to vượt ra ngoài vùng bộ dò khoanh)
-        if cc is None:
-            _n, cc = cv2.connectedComponents(((e > DIFF_GONE) & ~every).astype(np.uint8), connectivity=8)
-        ids = np.unique(cc[out_])
-        ids = ids[ids > 0]
-        if len(ids):
-            out_ = out_ | np.isin(cc, ids)
-        use_plate |= out_
-        n_miss += 1
+        for i_ in (int(v) for v in np.unique(cc[Rg["mask"]]) if v > 0):
+            if i_ in done:
+                continue
+            done.add(i_)
+            x, y, w, h, area = (int(v) for v in st[i_])
+            blob = cc[y:y + h, x:x + w] == i_
+            cnts, _h = cv2.findContours(blob.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            solid = cv2.drawContours(np.zeros(blob.shape, np.uint8), cnts, -1, 1, cv2.FILLED).astype(bool)
+            # vỏ / nét của một dòng đã có ô: tâm dòng nằm TRONG mảng (lấp kín); không xét theo khung -- khung của một vòm chữ
+            # trùm cả dòng nằm dưới vòm
+            if any(x <= ax < x + w and y <= ay < y + h and solid[int(ay - y), int(ax - x)] for ax, ay in anchors):
+                continue
+            if float(every[y:y + h, x:x + w][blob].mean()) >= 0.5:
+                continue
+            ys_, xs_ = np.nonzero(blob)
+            text = ocr.read_region(draft, cv2.minAreaRect(np.c_[xs_ + x, ys_ + y].astype(np.float32)))
+            if not re.search(r"[A-Za-z0-9À-ỹ]", text):
+                continue
+            use_plate[y:y + h, x:x + w] |= cv2.dilate(blob.astype(np.uint8), np.ones((7, 7), np.uint8)).astype(bool)
+            n_miss += 1
     a = cv2.GaussianBlur(use_plate.astype(np.float32), (0, 0), 2.0)[..., None]
     out = (plate * a + draft * (1 - a)).round().clip(0, 255).astype(np.uint8)
+    Lo = slots._lab(out) if flat or marks else None
+    for R, c in flat:   # chữ cũ còn sót trên bản xoá (bước xoá gỡ không sạch; trước đây nền riêng VLM vẽ che mất): lau nốt
+        ys_, xs_ = np.nonzero(R)
+        y0, y1, x0, x1 = ys_.min(), ys_.max() + 1, xs_.min(), xs_.max() + 1
+        fill[y0:y1, x0:x1] |= R[y0:y1, x0:x1] & (np.linalg.norm(Lo[y0:y1, x0:x1] - c, axis=2) >= slots.INK_IN_SHELL)
     if marks:
-        Lo = slots._lab(out)
         for (x0, y0, x1, y1), c in marks:
             x0, y0, x1, y1 = max(0, x0 - 2), max(0, y0 - 2), min(W, x1 + 2), min(H, y1 + 2)
             fill[y0:y1, x0:x1] |= np.linalg.norm(Lo[y0:y1, x0:x1] - c, axis=2) >= slots.INK_IN_SHELL

@@ -522,7 +522,9 @@ thẻ ~9/10, gỡ dấu nhỏ nét mảnh cạnh chữ; vỏ 1-2% ảnh bị g�
   NHÁP, trừ chỗ là chữ. Mỗi dòng: màu nền của dòng = màu chiếm nhiều nhất trong vùng dòng trên nháp; nền đó ở bản xoá còn
   nguyên (<= 8 ΔE) -> lấy điểm ảnh bản xoá trong vùng dòng; nền đổi (bước xoá gỡ cả vỏ) -> giữ vỏ của nháp, lấp nét chữ cũ
   (inpaint); không có nền phẳng (chữ trên ảnh chụp) -> bản xoá. Dòng "keep" (chữ in trên vật): nguyên điểm ảnh nháp. Vùng chữ
-  của bộ dò có >= 25% nằm ngoài mọi ô dòng (chữ OCR bỏ sót) + các mảng bị gỡ chạm nó -> bản xoá, để chữ méo không hiện lại.
+  Chữ OCR bỏ sót: mảng bị gỡ chạm lõi một vùng chữ của bộ dò, phần lớn nằm ngoài mọi ô dòng, không trùm tâm dòng nào, bộ đọc
+  đọc ra chữ / số -> bản xoá, để chữ méo không hiện lại (b03 chữ số "2"); icon bộ dò nhận nhầm là chữ thì giữ (b04 icon ngân
+  hàng). Dòng trên nền phẳng: sau khi ghép, lau mọi nét còn sót trong vùng dòng (b04: bản xoá còn mẩu chữ cũ trong nút).
   `fix_ops`: lệnh chữ không có nền / viền / đệm riêng; VLM lỡ bỏ dòng thì chữ cũ vẫn được xoá, chỗ đó trống.
 - [prompt VLM] `SYSTEM_L` (11.100 ký tự): chỉ ô L, kind text | keep; luật 2 "mọi dòng nháp vẽ đều được viết" -- dòng thừa lấp
   bằng (a) câu khách chưa có chỗ, (b) cụm rút từ câu khác của khách, (c) cụm tự viết không mang sự thật / cam kết; các bước,
