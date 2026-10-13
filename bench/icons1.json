@@ -1,0 +1,200 @@
+[
+ {
+  "id": "n01",
+  "tags": [
+   "icons"
+  ],
+  "why": "hàng 5 icon tính năng có nhãn dưới",
+  "request": {
+   "category": "product_intro",
+   "aspect_ratio": "1:1",
+   "prompt": "Ảnh giới thiệu robot hút bụi trên nền trắng xám. Tên \"RoboClean X5\" chữ to. Dưới robot có hàng năm icon tròn màu xanh, mỗi icon một nhãn bên dưới: \"Hút 4000Pa\", \"Lau ướt\", \"Tự sạc\", \"Điều khiển app\", \"Pin 180 phút\". Giá \"6.990.000đ\" ở đáy.",
+   "num_images": 1,
+   "seed": 9101
+  }
+ },
+ {
+  "id": "n02",
+  "tags": [
+   "icons"
+  ],
+  "why": "lưới 2x3 icon dịch vụ",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "prompt": "Poster giới thiệu sáu dịch vụ của tiệm sửa điện thoại, nền xanh dương. Tiêu đề \"Sửa nhanh, lấy liền\". Lưới hai hàng ba cột, mỗi ô một icon trắng to và nhãn bên dưới: \"Thay màn hình\", \"Thay pin\", \"Ép kính\", \"Sửa loa\", \"Cứu dữ liệu\", \"Dán cường lực\". Đáy \"Mobile Care - 0909 345 678\".",
+   "num_images": 1,
+   "seed": 9102
+  }
+ },
+ {
+  "id": "n03",
+  "tags": [
+   "icons"
+  ],
+  "why": "4 bước có icon to và mũi tên",
+  "request": {
+   "category": "guide",
+   "aspect_ratio": "16:9",
+   "title": "ĐẶT XE CHỈ 4 BƯỚC",
+   "guide_steps": [
+    "Mở ứng dụng",
+    "Chọn điểm đến",
+    "Xác nhận giá",
+    "Lên xe"
+   ],
+   "store_name": "Xe Xanh",
+   "num_images": 1,
+   "seed": 9103
+  }
+ },
+ {
+  "id": "n04",
+  "tags": [
+   "icons"
+  ],
+  "why": "ba thẻ gói cước, mỗi thẻ một icon to",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "16:9",
+   "prompt": "Bảng ba gói lưu trữ đám mây trên nền tím đậm. Tiêu đề \"Chọn gói lưu trữ\". Ba thẻ trắng xếp ngang, mỗi thẻ có một icon đám mây to phía trên: \"Cá nhân\" - \"50GB\" - \"29.000đ/tháng\"; \"Gia đình\" - \"200GB\" - \"69.000đ/tháng\"; \"Doanh nghiệp\" - \"2TB\" - \"199.000đ/tháng\". Đáy \"CloudBox - cloudbox.vn\".",
+   "num_images": 1,
+   "seed": 9104
+  }
+ },
+ {
+  "id": "n05",
+  "tags": [
+   "icons"
+  ],
+  "why": "danh sách 6 dấu tích",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "prompt": "Poster gói vệ sinh nhà cửa, nền xanh lá nhạt. Tiêu đề \"Nhà sạch trong 3 giờ\". Danh sách sáu mục, mỗi mục một dấu tích tròn xanh ở đầu: \"Lau sàn\", \"Hút bụi sofa\", \"Vệ sinh bếp\", \"Lau kính\", \"Cọ nhà tắm\", \"Đổ rác\". Giá \"Chỉ từ 299.000đ\". Đáy \"Sạch Nhà - 1900 2233\".",
+   "num_images": 1,
+   "seed": 9105
+  }
+ },
+ {
+  "id": "n06",
+  "tags": [
+   "icons"
+  ],
+  "why": "khối liên hệ có icon điện thoại / địa chỉ / web / giờ mở cửa",
+  "request": {
+   "category": "opening",
+   "aspect_ratio": "4:5",
+   "title": "KHAI TRƯƠNG PHÒNG TẬP",
+   "opening_date": "28/12/2026",
+   "opening_promo": "Tặng 1 tháng tập cho 50 khách đầu",
+   "store_name": "Power Gym",
+   "phone": "0966 222 111",
+   "address": "120 Phạm Văn Đồng, Thủ Đức",
+   "website_link": "powergym.vn",
+   "num_images": 1,
+   "seed": 9106
+  }
+ },
+ {
+  "id": "n07",
+  "tags": [
+   "icons"
+  ],
+  "why": "avatar + hàng sao + 3 nhãn có icon",
+  "request": {
+   "category": "feedback",
+   "aspect_ratio": "1:1",
+   "feedback_target": "Ứng dụng học tiếng Anh LingoGo",
+   "feedback_quote": "Mỗi ngày 15 phút mà sau hai tháng mình đã dám nói chuyện với khách nước ngoài",
+   "customer_name": "Bạn Minh Anh, sinh viên",
+   "feedback_highlights": "bài ngắn, có nhắc lịch, luyện nói với AI",
+   "store_name": "LingoGo",
+   "num_images": 1,
+   "seed": 9107
+  }
+ },
+ {
+  "id": "n08",
+  "tags": [
+   "icons"
+  ],
+  "why": "timeline dọc 5 mốc, mỗi mốc một icon",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "9:16",
+   "prompt": "Poster lịch trình sự kiện ngày hội gia đình, bố cục dọc có đường thời gian, mỗi mốc một icon tròn nhiều màu: \"8:00 Đón khách\", \"9:00 Trò chơi vận động\", \"11:00 Tiệc buffet\", \"14:00 Ca nhạc\", \"16:00 Bốc thăm trúng thưởng\". Tiêu đề \"Ngày hội gia đình\". Đáy \"Công viên Hồ Tây - 20/12\".",
+   "num_images": 1,
+   "seed": 9108
+  }
+ },
+ {
+  "id": "n09",
+  "tags": [
+   "icons"
+  ],
+  "why": "hàng icon thanh toán và giao hàng ở đáy",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "1:1",
+   "prompt": "Poster cửa hàng nội thất online, ảnh ghế sofa. Tiêu đề \"Sofa êm, giá mềm\". Giá \"4.590.000đ\". Đáy poster có hàng bốn icon nhỏ kèm nhãn: \"Miễn phí giao hàng\", \"Trả góp 0%\", \"Đổi trả 7 ngày\", \"Bảo hành 2 năm\". Góc dưới \"Nhà Đẹp - nhadep.vn\".",
+   "num_images": 1,
+   "seed": 9109
+  }
+ },
+ {
+  "id": "n10",
+  "tags": [
+   "icons"
+  ],
+  "why": "tuyển dụng: 4 quyền lợi có icon + 3 yêu cầu dấu chấm",
+  "request": {
+   "category": "recruitment",
+   "aspect_ratio": "4:5",
+   "job_position": "Lập trình viên Front-end",
+   "job_desc": "Làm việc với React, phối hợp cùng nhóm thiết kế, tối ưu tốc độ trang, tối thiểu 1 năm kinh nghiệm",
+   "special_offer": "Lương tới 30 triệu, làm việc hybrid, bảo hiểm sức khoẻ, thưởng dự án",
+   "apply_deadline": "20/01/2027",
+   "apply_method": "Gửi CV tới jobs@techviet.vn",
+   "store_name": "TechViet",
+   "num_images": 1,
+   "seed": 9110
+  }
+ },
+ {
+  "id": "n11",
+  "tags": [
+   "icons"
+  ],
+  "why": "ảnh sản phẩm + hàng 3 icon tính năng",
+  "image": "bench/refs/nescafe_classic.jpg",
+  "request": {
+   "category": "product_intro",
+   "aspect_ratio": "1:1",
+   "prompt": "Poster cà phê hoà tan với hũ cà phê trong ảnh. Tiêu đề \"Tỉnh táo mỗi sáng\". Dưới hũ có hàng ba icon tròn kèm nhãn: \"Pha 10 giây\", \"Vị đậm\", \"Hũ 200g\". Giá \"145.000đ\".",
+   "num_images": 1,
+   "seed": 9111
+  }
+ },
+ {
+  "id": "n12",
+  "tags": [
+   "icons"
+  ],
+  "why": "ảnh sản phẩm + khối liên hệ có icon",
+  "image": "bench/refs/banh_pia.jpg",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "title": "ĐẶC SẢN SÓC TRĂNG",
+   "discount": "Mua 3 hộp tặng 1",
+   "applied_product": "bánh pía sầu riêng",
+   "store_name": "Đặc sản Phương Nam",
+   "phone": "0939 111 222",
+   "address": "45 Hai Bà Trưng, Sóc Trăng",
+   "website_link": "dacsanphuongnam.vn",
+   "num_images": 1,
+   "seed": 9112
+  }
+ }
+]

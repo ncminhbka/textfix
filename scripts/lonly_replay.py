@@ -46,6 +46,12 @@ with Browser() as B:
             for l in P["slots"]["L"]:
                 if l.get("ocr_box"):
                     l["box"] = list(l["ocr_box"])
+                if not l.get("path"):   # góc dựng theo luật hiện hành (plan lưu góc OCR thô): nhiễu về 0, dòng viết dọc về ±90
+                    v = slots._vertical(D, {**l, "text": l.get("ocr") or ""})
+                    if v.get("vertical"):
+                        l.update(angle=v["angle"], poly=v["poly"], ocr=v["text"], size=0.8 * min(l["box"][2] - l["box"][0], l["box"][3] - l["box"][1]))
+                    else:
+                        l["angle"] = slots._line_angle(l)
             M = lonly.view({"L": P["slots"]["L"], "S": [], "I": [], "size": [D.shape[1], D.shape[0]], "by": {}})
             ops = [{k: v for k, v in o.items() if k != "fix"} | {"marks": o.get("slots") or o.get("marks") or []} for o in P["ops"]]
             P2, flog = lonly.fix_ops({**P, "ops": ops}, M)

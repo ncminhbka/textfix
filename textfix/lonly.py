@@ -88,10 +88,14 @@ def fill_gaps(P: dict, M: dict, texts: list[dict]) -> tuple[dict, list[str]]:
             ops.append({"id": f"fill_{l['id']}", "kind": "text", "marks": [l["id"]], "slots": [l["id"]], "client": f"T{k}",
                         "html": _html.escape(texts[k]["text"]), "box_style": "", "why": "fill: dòng bị bỏ, chữ nháp giống câu khách"})
             log.append(f"{l['id']}: dòng bị bỏ ({l.get('ocr')!r}) -> viết câu khách T{k} {texts[k]['text']!r}")
-        else:
-            ops.append({"id": f"fill_{l['id']}", "kind": "keep", "marks": [l["id"]], "slots": [l["id"]],
-                        "why": "fill: chữ in trên sản phẩm" if l.get("printed") else "fill: dòng bị bỏ, giữ chữ nháp"})
-            log.append(f"{l['id']}: dòng bị bỏ ({l.get('ocr')!r}) -> giữ nguyên chữ nháp" + (" (chữ in trên sản phẩm)" if l.get("printed") else ""))
+        elif l.get("printed"):
+            ops.append({"id": f"fill_{l['id']}", "kind": "keep", "marks": [l["id"]], "slots": [l["id"]], "why": "fill: chữ in trên sản phẩm"})
+            log.append(f"{l['id']}: dòng bị bỏ ({l.get('ocr')!r}) -> giữ nguyên (chữ in trên sản phẩm)")
+        else:   # không còn câu nào để viết (dòng nối của một câu đã viết ở dòng trên): XOÁ TRỐNG -- người dùng chốt 14/10, chữ
+            # nháp giữ lại là chữ giun (mix1 "SoundBean Air 3")
+            ops.append({"id": f"fill_{l['id']}", "kind": "skip", "marks": [l["id"]], "slots": [l["id"]], "html": "",
+                        "why": "fill: không còn câu nào để viết"})
+            log.append(f"{l['id']}: dòng bị bỏ ({l.get('ocr')!r}) -> xoá trống (không còn câu nào để viết)")
     return {**P, "ops": ops}, log
 
 

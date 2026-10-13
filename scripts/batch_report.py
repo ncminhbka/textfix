@@ -86,9 +86,13 @@ def sheets(rows: list, out: Path, name: str) -> list[Path]:
     panels = []
     for key, cid, s, old, vd, th, run in rows:
         ims = []
-        for kind in ("draft", "poster"):
+        # có lượt trước (cùng seed, ví dụ hướng cũ trong scripts/ab_lonly.sh): nháp | poster lượt trước | poster lượt này
+        srcs = [s["draft"], old["poster"] if old else None, s["poster"]]
+        for src in srcs:
+            if src is None:
+                continue
             try:
-                im = Image.open(s[kind]).convert("RGB")
+                im = Image.open(src).convert("RGB")
                 ims.append(im.resize((round(im.width * SHEET_H / im.height), SHEET_H), Image.LANCZOS))
             except (OSError, AttributeError, TypeError):
                 pass
@@ -99,7 +103,7 @@ def sheets(rows: list, out: Path, name: str) -> list[Path]:
         for i in ims:
             pn.paste(i, (x, 44))
             x += i.width + 12
-        cap = f"{key}   nhap | poster   loi: {', '.join(s['errors']) or 'khong'}   co nghi hong: {len(s['flags'])}   chu co: {s['shrink']:.2f}"
+        cap = f"{key}   {'nhap | luot truoc | luot nay' if old and old['poster'] else 'nhap | poster'}   loi: {', '.join(s['errors']) or 'khong'}   co nghi hong: {len(s['flags'])}   chu co: {s['shrink']:.2f}"
         ImageDraw.Draw(pn).text((8, 8), cap, fill=(255, 255, 255), font=font)
         panels.append(pn)
     files = []
@@ -240,6 +244,13 @@ def main(argv: list[str] | None = None) -> int:
                     data = jpg(src, q if kind != "poster" else min(q, 86))
                     items.append((f"runs/{run}/{v.name}/{kind}.jpg", data))
                     total += len(data)
+            # poster + lệnh của LƯỢT TRƯỚC (so hai hướng trên cùng nháp): vẫn một zip
+            if old and old.get("poster") is not None:
+                data = jpg(old["poster"], min(q, 86))
+                items.append((f"prev/{cid}/{old['v']}/poster.jpg", data))
+                total += len(data)
+                if (old["dir"] / "plan.json").exists():
+                    items.append((f"prev/{cid}/{old['v']}/plan.json", (old["dir"] / "plan.json").read_bytes()))
         if total <= 23 * 2**20:
             break
     with zipfile.ZipFile(zp, "w", zipfile.ZIP_DEFLATED) as z:

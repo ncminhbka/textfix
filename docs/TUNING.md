@@ -661,6 +661,23 @@ VLM bỏ dòng -> `fill_gaps` giữ chữ nháp méo, nhìn như chữ rác; t02
   LaMa cho cả mặt nạ. Muốn thử lại phải có phép đo bóng chữ tự động trước.
 - CÒN: mix1 f02 nút đỏ nhỏ vẫn thành một gạch; x04 cầu vồng nhoè dưới tiêu đề (LaMa); chữ cong.
 
+**BÀI THI accept2 (bản cbf5d89, LaMa trên máy chủ; chấm thô 30 poster):** đẹp 21, dùng được 7, hỏng 2 (7%) -- đạt ngưỡng 10%.
+Hỏng: h01 tiêu đề ba dòng chồng nhau trên ảnh món ăn (VLM), l04 đường thời gian chồng chữ + một mốc bịa (VLM). Không poster nào
+hỏng vì gỡ chữ; 3 ca ảnh sản phẩm giữ đủ chữ; không kế hoạch rỗng (h01: VLM viết 1 / 6 dòng, gọi lại được 6). ~34 s / poster
+(VLM 12, dựng + LaMa 7, xoá + dọn 6,5, LLM 5, vẽ nháp 2,7). Người dùng nêu hai lớp lỗi về HƯỚNG CHỮ:
+- CHỮ NGẢ NGHIÊNG dù nháp thẳng: OCR đo góc từ cạnh trên đa giác, dòng ngắn sai vài độ, mã dựng nghiêng từ 2 độ. 1.505 dòng của
+  sáu tập: 2-4 độ 57 dòng, 4-10 độ 34 (phần lớn từ ngắn), >= 10 độ 40 (nghiêng thật).
+  [mã] `slots._line_angle` ở `lines()`: < 4 độ -> 0; 4-10 độ chỉ giữ khi cạnh dài / cạnh ngắn >= 3; >= 10 giữ. Trên plan đã lưu:
+  73 dòng về thẳng, 58 dòng giữ nghiêng (accept1 b03 -6,0 / -5,4 độ được giữ).
+- CHỮ VIẾT DỌC bị viết ngang bé tí (h04): OCR trả đa giác cao - hẹp, góc 0, chữ rác. [mã] `slots._vertical`: đa giác cao >= 2,2
+  rộng thì đọc lại theo +90 / -90 (`ocr.read_rect`), lấy chiều tin hơn, ghi góc ±90 + chữ đọc được. Dựng lại h04 tại máy: hai
+  dòng dọc dựng dọc, đọc được. 6 / 1.505 dòng (4 dòng là chữ in trên sản phẩm).
+- [mã] `fill_gaps`: dòng không còn câu nào để viết -> XOÁ TRỐNG (người dùng chốt; trước giữ chữ nháp = chữ giun).
+- Dựng lại accept2 tại máy (không LaMa, không autofix): bộ kiểm 12 -> 16 poster có lỗi, phần tăng là low_contrast (nền luật) và 3
+  boxes_overlap (e03, k01, l04) -- phép dựng lại bỏ `fix` của autofix nên chưa kết luận; xác nhận trên máy chủ.
+- [công cụ] `scripts/ab_lonly.sh <đề>`: chạy hướng cũ rồi chỉ dòng chữ cùng seed; báo cáo xếp nháp | lượt trước | lượt này và gói
+  poster + plan lượt trước vào cùng zip. `bench/icons1.json`: 12 đề nhiều icon (seed 9101-9112) để so hai hướng.
+
 **Bộ thi `bench/accept2.json` (30 ca, seed 9001-9030):** e nút / thẻ / huy hiệu (6), h nền khó (5), k chữ khó (5), l danh sách /
 bảng / các bước (5), q ảnh sản phẩm (3), r form thường gặp (6). CHỈ chạy và chấm, không sửa mã theo từng ca của bộ này; lỗi
 thấy ở đây chỉ sửa khi nó hiện thành một con số trên tập luyện (mix1, accept1, dev2, dev3, form1).

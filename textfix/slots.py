@@ -69,6 +69,46 @@ def _tall(c: str) -> bool:
     return c.isupper() or c.isdigit() or unicodedata.normalize("NFD", c)[0] in "bdfhklt"
 
 
+TILT_MIN = 4.0     # độ: dòng đo ra nghiêng dưới 4 độ là nhiễu đo của OCR -> thẳng (13/10: 57 / 1505 dòng ở 2-4 độ, nháp vẽ thẳng)
+TILT_SURE = 10.0   # ... từ 10 độ trở lên là nghiêng thật (nhãn dán, dải xéo); ở giữa chỉ tin khi dòng đủ dài:
+TILT_LONG = 3.0    # cạnh dài / cạnh ngắn của đa giác >= 3 (từ ngắn "MC", "200g", "Glow Up" đo sai tới 8 độ)
+VERT_TALL = 2.2    # dòng viết DỌC: đa giác OCR cao >= 2,2 lần rộng, đọc được >= 3 ký tự
+
+
+def _line_angle(l: dict) -> float:
+    """Góc DỰNG của một dòng OCR: bỏ nhiễu đo (người dùng 13/10: chữ ngả nghiêng dù nháp viết thẳng)."""
+    a = float(l.get("angle") or 0.0)
+    if abs(a) >= TILT_SURE:
+        return a
+    if abs(a) < TILT_MIN:
+        return 0.0
+    pl = l.get("poly")
+    if pl and len(pl) == 4:
+        e = sorted(float(np.hypot(pl[i][0] - pl[(i + 1) % 4][0], pl[i][1] - pl[(i + 1) % 4][1])) for i in range(4))
+        reach = e[-1] / max(1.0, e[0])
+    else:
+        reach = (l["box"][2] - l["box"][0]) / max(1.0, l["box"][3] - l["box"][1])
+    return a if reach >= TILT_LONG else 0.0
+
+
+def _vertical(img: np.ndarray, l: dict) -> dict:
+    """Dòng viết DỌC (chữ chạy dọc mép poster): OCR trả đa giác cao - hẹp với góc 0 và chữ rác (đọc sai chiều) -> mã coi là dòng
+    ngang trong ô hẹp, chữ dựng ngang bé tí (accept2 "Ngày hội siêu sale"). Đọc lại theo hai chiều +90 / -90, lấy chiều tin hơn:
+    ghi góc, chữ đọc được và đa giác theo chiều đọc. Không phải dòng dọc: trả nguyên."""
+    from .ocr import MIN_REC, read_rect
+    b = l["box"]
+    w, h = b[2] - b[0], b[3] - b[1]
+    if h < VERT_TALL * w or abs(float(l.get("angle") or 0.0)) >= TILT_SURE or sum(ch.isalnum() for ch in l["text"]) < 3:
+        return l
+    c = ((b[0] + b[2]) / 2, (b[1] + b[3]) / 2)
+    best = max(((*read_rect(img, c, h, w, a), a) for a in (90.0, -90.0)), key=lambda t: t[1])
+    if best[1] < MIN_REC or not any(ch.isalnum() for ch in best[0]):
+        return l
+    x0, y0, x1, y1 = b
+    poly = [[x1, y0], [x1, y1], [x0, y1], [x0, y0]] if best[2] > 0 else [[x0, y1], [x0, y0], [x1, y0], [x1, y1]]
+    return {**l, "text": best[0], "angle": best[2], "poly": poly, "vertical": True}
+
+
 def lines(img: np.ndarray) -> list[dict]:
     """Dòng OCR + số đo nét: cao thân chữ -> cỡ chữ (px), màu, góc nghiêng."""
     import cv2
@@ -77,14 +117,17 @@ def lines(img: np.ndarray) -> list[dict]:
     H, W = img.shape[:2]
     # "dòng" không có chữ cái / chữ số (hàng sao "★★★★★", gạch, chấm) không phải chữ: để lớp phủ tách thành chi tiết I
     raw = [l for l in read_lines(img) if any(ch.isalnum() for ch in l["text"])]
-    raw = [q for l in raw for q in _split_gaps(img, l)]
+    raw = [_vertical(img, q) for l in raw for q in _split_gaps(img, l)]
     L = []
     for i, l in enumerate(raw, 1):
-        ang = float(l.get("angle") or 0.0)
+        ang = _line_angle(l)
         if abs(ang) >= 2:   # dòng NGHIÊNG: xoay thẳng ảnh quanh dòng rồi đo (khung thẳng của dòng nghiêng làm cao thân chữ phồng)
             P_ = np.asarray(l["poly"], np.float32)
             c = P_.mean(0)
             R = cv2.getRotationMatrix2D((float(c[0]), float(c[1])), ang, 1.0)
+            # dòng dọc sát mép ảnh: xoay quanh tâm dòng thì dòng chìa ra ngoài khung -> dời tâm dòng về giữa ảnh
+            R[0, 2] += W / 2 - float(c[0])
+            R[1, 2] += H / 2 - float(c[1])
             img_r = cv2.warpAffine(img, R, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
             q = np.hstack([P_, np.ones((4, 1), np.float32)]) @ R.T
             m = measure(img_r, [float(q[:, 0].min()), float(q[:, 1].min()), float(q[:, 0].max()), float(q[:, 1].max())], l["text"], [])
@@ -92,7 +135,7 @@ def lines(img: np.ndarray) -> list[dict]:
             m = measure(img, l["box"], l["text"], [o["box"] for o in raw if o is not l])
         lt = [c for c in l["text"] if c.isalnum()]
         caps = bool(lt) and sum(c.isupper() or c.isdigit() for c in lt) >= 0.8 * len(lt)
-        h = m["h"] if m else 0.7 * (l["box"][3] - l["box"][1])
+        h = m["h"] if m else 0.7 * min(l["box"][3] - l["box"][1], l["box"][2] - l["box"][0] if l.get("vertical") else 1e9)
         size = h / (CAP_EM if caps else X_EM)
         # dòng có ký tự CAO (chữ hoa / số / nét lên): cỡ theo cao nét cao nhất -- mặt cắt mật độ đo lẫn cao chữ hoa với cao chữ
         # thường khi dòng nhiều chữ số ("Hotline 0866 777 888" ước 1.37 lần cỡ thật -> chữ dựng tràn ngang, co < 0.7: too_small)

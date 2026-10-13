@@ -125,11 +125,19 @@ def regions(img: np.ndarray) -> list[dict]:
 def read_region(img: np.ndarray, rect) -> str:
     """Đọc chữ trong một hình chữ nhật xoay (cv2.minAreaRect) bằng bộ đọc của RapidOCR -- để biết một vùng chữ mà bộ dò thấy nhưng
     khâu ép khung đã bỏ có thật là CHỮ không (hàng sao, hoạ tiết đọc ra rỗng). Lỗi / phiên bản không hỗ trợ: ""."""
+    (cx, cy), (w, h), a = rect
+    if w < h:
+        w, h, a = h, w, a + 90
+    text, score = read_rect(img, (cx, cy), w, h, a)
+    return text if score >= MIN_REC else ""
+
+
+def read_rect(img: np.ndarray, c, w: float, h: float, a: float) -> tuple[str, float]:
+    """Đọc MỘT dòng nằm trong hình chữ nhật tâm c, dài w, cao h, nghiêng a độ (dương = xuôi kim đồng hồ trên ảnh) -> (chữ, độ tin).
+    Dùng để chọn chiều đọc của dòng viết DỌC (a = +90 hay -90). Lỗi: ("", 0)."""
     import cv2
     try:
-        (cx, cy), (w, h), a = rect
-        if w < h:
-            w, h, a = h, w, a + 90
+        cx, cy = c
         w, h = int(w * 1.08) + 2, int(h * 1.25) + 2
         Mx = cv2.getRotationMatrix2D((cx, cy), a, 1.0)
         Mx[0, 2] += w / 2 - cx
@@ -137,9 +145,9 @@ def read_region(img: np.ndarray, rect) -> str:
         crop = cv2.warpAffine(np.ascontiguousarray(img), Mx, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
         res = _engine().text_recognizer([crop])
         rec = res[0] if isinstance(res, tuple) else res
-        return str(rec[0][0]) if rec and rec[0] and float(rec[0][1]) >= MIN_REC else ""
+        return (str(rec[0][0]), float(rec[0][1])) if rec and rec[0] else ("", 0.0)
     except Exception:
-        return ""
+        return "", 0.0
 
 
 MIN_REC = 0.3   # độ tin tối thiểu của bộ đọc (chữ méo của nháp đọc ra độ tin thấp vẫn là chữ)
