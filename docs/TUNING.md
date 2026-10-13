@@ -641,6 +641,14 @@ lên trần. Cây luật (nền phẳng? bản xoá tin được? ba cách lấp
   vòm chữ plan cũ (g04, còn nửa tiêu đề), nút giá của nệm bị khuyết một góc (f02), vòm cầu vồng bị mờ (g03).
   Bản cuối CHƯA đo lại bằng erase_bench (máy không GPU) -- xác nhận trên máy chủ.
 
+**Bộ thi `bench/accept2.json` (30 ca, seed 9001-9030):** e nút / thẻ / huy hiệu (6), h nền khó (5), k chữ khó (5), l danh sách /
+bảng / các bước (5), q ảnh sản phẩm (3), r form thường gặp (6). CHỈ chạy và chấm, không sửa mã theo từng ca của bộ này; lỗi
+thấy ở đây chỉ sửa khi nó hiện thành một con số trên tập luyện (mix1, accept1, dev2, dev3, form1).
+**Phía chữ mới, đếm trên mix1 lượt hai (34 poster, 286 dòng):** bộ kiểm còn 9 too_small + 1 overflow; 8 poster có lệnh co < 0,7,
+gần hết vì VLM đặt câu DÀI HƠN chữ nháp vào ô nhỏ (nháp 7 ký tự "Glow Up" -> "Serum Vitamin C Glow Up 30ml"). Chữ cong còn hỏng
+(g04, c01) là do bước ĐO bỏ sót / đo sai dòng cong, không phải bước gỡ: 76 poster chỉ có 12 mảng "chữ bỏ sót" ứng viên, luật
+theo vùng chữ của bộ dò không cứu được g04 (độ phủ 0,2-0,44).
+
 **Không để trống dòng (13/10 tối, người dùng: "cố gắng bịa vào, đừng bỏ trống"):** đọc lệnh của 34 poster mix1: 13 / 286 dòng
 bị bỏ, ở 5 poster -- và phần lớn KHÔNG phải VLM bỏ: 4 poster do luật "lặp chữ -> skip" của mã (i05 huy hiệu "Ưu đãi" nháp vẽ hai
 lần, VLM viết cả hai, mã xoá một), 1 poster do VLM trả lời cụt (p02: 1 lệnh cho 10 dòng, autofix đổi 9 dòng còn lại thành skip,
