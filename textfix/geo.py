@@ -338,30 +338,39 @@ def apply_arcs(L: list[dict], I: list[dict], found: list[dict], cap_em: float) -
         cov_L = [l for l in L if on(l["box"])]
         cov_I = [c for c in I if on(c["box"])]
         # MẨU Ở HAI ĐẦU CUNG (12/10 g01: chữ cái đầu / cuối vòm không nối được vào chuỗi nét, còn lại thành ô rời; g02: mẩu OCR
-        # "NHA GAO" nghiêng 42 độ nằm ngay trên vòng con dấu): ô có tâm nằm TRÊN đường tròn của cung (lệch <= 0.6 cao chữ) và
-        # trong khoảng góc của cung nới 2 cao chữ mỗi đầu -> cũng thuộc cung; cung dài ra tới hết các ô đó
+        # "NHA GAO" nghiêng 42 độ nằm ngay trên vòng con dấu; 13/10 run ba93: bộ dò thấy vòm "TIỆM BÁNH NHÀ" và mẩu "GẠO" là hai
+        # vùng rời): ô có tâm nằm TRÊN đường tròn của cung (lệch <= 0.6 cao chữ), cùng cỡ chữ, và BẮT ĐẦU trong vòng 2 cao chữ kể
+        # từ đầu cung (tính theo mép gần của ô, không theo tâm: một từ dài có tâm cách đầu cung cả nửa chiều dài của nó) -> cũng
+        # thuộc cung; cung dài ra tới hết các ô đó
         c = a.get("curve")
         if c:
             h = a["h"]
             rc = c["r"] + (h / 2 if c["up"] else -h / 2)   # bán kính đường TÂM chữ
             pad = math.degrees(2 * h / max(rc, 1.0))
-            lo, hi = (c["a0"], c["a1"]) if c["up"] else (c["a1"], c["a0"])
+            lo, hi = min(c["a0"], c["a1"]), max(c["a0"], c["a1"])
+            mid = (lo + hi) / 2
 
-            def ang(x, y):
+            def ang(x, y, mid=mid, c=c):   # góc liền mạch quanh giữa cung
                 t = math.degrees(math.atan2(y - c["cy"], x - c["cx"]))
-                return (t + 360 if t < 0 else t) if c["up"] else (t + 360 if t < -90 else t)
+                return t + 360 * round((mid - t) / 360)
 
-            def near(m):
+            def spread(m, c=c, rc=rc, h=h, ang=ang):   # các góc của ô trên đường tròn: tâm + những góc khung nằm sát đường tròn
+                pts = m.get("poly") or [[x, y] for x in (m["box"][0], m["box"][2]) for y in (m["box"][1], m["box"][3])]
                 x, y = (m["box"][0] + m["box"][2]) / 2, (m["box"][1] + m["box"][3]) / 2
-                return abs(math.hypot(x - c["cx"], y - c["cy"]) - rc) <= 0.6 * h and lo - pad <= ang(x, y) <= hi + pad \
+                return [ang(x, y)] + [ang(px, py) for px, py in pts if abs(math.hypot(px - c["cx"], py - c["cy"]) - rc) <= 1.2 * h]
+
+            def near(m, c=c, rc=rc, h=h, lo=lo, hi=hi, pad=pad, spread=spread):
+                if m.get("path"):
+                    return False
+                x, y = (m["box"][0] + m["box"][2]) / 2, (m["box"][1] + m["box"][3]) / 2
+                return abs(math.hypot(x - c["cx"], y - c["cy"]) - rc) <= 0.6 * h and any(lo - pad <= t <= hi + pad for t in spread(m)) \
                     and (m["size"] <= 2 * h / 0.72 if m.get("size") else min(m["box"][2] - m["box"][0], m["box"][3] - m["box"][1]) <= 3 * h)
             more_L = [l for l in L if l not in cov_L and near(l)]
             more_I = [m for m in I if m not in cov_I and near(m)]
             if more_L or more_I:
-                aa = [ang(x, y) for m in more_L + more_I for x in (m["box"][0], m["box"][2]) for y in (m["box"][1], m["box"][3])
-                      if abs(math.hypot(x - c["cx"], y - c["cy"]) - rc) <= 1.2 * h]
+                aa = [t for m in more_L + more_I for t in spread(m)[1:]]
                 lo, hi = min([lo] + aa), max([hi] + aa)
-                a0, a1 = (lo, hi) if c["up"] else (hi, lo)
+                a0, a1 = (lo, hi) if c["a0"] <= c["a1"] else (hi, lo)
                 c = {**c, "a0": round(a0, 1), "a1": round(a1, 1)}
                 a = {**a, "curve": c, "path": [[round(c["cx"] + c["r"] * math.cos(math.radians(t)), 1),
                                                 round(c["cy"] + c["r"] * math.sin(math.radians(t)), 1)] for t in np.linspace(a0, a1, NPATH)]}
@@ -383,12 +392,36 @@ def apply_arcs(L: list[dict], I: list[dict], found: list[dict], cap_em: float) -
                "size": float(a["h"] / (cap_em if caps else 0.6)), "angle": 0.0, "geo": a["geo"], "path": a["path"],
                "scale": a.get("scale"), **({"curve": a["curve"]} if a.get("curve") else {}),
                "poly": [[a["box"][0], a["box"][1]], [a["box"][2], a["box"][1]], [a["box"][2], a["box"][3]], [a["box"][0], a["box"][3]]]}
+        zone = mk.copy()   # vùng chữ của ô: vùng dò được + khung các mẩu đã gộp (slots._geo_lines thêm dải dọc đường chân)
+        for m in cov_L + cov_I:
+            if m.get("poly"):
+                import cv2
+                one = np.zeros(zone.shape, np.uint8)
+                cv2.fillPoly(one, [np.asarray(m["poly"], np.int32)], 1)
+                zone |= one.astype(bool)
+            else:
+                x0, y0, x1, y1 = (int(max(0, v)) for v in m["box"])
+                zone[y0:y1, x0:x1] = True
+        new["_mask"] = zone
         gone = {id(l) for l in cov_L}
         L = [new if l is first else l for l in L if id(l) not in gone or l is first]
         I = [c for c in I if c not in cov_I]
         log.append(f"chữ {a['geo']}: {[l['id'] for l in cov_L]} + {[c['id'] for c in cov_I]} -> {first['id']}"
                    + (f" {a['curve']}" if a.get("curve") else "") + (f" cỡ {a['scale'][0]}..{a['scale'][-1]}" if a.get("scale") else ""))
     return L, I, log
+
+
+def circle_of(cen: np.ndarray, h: float) -> dict:
+    """Đường TÂM một dòng cong (trái -> phải) có khớp đường tròn không -> {"curve": ...} cùng khuôn với `_fit_circle` (r = bán kính
+    đường CHÂN), hoặc {} (cong tự do: không có "phần kéo dài" để nối mẩu rời vào)."""
+    cx, cy, r = _circle(cen)
+    chord = float(np.hypot(*(cen[-1] - cen[0])))
+    if float(np.median(np.abs(np.hypot(cen[:, 0] - cx, cen[:, 1] - cy) - r))) > ARC_FIT * h or r > 8 * chord:
+        return {}
+    up = bool(cy > cen[:, 1].mean())   # tâm dưới chữ: cung lồi phía trên
+    ang = np.degrees(np.unwrap(np.arctan2(cen[:, 1] - cy, cen[:, 0] - cx)))
+    return {"curve": {"cx": round(cx, 1), "cy": round(cy, 1), "r": round(r - h / 2 if up else r + h / 2, 1),
+                      "a0": round(float(ang[0]), 1), "a1": round(float(ang[-1]), 1), "up": up}}
 
 
 def runs(L: list[dict]) -> tuple[list[dict], list[str]]:

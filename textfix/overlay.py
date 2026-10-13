@@ -2,7 +2,9 @@
 luận, pill, dải, nút), icon, avatar, sao -- và giữ ảnh gần như từng pixel (probe: đổi ngoài chữ ~0%). Nên chỗ nháp khác bản xoá
 = lớp phủ, đúng vị trí, không cần DINO; ảnh / người / sản phẩm không bao giờ bị khoanh (bản xoá giữ chúng).
 
-  O = overlay(draft, plate, lines)   # lines: ocr.read_lines(draft)
+  O = overlay(draft, plate, lines)   # lines: ocr.read_lines(draft); dòng chữ CONG / dòng OCR sót (slots._geo_lines) có thêm
+                                     # "mask" (vùng chữ thật, bool cỡ ảnh) và "anchor" (một điểm trên dòng): khung thẳng của
+                                     # một vòm chữ trùm cả thứ nằm dưới vòm nên mọi phép "trong dòng" của dòng đó tính theo mask
   O["S"]: vỏ  {id, box, fill (#hex), radius (px), lines [chỉ số dòng trong vỏ], icons [id I], _mask, _fill_lab}
   O["I"]: chi tiết nhỏ {id, box, color, shell (id S | None)}
   O["mask"]: lớp phủ (bool), O["text"]: mặt nạ chữ (bool)
@@ -119,6 +121,8 @@ def _soft_shells(draft, A, B, lines, text, taken) -> list[dict]:
     e = np.linalg.norm(A - B, axis=2)
     out = []
     for l in lines:
+        if l.get("mask") is not None:   # dòng cong: không tìm vỏ chữ nhật quanh khung thẳng của nó
+            continue
         x0, y0, x1, y1 = l["box"]
         h = y1 - y0
         cx, cy = int((x0 + x1) / 2), int((y0 + y1) / 2)
@@ -177,18 +181,24 @@ def overlay(draft: np.ndarray, plate: np.ndarray, lines: list[dict]) -> dict:
     ov = (e > DIFF).astype(np.uint8)
     ov_fine = cv2.morphologyEx(ov, cv2.MORPH_OPEN, np.ones((DETAIL_OPEN, DETAIL_OPEN), np.uint8)).astype(bool)
     ov = cv2.morphologyEx(ov, cv2.MORPH_OPEN, np.ones((OPEN, OPEN), np.uint8))
-    text = text_mask(draft, lines)
+    plain = [l for l in lines if l.get("mask") is None]
+    shaped = [l for l in lines if l.get("mask") is not None]   # dòng cong / dòng OCR sót: vùng chữ đã đo sẵn
+    text = text_mask(draft, plain)
+    for l in shaped:
+        text |= l["mask"]
     rest = ov.astype(bool) & ~text   # lớp phủ không phải chữ
     # VỎ: mảng lớp phủ (đóng nhẹ, lấp lỗ) TO, GỌN và ĐẶC -- đo trên lớp phủ thô, không dựa mặt nạ chữ (pill / dải mà chữ chiếm gần
     # hết: màu vỏ bị coi là màu mực, 07/10 dải đỏ p11, pill p13)
     full = cv2.morphologyEx(ov, cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))
     boxes = np.zeros((H, W), np.uint8)   # khung các dòng chữ (đa giác OCR nới 0.1 cao dòng)
-    for l in lines:
+    for l in plain:
         one = np.zeros((H, W), np.uint8)
         cv2.fillPoly(one, [np.asarray(l["poly"], np.int32)], 1)
         k = max(1, int(0.1 * (l["box"][3] - l["box"][1])))
         boxes |= cv2.dilate(one, np.ones((2 * k + 1, 2 * k + 1), np.uint8))
     boxes = boxes.astype(bool)
+    for l in shaped:   # nét chữ cong rất đậm ("KHÓ" 13/10) cũng to, gọn, đặc: nằm trong vùng chữ thì không phải vỏ
+        boxes |= l["mask"]
     n, cc, st, _ = cv2.connectedComponentsWithStats(full, 8)
     S, I = [], []
     shell_mask = np.zeros((H, W), bool)
@@ -239,14 +249,14 @@ def overlay(draft: np.ndarray, plate: np.ndarray, lines: list[dict]) -> dict:
         # mẩu nằm LỌT trong một dòng chữ hoặc vùng dấu thanh ngay trên dòng (nét / dấu sót mặt nạ) không phải chi tiết
         if any(l["box"][0] - 0.25 * (l["box"][3] - l["box"][1]) <= cx <= l["box"][2] + 0.25 * (l["box"][3] - l["box"][1])
                and l["box"][1] - 0.9 * (l["box"][3] - l["box"][1]) <= cy <= l["box"][3] + 0.25 * (l["box"][3] - l["box"][1])
-               and max(w, h) <= 0.8 * (l["box"][3] - l["box"][1]) for l in lines):
+               and max(w, h) <= 0.8 * (l["box"][3] - l["box"][1]) for l in plain):
             continue
         sel = cc == i
         # nét MẢNH (chỉ có trên mặt nạ mở nhẹ): icon nét mảnh designer đặt luôn đi kèm một dòng chữ cùng hàng (icon đầu dòng,
         # icon liên hệ); mảnh mảnh đứng lẻ giữa cảnh = cảnh FLUX vẽ lại (confetti, vệt sáng, mép vật)
         if ov.astype(bool)[sel].mean() < 0.2 and not any(
                 l["box"][1] - 0.5 * (l["box"][3] - l["box"][1]) <= cy <= l["box"][3] + 0.5 * (l["box"][3] - l["box"][1])
-                and max(l["box"][0] - (x + w), x - l["box"][2]) <= 2 * (l["box"][3] - l["box"][1]) for l in lines):
+                and max(l["box"][0] - (x + w), x - l["box"][2]) <= 2 * (l["box"][3] - l["box"][1]) for l in plain):
             continue
         shell = next((s["id"] for s in S if s["_mask"][sel].mean() > 0.5), None)
         col = np.median(draft[sel], axis=0)
@@ -257,8 +267,8 @@ def overlay(draft: np.ndarray, plate: np.ndarray, lines: list[dict]) -> dict:
         I.append({"id": f"I{len(I) + 1}", "box": [float(x), float(y), float(x + w), float(y + h)],
                   "color": "#%02x%02x%02x" % tuple(int(v) for v in col), "shell": shell})
     for s in S:
-        s["lines"] = [j for j, l in enumerate(lines) if s["_mask"][int((l["box"][1] + l["box"][3]) / 2) % H,
-                                                                  int((l["box"][0] + l["box"][2]) / 2) % W]]
+        at = [l.get("anchor") or ((l["box"][0] + l["box"][2]) / 2, (l["box"][1] + l["box"][3]) / 2) for l in lines]
+        s["lines"] = [j for j, (ax, ay) in enumerate(at) if s["_mask"][int(ay) % H, int(ax) % W]]
         s["icons"] = [c["id"] for c in I if c["shell"] == s["id"]]
     # _mask / _fill_lab (mặt nạ vỏ, màu lòng Lab) giữ lại cho bước nắn khung chữ (slots); bỏ khi ghi JSON
     return {"S": S, "I": I, "mask": ov.astype(bool), "text": text}

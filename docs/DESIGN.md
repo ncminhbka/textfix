@@ -77,6 +77,14 @@ Luật chung (chỉnh trên dev, kiểm một lần trên test của `bench/slot
 - chi tiết giống nhau cùng hàng cách nhau <= 0.5 cao = một chi tiết (hàng sao); chi tiết nhỏ hơn 0.5 cao dòng trung vị = vụn.
 Chữ số to OCR bỏ sót (số bước trong vòng tròn) thành chi tiết: designer được dùng lệnh `text` cho ô I.
 
+**Dòng cong / dòng OCR sót** (`TEXTFIX_GEO=on`, mặc định tắt; `slots._geo_lines`): đo từ bản đồ vùng chữ của bộ dò RapidOCR trước
+khâu ép khung (`ocr.regions`). Vùng võng >= 0.3 cao dòng -> một ô L có đường chân; vùng khớp đường tròn thì các mẩu OCR / chi
+tiết nằm trên phần kéo dài của đường tròn đó (bắt đầu trong vòng 2 cao chữ kể từ đầu cung) nhập vào cùng ô. Dòng mới sinh ra ở
+đây đi vào **đầu nguồn**: có dòng mới thì vỏ và chi tiết đo lại với danh sách dòng cuối (`slots._layers`), vùng chữ của dòng cong
+(`mask`) là chữ với mọi luật như khung của dòng thẳng -- không luật nào cần nhánh riêng cho chữ cong. Lệnh chữ viết vào ô cong
+dựng bằng SVG textPath; lệnh gộp ô cong với ô L khác: cả câu viết theo đường cong, các ô còn lại để trống (không bao giờ lùi về
+khối chữ thẳng trong khung bao).
+
 | Lớp (IoU >= 0.5) | dev F1 trước -> sau | test F1 trước -> sau |
 |---|---|---|
 | L | 0.950 -> 0.954 | 0.917 -> 0.926 |

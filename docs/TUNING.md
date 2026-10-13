@@ -385,9 +385,43 @@ nghiêng nhiều dòng; chữ nghiêng một khối và một dòng nhiều cỡ
   không (log "bộ dò: N vùng chữ" / "KHÔNG lấy được bản đồ").
   Chạy: `export TEXTFIX_GEO=on` trước khi khởi động máy chủ, rồi `%run scripts/dev_batch.py bench/dev3.json --only g01,...,g16`.
 
+### 13/10: chữ cong đi vào đầu nguồn (sau 2 lượt e2e GEO bật: ba93 con dấu tiệm bánh, 1077 donut)
+
+Chấm lượt trước: server LẤY ĐƯỢC bản đồ vùng chữ ("bộ dò: 3 / 5 vùng chữ") -- **đạt**. VLM thật viết đúng vào ô cong ở 3 / 3 ô
+(mỗi ô một lệnh, tự ghi "curved lines redrawn by renderer") -- **đạt**. Hai poster vẫn hỏng, cả hai do mã, cùng một gốc: dòng
+cong sinh ra SAU khi vỏ / chi tiết đã đo, nên các luật có sẵn không biết đến nó.
+- 1077: ba chữ "KHÓ" đậm của dòng cong là một mảng to, gọn, đặc -> thành "vỏ" nâu; luật vỏ giả (màu lòng = màu chữ) chạy lúc
+  chưa có dòng nào trong đó; sau đó luật "vỏ chứa chữ được viết thì vẽ lại" tô mảng nâu đè lên chữ. Ô cong không có màu đo.
+- ba93: bộ dò thấy vòm "TIỆM BÁNH NHÀ" và mẩu "GẠO" là hai vùng rời trên cùng một đường tròn; VLM gộp hai ô vào một lệnh; bộ
+  dựng gặp "ô cong + ô khác" lùi về khối chữ thẳng trong khung bao, đè lên ổ bánh; bộ kiểm không báo gì.
+- [mã] B2.5 `slots._layers` + `build`: phần hình học tạo dòng nào (cong / OCR sót) thì vỏ và chi tiết ĐO LẠI với danh sách dòng
+  cuối; vùng chữ của dòng đó (`mask` = vùng bộ dò + mẩu đã gộp + dải dọc đường chân) là chữ với mọi luật của `overlay` như khung
+  của dòng thẳng (không thành vỏ, không thành chi tiết, không tìm vỏ nhạt quanh khung thẳng của một vòm). Dòng nằm trong vỏ nào
+  tính theo điểm giữa chữ (`_anchor`), không theo tâm khung thẳng. Màu ô cong đo trên lõi nét bị gỡ.
+- [mã] `geo.circle_of` + `apply_arcs`: vùng cong khớp đường tròn (lệch <= 0.15 cao chữ) thì mẩu OCR / chi tiết có tâm trên đường
+  tròn đó, cùng cỡ, bắt đầu trong vòng 2 cao chữ kể từ đầu cung (tính theo mép gần, không theo tâm) nhập vào ô cung; góc tính
+  liền mạch quanh giữa cung (cung vắt qua 3 giờ không gãy).
+- [mã] B3 `validate`: lệnh chữ có ô cong lẫn ô L khác -> cả câu viết theo đường cong (dài nhất), các ô L kia để trống, bỏ <br>;
+  B4 `render.path_of`: lệnh có ô cong không bao giờ dựng thành khối thẳng. [prompt VLM] ô cong không chung lệnh với ô nào khác.
+- Đo: dựng lại 2 lượt bằng lệnh VLM của server -- ba93 chữ chạy theo vòm, 0 lỗi (trước: khối thẳng đè hình); 1077 hết mảng nâu,
+  còn 1 too_small (hàng chữ trên cùng, không liên quan). Thử nhánh gộp (lệnh [ô cong, ô thẳng]): tách đúng, chữ theo đường cong.
+  Chống khớp sát: GEO tắt, 30 nháp dev2 / dev3 / form1 đo ô lại (cùng dòng OCR) giống hệt mã cũ; GEO bật, 165 nháp
+  (`geo_measure.py`): log dò cung / dòng sót chỉ đổi ở ba93 (thêm "GẠO") -- không nháp nào khác bị nối thêm mẩu. Sau đo lại: ecda_v0
+  thêm 1 chi tiết (biểu tượng nhỏ cạnh "MINIGAME", trước bị khung dòng OCR nuốt -- đúng là chi tiết).
+- Theo dõi: dòng OCR sót mà vùng bộ dò chỉ ôm một phần mảng chữ to thì phần thừa thành chi tiết vụn (chỉ thấy ở 0767 khi ép chạy
+  như không có ảnh sản phẩm; trên server ca đó không tạo dòng sót). Lệnh chữ cong không bóng chữ nằm sát bóng đổ của vật: kiểm
+  tương phản tính trên khung bao của vòm (low_contrast 0.26 ở bản thử gộp) -- chưa sửa.
+- KHÔNG làm: phép kiểm riêng "chữ dựng ra nằm đúng chỗ nháp vẽ chữ". Với dòng thẳng nó trùng phép kiểm tràn khung đã có; với
+  dòng cong, lỗi nó định bắt (lùi về khối thẳng) giờ không còn đường xảy ra.
+- CHƯA đo (cần server): VLM thật có còn gộp ô cong với ô khác không; nhãn nghiêng nhiều dòng; "FLASH" + "SALE" xếp chồng.
+
 ## Lượt chạy server tiếp theo
 
 Cập nhật mã (docs/SERVER.md), khởi động lại máy chủ **và kernel**, rồi:
+0. Chữ cong sau sửa 13/10: `export TEXTFIX_GEO=on`, chạy lại đúng hai đề bài con dấu tiệm bánh và donut trên giao diện (tải
+   "Tải debug (zip)"), rồi `%run scripts/dev_batch.py bench/dev3.json --only g01,g02,g03,g04,g05,g06,g07,g08,g09,g10,g11,g12,g13,g14,g15,g16 --fresh`.
+   Xem trong plan.json: log "chữ arc: ... {cx, cy, r ...}", không còn "vỏ ... chứa chữ được viết" trên ô cong, và có / không dòng
+   "lệnh gộp ô cong".
 1. `%run scripts/dev_batch.py bench/dev3.json` -- tập dev 3 (thay cho dev3_geo: dev3 đã gồm cả 16 ca hình học chữ).
 2. Để so trước / sau dev2 (prompt LLM / VLM mới, B2 hai lượt, cỡ / khung mới): xoá `output/dev/dev2_manifest.json` rồi
    `%run scripts/dev_batch.py` -- chạy lại cả 40 ca (seed cố định; d33-d40 là ca mới).

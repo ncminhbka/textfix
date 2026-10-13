@@ -113,15 +113,16 @@ def _geom(op: dict, M: dict) -> dict | None:
 
 
 def path_of(op: dict, M: dict) -> list | None:
-    """Đường chân của lệnh chữ viết vào MỘT ô cung / lượn (textfix/geo.py) -> các điểm, hướng đọc trái -> phải; lệnh thường: None.
-    Lệnh gộp ô cung với ô khác: dựng như lệnh thường (không đoán đường cho nhiều dòng)."""
+    """Đường chân của lệnh chữ viết vào ô cung / lượn (textfix/geo.py) -> các điểm, hướng đọc trái -> phải; lệnh thường: None.
+    Lệnh chữ chỉ dựng theo các ô L của nó (_ids), nên ô S / I đi kèm không đổi gì. Lệnh có ô cong KHÔNG BAO GIỜ lùi về khối chữ
+    thẳng trong khung bao (13/10 run ba93: chữ thẳng đè lên hình giữa con dấu): slots.validate đã tách ô cong ra đi một mình;
+    lệnh chưa qua validate mà gộp nhiều ô L thì viết theo đường cong dài nhất."""
     if op.get("kind") != "text":
         return None
-    lm = [m for m in op.get("marks") or [] if m.startswith("L") and m in M["by"]]
-    if len(lm) != 1 or len(lm) != len(op.get("marks") or []):
+    pts = [M["by"][m]["path"] for m in op.get("marks") or [] if m.startswith("L") and m in M["by"] and len(M["by"][m].get("path") or []) >= 2]
+    if not pts:
         return None
-    pt = M["by"][lm[0]].get("path")
-    return pt if pt and len(pt) >= 2 else None
+    return max(pts, key=lambda pt: sum(float(np.hypot(b[0] - a[0], b[1] - a[1])) for a, b in zip(pt[:-1], pt[1:])))
 
 
 def _path_polys(path: list, size: float) -> list:
