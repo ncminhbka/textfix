@@ -691,6 +691,17 @@ dòng: mã gắn 8, VLM viết dấu 27.
   dòng (được gỡ cùng chữ, không đúp). Ca của người dùng (chấm trắng cách chữ một quãng) không có tệp để dựng lại: CHƯA xác nhận.
 - CÒN: dòng có khung OCR cao bất thường trùm hàng trên (accept2 q02) che mất dấu của hàng đó.
 
+**14/10: CHỈ DÒNG CHỮ LÀ ĐƯỜNG DUY NHẤT CỦA MAIN.** Người dùng chốt sau accept2 chạy lại (chữ dọc đã dựng dọc) và phép so trên đề
+nhiều icon: đường cũ (ô vỏ S + ô chi tiết I) lưu ở nhánh git `legacy-slots-si`, không vào main nữa. `lonly.LONLY = True` (bỏ cờ
+`TEXTFIX_LONLY`), `TEXTFIX_GEO` mặc định `on`, gỡ `scripts/ab_lonly.sh`. Lệnh chạy: `bash scripts/start_server.sh` rồi
+`python scripts/dev_batch.py bench/<tập>.json`, không cần đặt cờ. CÒN NỢ: các hàm chỉ đường cũ dùng trong slots.py / render.py /
+overlay.py (base_image, SYSTEM, describe, ô S / I) chưa cắt khỏi main -- cắt sau, từng phần, có chạy máy chủ xác nhận.
+- [mã] góc nghiêng 4-10 độ: thêm điều kiện có dòng khác nghiêng cùng góc (lệch <= 2,5 độ, `TILT_PAIR`). accept2 q02 (dầu gội):
+  "Hương dịu nhẹ" đo 8,4 độ do OCR gộp hai mẩu lệch hàng -> nay thẳng; accept1 b03 (-6,0 / -5,4, một cụm) và k03 (nhãn dán
+  14-22 độ) vẫn nghiêng; h04 hai dòng dọc ±90.
+- LƯU Ý ĐO: VLM được gọi KHÔNG đặt nhiệt độ / seed -> hai lượt cùng đề có thể khác nhau chỉ vì VLM (cache theo nội dung câu hỏi
+  chỉ khoá khi câu hỏi y hệt). So trước / sau bằng số lượt chạy lại là chưa công bằng cho tới khi khoá (chờ người dùng quyết).
+
 **Bộ thi `bench/accept2.json` (30 ca, seed 9001-9030):** e nút / thẻ / huy hiệu (6), h nền khó (5), k chữ khó (5), l danh sách /
 bảng / các bước (5), q ảnh sản phẩm (3), r form thường gặp (6). CHỈ chạy và chấm, không sửa mã theo từng ca của bộ này; lỗi
 thấy ở đây chỉ sửa khi nó hiện thành một con số trên tập luyện (mix1, accept1, dev2, dev3, form1).

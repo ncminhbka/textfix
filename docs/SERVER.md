@@ -156,3 +156,8 @@ Thêm `--full` khi cần cả nháp / bản xoá cỡ gốc (các zip < 24 MB nh
 Tệp `big-lama.pt` (196 MB): `wget -O ~/persistent-data/lama/big-lama.pt https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt`.
 Mã tự dùng khi tệp có ở `~/persistent-data/lama/big-lama.pt`; đổi chỗ thì `export TEXTFIX_LAMA=<đường dẫn>`, tắt thì
 `export TEXTFIX_LAMA=off` (về đường luật cũ). plan.json ghi dòng log "nền = nháp trừ chữ (LaMa): ..." khi LaMa chạy.
+
+## Từ 14/10: một đường duy nhất
+
+Nhánh `main` chỉ còn chế độ "chỉ dòng chữ" (nền = nháp, gỡ chữ bằng LaMa, VLM chỉ viết dòng chữ). Không còn cờ `TEXTFIX_LONLY`;
+`TEXTFIX_GEO` mặc định bật. Đường cũ (ô vỏ / ô chi tiết) ở nhánh `legacy-slots-si`. Cần tệp `~/persistent-data/lama/big-lama.pt`.

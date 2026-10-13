@@ -71,6 +71,8 @@ def _tall(c: str) -> bool:
 
 TILT_MIN = 4.0     # độ: dòng đo ra nghiêng dưới 4 độ là nhiễu đo của OCR -> thẳng (13/10: 57 / 1505 dòng ở 2-4 độ, nháp vẽ thẳng)
 TILT_SURE = 10.0   # ... từ 10 độ trở lên là nghiêng thật (nhãn dán, dải xéo); ở giữa chỉ tin khi dòng đủ dài:
+TILT_PAIR = 2.5    # ... VÀ có dòng khác trong poster nghiêng cùng góc (lệch <= 2,5 độ): nghiêng thật đi theo cụm (nhãn hai dòng);
+                   # một dòng dài nghiêng lẻ 4-10 độ là OCR gộp hai mẩu lệch hàng (accept2 q02 "Hương dịu nhẹ" đo 8,4 độ)
 TILT_LONG = 3.0    # cạnh dài / cạnh ngắn của đa giác >= 3 (từ ngắn "MC", "200g", "Glow Up" đo sai tới 8 độ)
 VERT_TALL = 2.2    # dòng viết DỌC: đa giác OCR cao >= 2,2 lần rộng, đọc được >= 3 ký tự
 
@@ -118,9 +120,15 @@ def lines(img: np.ndarray) -> list[dict]:
     # "dòng" không có chữ cái / chữ số (hàng sao "★★★★★", gạch, chấm) không phải chữ: để lớp phủ tách thành chi tiết I
     raw = [l for l in read_lines(img) if any(ch.isalnum() for ch in l["text"])]
     raw = [_vertical(img, q) for l in raw for q in _split_gaps(img, l)]
+    angs = [_line_angle(l) for l in raw]
+    for k, l in enumerate(raw):   # góc dựng chốt ở đây: mọi nơi dùng l["angle"] thấy cùng một góc
+        a = angs[k]
+        if TILT_MIN <= abs(a) < TILT_SURE and not any(j != k and abs(b - a) <= TILT_PAIR for j, b in enumerate(angs)):
+            a = 0.0
+        l["angle"] = a
     L = []
     for i, l in enumerate(raw, 1):
-        ang = _line_angle(l)
+        ang = float(l["angle"])
         if abs(ang) >= 2:   # dòng NGHIÊNG: xoay thẳng ảnh quanh dòng rồi đo (khung thẳng của dòng nghiêng làm cao thân chữ phồng)
             P_ = np.asarray(l["poly"], np.float32)
             c = P_.mean(0)

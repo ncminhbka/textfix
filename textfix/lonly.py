@@ -1,4 +1,5 @@
-"""CHỈ DÒNG CHỮ (13/10, `TEXTFIX_LONLY=on`, mặc định TẮT): poster = bản NHÁP với chữ viết lại cho rõ.
+"""CHỈ DÒNG CHỮ -- ĐƯỜNG DUY NHẤT của nhánh main từ 14/10 (người dùng chốt sau bài thi accept2 và phép so trên đề nhiều icon;
+đường cũ ô vỏ S + ô chi tiết I nằm ở nhánh git `legacy-slots-si`, không phát triển tiếp): poster = bản NHÁP với chữ viết lại cho rõ.
 
 Người dùng chốt sau bộ accept1: (1) không bỏ dòng nào nháp đã vẽ, thiếu câu khách thì VLM viết cho đủ; (2) icon nhỏ trước mỗi
 dòng -> vẽ lại; (3) mọi thứ còn lại -- vỏ, icon to, hoạ tiết, hàng sao, avatar -- là điểm ảnh của nháp. Không còn ô vỏ S, ô chi
@@ -16,7 +17,7 @@ import re
 
 import numpy as np
 
-LONLY = os.environ.get("TEXTFIX_LONLY", "off") == "on"
+LONLY = True   # không còn cờ: main chỉ có đường này (đường cũ: nhánh legacy-slots-si)
 
 DIFF_GONE = 20.0  # nháp cách bản xoá > 20 ΔE = bước xoá đã gỡ thứ ở đó (cùng số với overlay.DIFF)
 FLAT_DE = 12.0    # điểm thuộc nền của dòng: cách màu nền <= 12 ΔE

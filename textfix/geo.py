@@ -16,7 +16,7 @@ import os
 
 import numpy as np
 
-ENABLED = os.environ.get("TEXTFIX_GEO", "off") == "on"   # bật khi B3 (mô tả) + B4 (dựng theo đường chân) xong
+ENABLED = os.environ.get("TEXTFIX_GEO", "on") == "on"   # bật khi B3 (mô tả) + B4 (dựng theo đường chân) xong
 RUNS = os.environ.get("TEXTFIX_GEO_RUNS", "off") == "on"   # gộp "một dòng nhiều cỡ": TẮT -- nhóm này dựng theo ô OCR rời đã ổn
                                                              # (12/10: 7 / 8 nháp g08-g10, g14), gộp lại chỉ thêm rủi ro
 
