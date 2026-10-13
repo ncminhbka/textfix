@@ -651,6 +651,16 @@ VLM bỏ dòng -> `fill_gaps` giữ chữ nháp méo, nhìn như chữ rác; t02
   Dòng còn "giữ chữ nháp" là dòng THỨ HAI của một câu đã viết ở dòng trên ("Air 3", "30ml") -- chờ người dùng quyết: giữ hay xoá.
 - [mã] VLM trả rỗng: không gọi lần thứ ba; log ghi 300 ký tự đầu của câu trả lời thô.
 
+**Mặt nạ nét chữ, vòng hai (14/10, tập luyện, xem mắt 9-15 poster mỗi lần vì máy không GPU):**
+- [mã, giữ] `ink_mask`: (a) mảng nét chữ nằm >= 50% trong vùng của DÒNG KHÁC thì dòng này không lấy (nút nhỏ nằm dưới một vòm chữ;
+  accept1 f02 nút giá hết khuyết góc); (b) bản xoá đáng tin là trọng tài: mảng mà nó chỉ đổi dưới một nửa thì chỉ lấy phần đổi;
+  (c) bằng chứng bản xoá bỏ phần có màu nền của dòng (lòng nút nhỏ bị gỡ) khi vẫn còn phần khác màu nền.
+- [ĐÃ THỬ VÀ GỠ] LẤP HAI NGUỒN (chỗ bản xoá đáng tin lấy điểm ảnh bản xoá theo hình nét chữ, còn lại LaMa): x04 cầu vồng dưới tiêu
+  đề đẹp hoàn toàn và f02 thẻ sạch, NHƯNG sinh bóng chữ ở nút pastel (v06), hộp trích dẫn (f05), nút cam (v05), huy hiệu vàng
+  (c02, x04) -- "đáng tin" theo tỉ lệ đổi không loại được vỏ nhạt bị gỡ; siết thêm "nền của dòng còn nguyên" vẫn còn bóng. Về lại
+  LaMa cho cả mặt nạ. Muốn thử lại phải có phép đo bóng chữ tự động trước.
+- CÒN: mix1 f02 nút đỏ nhỏ vẫn thành một gạch; x04 cầu vồng nhoè dưới tiêu đề (LaMa); chữ cong.
+
 **Bộ thi `bench/accept2.json` (30 ca, seed 9001-9030):** e nút / thẻ / huy hiệu (6), h nền khó (5), k chữ khó (5), l danh sách /
 bảng / các bước (5), q ảnh sản phẩm (3), r form thường gặp (6). CHỈ chạy và chấm, không sửa mã theo từng ca của bộ này; lỗi
 thấy ở đây chỉ sửa khi nó hiện thành một con số trên tập luyện (mix1, accept1, dev2, dev3, form1).

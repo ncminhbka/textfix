@@ -309,10 +309,15 @@ def ink_mask(draft: np.ndarray, plate: np.ndarray, M: dict, kept: set, log: list
     A, B = slots._lab(draft), slots._lab(plate)
     e = np.linalg.norm(A - B, axis=2)
     mask, every = np.zeros((H, W), bool), np.zeros((H, W), bool)
+    from_plate = np.zeros((H, W), bool)   # phần mặt nạ của các dòng mà bản xoá ĐÁNG TIN và đã đổi: lấy thẳng bản xoá
     n = {"màu mực": 0, "bản xoá": 0, "cả hai": 0, "lõi dòng": 0}
-    for l in M["L"]:
-        R = _region(l, H, W, 0.3)
+    regs = {l["id"]: _region(l, H, W, 0.3) for l in M["L"]}
+    count = np.zeros((H, W), np.uint8)
+    for R in regs.values():
         every |= R
+        count += R
+    for l in M["L"]:
+        R = regs[l["id"]]
         if l["id"] in kept:
             continue
         R0, R2 = _region(l, H, W, 0.1), _region(l, H, W, 0.6)
@@ -322,6 +327,30 @@ def ink_mask(draft: np.ndarray, plate: np.ndarray, M: dict, kept: set, log: list
         hgt = float(l.get("size") or (l["box"][3] - l["box"][1]))
         got = np.zeros(r.shape, bool)
         by_ink = by_plate = False
+        # màu nhiều nhất của lõi dòng = nền của dòng (lòng nút, nền trơn); nb = điểm KHÁC màu đó trong vùng dòng
+        q = (draft[y0:y1, x0:x1][r0] // 16).astype(np.int32)
+        key = q[:, 0] * 256 + q[:, 1] * 16 + q[:, 2]
+        cb = np.median(A[y0:y1, x0:x1][r0][key == np.bincount(key).argmax()], axis=0)
+        nb = r & (np.linalg.norm(A[y0:y1, x0:x1] - cb, axis=2) > FLAT_DE)
+        trust = float((e[R] > DIFF_GONE).mean()) < TRUST   # bản xoá chỉ gỡ chữ ở dòng này
+        chg = cv2.dilate((e[y0:y1, x0:x1] > SAME_DE).astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool)
+
+        theirs = (count[y0:y1, x0:x1] - r.astype(np.uint8)) > 0   # vùng của các dòng KHÁC
+
+        def clip(m: np.ndarray) -> np.ndarray:
+            """Bản xoá đáng tin là TRỌNG TÀI: mảng nét chữ mà bản xoá chỉ đổi MỘT PHẦN (< nửa) là chữ dính liền hình khác (tiêu đề
+            đè lên cầu vồng, x04) -> chỉ lấy phần bản xoá đổi. Mảng bản xoá không đụng tới (chữ nó gỡ sót) thì giữ nguyên."""
+            k_, c_, s_, _x = cv2.connectedComponentsWithStats(m.astype(np.uint8), 8)
+            # mảng nằm phần lớn trong vùng của DÒNG KHÁC là chữ / vỏ của dòng đó (nút nhỏ nằm dưới một vòm chữ, f02): dòng đó
+            # tự lo, dòng này không lấy
+            own = np.bincount(c_[theirs & ~r0], minlength=k_)
+            m = m & ~np.isin(c_, [i for i in range(1, k_) if own[i] >= 0.5 * s_[i, cv2.CC_STAT_AREA]])
+            if not trust:
+                return m
+            k_, c_, s_, _x = cv2.connectedComponentsWithStats(m.astype(np.uint8), 8)
+            hit = np.bincount(c_[chg], minlength=k_)
+            part = [i for i in range(1, k_) if 0 < hit[i] < 0.5 * s_[i, cv2.CC_STAT_AREA]]
+            return m & ~(np.isin(c_, part) & ~chg) if part else m
         if l.get("color"):
             cand = r2 & (np.linalg.norm(A[y0:y1, x0:x1] - slots._hex_lab(l["color"]), axis=2) <= INK_SAME)
             share = float((cand & r0).sum()) / max(1.0, float(r0.sum()))
@@ -329,33 +358,36 @@ def ink_mask(draft: np.ndarray, plate: np.ndarray, M: dict, kept: set, log: list
                 k, cc, st, _c = cv2.connectedComponentsWithStats(cand.astype(np.uint8), 8)
                 core, inside = np.bincount(cc[r0], minlength=k), np.bincount(cc[r], minlength=k)
                 ok = [i for i in range(1, k) if core[i] and inside[i] >= INK_IN * st[i, cv2.CC_STAT_AREA]]
-                got |= np.isin(cc, ok)
+                got |= clip(np.isin(cc, ok))
                 by_ink = bool(ok)
-        if float((e[R] > DIFF_GONE).mean()) < TRUST:
+        if trust:
             ch = (e[y0:y1, x0:x1] > SAME_DE) & r
             k, cc = cv2.connectedComponents(ch.astype(np.uint8), connectivity=8)
             seed = np.unique(cc[(e[y0:y1, x0:x1] > DIFF_GONE) & r])
             add = np.isin(cc, seed[seed > 0])
+            # bản xoá gỡ cả NÚT NHỎ quanh chữ mà vẫn dưới ngưỡng tin (nút ôm sát chữ, f02 "Giảm 30% + freeship"): phần đổi có
+            # màu nền của dòng là lòng nút, không phải nét chữ -- chỉ áp khi phần còn lại vẫn còn (có nét chữ khác màu nền)
+            if (add & nb).any() and float((add & ~nb).sum()) > 0.3 * float(add.sum()):
+                add &= nb
             by_plate = bool(add.any())
             got |= add
         # (3) KHÁC MÀU NỀN CỦA DÒNG: nét chữ = điểm khác màu nhiều nhất của lõi dòng, chạm lõi, nằm trong vùng dòng. Bắt chữ mà
         # bản xoá bỏ sót hoặc gỡ quá tay, chữ nhiều tông / có viền mà màu mực chỉ bắt một phần (v06, g04). Phần đó trùm quá
         # COVER_MAX vùng dòng (chữ trên ảnh chụp, vỏ nhiều dải sáng) thì nền không phải một màu: không dùng.
-        q = (draft[y0:y1, x0:x1][r0] // 16).astype(np.int32)
-        key = q[:, 0] * 256 + q[:, 1] * 16 + q[:, 2]
-        cb = np.median(A[y0:y1, x0:x1][r0][key == np.bincount(key).argmax()], axis=0)
-        nb = r & (np.linalg.norm(A[y0:y1, x0:x1] - cb, axis=2) > FLAT_DE)
         k, cc, st, _c = cv2.connectedComponentsWithStats(nb.astype(np.uint8), 8)
         core = np.bincount(cc[r0], minlength=k)
         add = np.isin(cc, [i for i in range(1, k) if core[i] >= INK_CORE * st[i, cv2.CC_STAT_AREA]])
         if 0 < float(add.sum()) <= COVER_MAX * float(r.sum()):
-            got |= add
+            got |= clip(add)
             by_ink = True
         if not got.any():
             got = r0.copy()
         n["cả hai" if by_ink and by_plate else "màu mực" if by_ink else "bản xoá" if by_plate else "lõi dòng"] += 1
         k = 2 * max(3, int(round(MASK_GROW * hgt))) + 1   # viền khử răng cưa + bóng sát nét: còn sót viền là LaMa vẽ lại hình chữ
-        mask[y0:y1, x0:x1] |= cv2.dilate(got.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))).astype(bool) & r2
+        grown = cv2.dilate(got.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))).astype(bool) & r2
+        mask[y0:y1, x0:x1] |= grown
+        if trust:
+            from_plate[y0:y1, x0:x1] |= grown & chg
         if l.get("mark"):
             mx0, my0, mx1, my1 = (int(v) for v in l["mark"]["box"])
             mask[max(0, my0 - 2):my1 + 2, max(0, mx0 - 2):mx1 + 2] = True
@@ -386,7 +418,7 @@ def ink_mask(draft: np.ndarray, plate: np.ndarray, M: dict, kept: set, log: list
     if log is not None:
         log.append("nền = nháp trừ chữ (LaMa): mặt nạ nét chữ %.1f%% ảnh; dòng theo %s; %d vùng chữ OCR sót; %d dòng giữ nguyên"
                    % (100 * mask.mean(), ", ".join(f"{k} {v}" for k, v in n.items() if v), n_miss, len(kept)))
-    return mask
+    return mask, from_plate & mask
 
 
 def draft_base(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = None, log: list | None = None) -> np.ndarray:
@@ -398,7 +430,7 @@ def draft_base(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict | None = N
             import cv2
             kept = {m for op in (P or {}).get("ops") or [] if op.get("kind") == "keep" for m in op.get("marks") or []}
             sub = [] if log is not None else None
-            mask = ink_mask(draft, plate, M, kept, sub)
+            mask, _fp = ink_mask(draft, plate, M, kept, sub)
             if not mask.any():
                 out = draft.copy()
             else:
