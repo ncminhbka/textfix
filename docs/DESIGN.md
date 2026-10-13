@@ -77,6 +77,10 @@ Luật chung (chỉnh trên dev, kiểm một lần trên test của `bench/slot
 - chi tiết giống nhau cùng hàng cách nhau <= 0.5 cao = một chi tiết (hàng sao); chi tiết nhỏ hơn 0.5 cao dòng trung vị = vụn.
 Chữ số to OCR bỏ sót (số bước trong vòng tròn) thành chi tiết: designer được dùng lệnh `text` cho ô I.
 
+**Số ô theo khối, dấu đầu dòng** (13/10): số L đánh theo thứ tự đọc từng khối (`slots._xy_order`: cắt đệ quy tại khe trống rộng
+nhất; bảng "tên ... giá" theo hàng) để các ô VLM gộp vào một lệnh luôn là số liền nhau. Chấm / tick / icon nhỏ ngay bên trái một
+dòng nhập vào ô của dòng đó (`slots._row_marks`, khung nới sang trái, VLM viết dấu ở đầu chữ); icon to hoặc đứng riêng vẫn là I.
+
 **Dòng cong / dòng OCR sót** (`TEXTFIX_GEO=on`, mặc định tắt; `slots._geo_lines`): đo từ bản đồ vùng chữ của bộ dò RapidOCR trước
 khâu ép khung (`ocr.regions`). Vùng võng >= 0.3 cao dòng -> một ô L có đường chân; vùng khớp đường tròn thì các mẩu OCR / chi
 tiết nằm trên phần kéo dài của đường tròn đó (bắt đầu trong vòng 2 cao chữ kể từ đầu cung) nhập vào cùng ô. Dòng mới sinh ra ở

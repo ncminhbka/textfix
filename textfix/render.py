@@ -1109,10 +1109,14 @@ def _uneven(P: dict, M: dict, res: list) -> list[dict]:
     fs = {r["id"]: r["fs"] for r in res if r.get("fs")}
     fw = {r["id"]: r.get("fw") or 400 for r in res}
     out = []
+    dg = {op["id"]: str(op.get("group") or "").strip().lower() for op in P["ops"]}
     for g in _role_groups(P, M, res):
-        sz, wt = [fs[i] for i in g], [fw[i] for i in g]
+        sz = [fs[i] for i in g]
+        # độ đậm chỉ so giữa các lệnh VLM khai CÙNG nhóm (13/10 run a9ed: nhãn "Điểm nổi bật" đậm, không nhóm, đứng thẳng cột với
+        # ba mục của nhóm "features" -> báo nhầm đậm nhạt không đều)
+        wd = max((max(w) - min(w) for w in ([fw[i] for i in g if dg.get(i) == k] for k in {dg.get(i) for i in g}) if w), default=0)
         # cỡ lệch > 25%, hoặc độ đậm lệch >= 200 (08/10 r01: cùng danh sách mục đậm mục nhạt)
-        if max(sz) / max(1.0, min(sz)) > UNEVEN or max(wt) - min(wt) >= 200:
+        if max(sz) / max(1.0, min(sz)) > UNEVEN or wd >= 200:
             out.append({"type": "uneven_size", "ops": g, "sizes": {i: round(fs[i]) for i in g}, "weights": {i: fw[i] for i in g}})
     return out
 
@@ -1131,7 +1135,8 @@ def _role_groups(P: dict, M: dict, res: list, same_font: bool = True) -> list[li
         T.append((op["id"], float(np.median([m["size"] for m in Ls])), b))
     # DÒNG CÓ ĐẦU DÒNG (icon / tick ngay bên trái): nháp hay vẽ các mục một danh sách to nhỏ khác nhau (08/10 r01_s1: 34-38 so với
     # 30-32 px) -> cỡ nháp không đủ để nhận cùng vai; hai dòng cùng có đầu dòng và thẳng mép trái là một danh sách dù lệch tới 40%
-    bul = {c["near"].split()[-1] for c in M.get("I") or [] if str(c.get("near") or "").startswith("left of")}
+    bul = {c["near"].split()[-1] for c in M.get("I") or [] if str(c.get("near") or "").startswith("left of")} | \
+        {l["id"] for l in M.get("L") or [] if l.get("mark")}   # dấu đầu dòng đã nhập vào ô của dòng (slots._row_marks)
     has_bul = {op["id"] for op in P["ops"] if any(m in bul for m in op.get("marks") or [])}
     lim = lambda a, b: 1.4 if a[0] in has_bul and b[0] in has_bul else 1.15   # noqa: E731
     par = {t[0]: t[0] for t in T}

@@ -415,9 +415,42 @@ cong sinh ra SAU khi vỏ / chi tiết đã đo, nên các luật có sẵn khô
   dòng cong, lỗi nó định bắt (lùi về khối thẳng) giờ không còn đường xảy ra.
 - CHƯA đo (cần server): VLM thật có còn gộp ô cong với ô khác không; nhãn nghiêng nhiều dòng; "FLASH" + "SALE" xếp chồng.
 
+### 13/10: 3 lượt e2e đề bài dài (2638 nồi cơm, 1f85 studio, a9ed resort; mã TRƯỚC bản sửa chữ cong) -> đánh số theo khối, dấu đầu dòng
+
+Xem mắt: 2638 hỏng (VLM gộp L5-L8 của HAI cột vào một lệnh, icon đặt vào ô dòng chữ, câu ưu đãi + 3 ý mất, bộ kiểm 0 lỗi);
+1f85 hỏng (tiêu đề mất chữ "nghìn", mô tả co 0.54, ba ý co 0.46, icon lệch hàng); a9ed dùng được (mất 1 ý, danh sách 19 px so
+với nháp 26). Lời dặn COLUMNS của 12/10: **không đạt** (2638 gộp đúng theo số liền nhau).
+Người dùng chốt (13/10): nháp vẽ ít hàng hơn số ý thì CHỊU (không coi là lỗi, không vẽ lại nháp); câu dài là việc của VLM, chỉ
+viết lời dặn cho gọn, KHÔNG thêm vòng hỏi lại.
+- [mã] B2.5 `slots._renumber` / `_xy_order`: số ô L đánh theo KHỐI -- cắt đệ quy tại khe trống rộng nhất, cột trái hết rồi mới
+  sang cột phải; ngoại lệ BẢNG (một bên là cột giá trị, đa số ô toàn chữ số, mỗi ô cùng hàng với một ô bên kia): theo hàng "tên
+  rồi giá". 159 plan đã lưu: thứ tự đổi ở 55 poster; lệnh chữ nhiều ô mà các ô KHÔNG liền số 23 -> 5, cả 5 là lệnh VLM gộp nhầm
+  (2638, 320d x2, 472a hai dòng đáy cách nhau cả poster, cb04 nhảy qua một dòng) -- tức gộp đúng nay luôn là số liền nhau, gộp
+  nhầm thì không. Bảng giá dev2 2963 (8 cặp tên - giá VLM ghép theo hàng) giữ nguyên thứ tự. [prompt VLM] đoạn COLUMNS thay bằng
+  BLOCKS (ngắn hơn một nửa).
+- [mã] B2.5 `slots._row_marks` (`TEXTFIX_ROWMARK=0` để tắt): chi tiết nhỏ (cạnh dài <= 1.6 cao dòng, gần vuông) ngay bên trái
+  một dòng, cùng hàng, cách <= 1.2 cao dòng -> nhập vào Ô CỦA DÒNG (khung nới sang trái, "mark" trong plan.json), không còn là
+  ô I; VLM viết dấu ở đầu html của dòng. 159 plan: 21 chi tiết ở 6 poster, xem mắt cả 21 đều là tick / icon đầu dòng (VLM cũ:
+  15 icon, 6 skip vì hàng bị bỏ); loại được nét viền khung quanh dòng (99a1) nhờ điều kiện gần vuông. Icon to, đứng xa, không ở
+  bên trái dòng nào vẫn là ô I. Lưu ý: `slots_gt` chấm các dấu này là I -> F1 lớp I sẽ tụt theo thiết kế, chưa cập nhật đáp án.
+- [mã] quan hệ chi tiết - dòng: dòng CÙNG HÀNG trước, rồi mới dòng gần nhất (1f85: ba icon bên trái ba dòng đều ghi "below L5").
+- [mã] B3 `_guard` 1a: chữ không có trong câu khách nào, đứng đúng chỗ một chữ của câu lệnh khai -> THAY bằng chữ của khách
+  ("ngàn" -> "nghìn"), trước đây bị xoá. Thử 6 câu: chệch 1 chữ / chữ hoa được thay; rút gọn hợp lệ, nguyên văn không đổi; chữ
+  thừa cuối câu vẫn bị bỏ; sai dấu vẫn sửa như cũ. `validate`: lệnh icon / sao viết vào ô dòng chữ -> skip.
+- [mã] B4 `_uneven`: độ đậm chỉ so giữa các lệnh VLM khai cùng nhóm (a9ed: nhãn "Điểm nổi bật" đậm đứng thẳng cột với ba mục).
+- [prompt VLM] FIT: một đoạn duy nhất thay ba chỗ dặn rải rác -- chỗ là chỗ nháp vẽ, số ký tự nháp viết là trần, câu dài VIẾT LẠI
+  NGẮN bằng chữ của khách, có ví dụ; không đổi chữ khách bằng từ đồng nghĩa. Row marks viết lại theo "row mark in front".
+- Đo: dựng lại 139 plan (dev2 62, dev3 58, form1 19) mã cũ / mới: 138 không đổi, d24_v1 hết 1 uneven_size báo nhầm. Ba plan mới:
+  2638 hai icon nhầm ô bị bỏ, a9ed hết uneven_size. Đo ô lại ba nháp: 2638 đoạn mô tả L5-L8, ba gạch L9-L11; 1f85 ba icon nhập
+  vào L6-L8.
+- CHƯA đo (cần VLM thật): VLM có hết gộp hai cột không; có viết dấu đầu dòng trong lệnh chữ không; FIT có làm câu ngắn lại không.
+
 ## Lượt chạy server tiếp theo
 
 Cập nhật mã (docs/SERVER.md), khởi động lại máy chủ **và kernel**, rồi:
+0a. Đề bài dài sau sửa 13/10 (không cần GEO): chạy lại đúng ba đề nồi cơm / studio chụp ảnh / resort trên giao diện, tải
+   "Tải debug (zip)" cả ba một lần. Xem: lệnh chữ nhiều ô có cùng một khối không, dòng có "mark" có dấu ở đầu chữ không, lệnh
+   nào còn "co còn" dưới 0.7.
 0. Chữ cong sau sửa 13/10: `export TEXTFIX_GEO=on`, chạy lại đúng hai đề bài con dấu tiệm bánh và donut trên giao diện (tải
    "Tải debug (zip)"), rồi `%run scripts/dev_batch.py bench/dev3.json --only g01,g02,g03,g04,g05,g06,g07,g08,g09,g10,g11,g12,g13,g14,g15,g16 --fresh`.
    Xem trong plan.json: log "chữ arc: ... {cx, cy, r ...}", không còn "vỏ ... chứa chữ được viết" trên ô cong, và có / không dòng

@@ -264,6 +264,126 @@ def _layers(draft: np.ndarray, plate: np.ndarray, A: np.ndarray, L: list, masks:
     return O, S, I, shells, fake
 
 
+ROWMARK = os.environ.get("TEXTFIX_ROWMARK", "1") != "0"   # dấu đầu dòng nhập vào ô của dòng (13/10); 0 = để thành ô I như trước
+MARK_MAX = 1.6    # dấu đầu dòng: cạnh dài <= 1.6 cao dòng (icon to hơn là hình minh hoạ / avatar: vẫn là ô I riêng)
+MARK_SQUARE = 0.4   # ... và gọn: cạnh ngắn >= 0.4 cạnh dài (chấm, tick, icon đều gần vuông)
+MARK_GAP = 1.2    # ... cách mép trái dòng <= 1.2 cao dòng, tâm nằm trong chiều cao dòng (nới 0.25 cao)
+
+
+def _row_marks(L: list, I: list) -> tuple[list, list[str]]:
+    """DẤU ĐẦU DÒNG (chấm, tick, icon nhỏ ngay bên trái một dòng, cùng hàng) nhập vào Ô CỦA DÒNG ĐÓ: khung dòng nới sang trái ôm
+    cả dấu, l["mark"] ghi lại; chi tiết đó không còn là ô I. Lý do (13/10 run 1f85, 93f1): dấu và chữ là hai lệnh rời thì lệch
+    cỡ, lệch hàng, dấu còn chữ mất hoặc ngược lại; OCR vốn đã gộp chấm "•" vào dòng ở nhiều poster nên cùng một danh sách có
+    hàng ôm dấu, hàng không -> lề thò thụt. Icon to / đứng xa / không nằm bên trái dòng nào giữ nguyên là ô I. -> (I còn lại, log)."""
+    log, rest = [], []
+    for c in I:
+        x0, y0, x1, y1 = c["box"]
+        cy, side = (y0 + y1) / 2, max(x1 - x0, y1 - y0)
+        best = None
+        if min(x1 - x0, y1 - y0) < MARK_SQUARE * side:   # mảnh dẹt / dài: nét viền khung quanh dòng (dev2 99a1), gạch kẻ -- không phải dấu
+            rest.append(c)
+            continue
+        for l in L:
+            if l.get("path") or abs(l.get("angle") or 0) >= 2 or l.get("shell") != c.get("shell"):
+                continue
+            lx0, ly0, lx1, ly1 = l["box"]
+            h = ly1 - ly0
+            gap = lx0 - x1
+            if ly0 - 0.25 * h <= cy <= ly1 + 0.25 * h and -0.3 * h <= gap <= MARK_GAP * h and side <= MARK_MAX * h and x0 < lx0 \
+                    and (best is None or gap < best[0]):
+                best = (gap, l)
+        if best is None:
+            rest.append(c)
+            continue
+        l = best[1]
+        b = l["box"]
+        mb = (l.get("mark") or {}).get("box") or c["box"]
+        l["mark"] = {"box": [min(mb[0], x0), min(mb[1], y0), max(mb[2], x1), max(mb[3], y1)], "color": c.get("color")}
+        l["box"] = [min(b[0], x0), b[1], b[2], b[3]]
+        l["ocr_box"] = list(l["box"])
+        l["poly"] = [[l["box"][0], b[1]], [b[2], b[1]], [b[2], b[3]], [l["box"][0], b[3]]]
+        log.append(f"dấu đầu dòng {c['id']} {[round(v) for v in c['box']]} -> nhập vào {l['id']}")
+    for k, c in enumerate(rest, 1):
+        c["id"] = f"I{k}"
+    return rest, log
+
+
+def _xy_order(boxes: list, texts: list | None = None) -> list[int]:
+    """Thứ tự ĐỌC THEO KHỐI của các khung: cắt đệ quy tại khe trống RỘNG NHẤT (ngang hay dọc). Khe giữa hai cột chữ rộng hơn khe
+    giữa các dòng trong một cột nên cột trái được xếp hết rồi mới tới cột phải; tiêu đề chạy ngang cả poster tách ra trước nhờ
+    khe phía dưới nó. Không có khe nào: trên xuống, trái sang.
+    BẢNG (texts = chữ OCR từng khung): một bên khe dọc là CỘT GIÁ TRỊ (>= 2 ô, đa số ô toàn chữ số: giá, giờ, số lượng) và mỗi ô
+    đứng cùng hàng với một ô bên kia -> đó là các HÀNG "tên ... giá", xếp theo hàng (tên rồi giá của nó), không theo cột
+    (dev2 2963: bảng giá 8 hàng, VLM ghép từng cặp tên - giá)."""
+    def valuey(i):
+        t = [ch for ch in (texts[i] if texts else "") if ch.isalnum()]
+        return bool(t) and sum(ch.isdigit() for ch in t) >= 0.5 * len(t)
+
+    def table(a, b):   # b là cột giá trị của a (hoặc ngược lại)?
+        for v, o in ((b, a), (a, b)):
+            if len(v) >= 2 and sum(valuey(i) for i in v) >= 0.6 * len(v) and all(
+                    any(abs((boxes[i][1] + boxes[i][3]) - (boxes[j][1] + boxes[j][3])) / 2 <= 0.5 * (boxes[i][3] - boxes[i][1]) for j in o)
+                    for i in v):
+                return True
+        return False
+
+    def rows(idx):   # theo hàng: các ô có tâm lệch <= nửa cao là một hàng, trong hàng trái sang
+        out, left = [], sorted(idx, key=lambda i: (boxes[i][1] + boxes[i][3]) / 2)
+        while left:
+            i0 = left[0]
+            h, cy = boxes[i0][3] - boxes[i0][1], (boxes[i0][1] + boxes[i0][3]) / 2
+            row = [i for i in left if abs((boxes[i][1] + boxes[i][3]) / 2 - cy) <= 0.5 * h]
+            out += sorted(row, key=lambda i: boxes[i][0])
+            left = [i for i in left if i not in row]
+        return out
+
+    def gaps(idx, lo, hi):   # các khe trống trên một trục -> [(bề rộng khe, toạ độ cắt)]
+        iv = sorted((boxes[i][lo], boxes[i][hi]) for i in idx)
+        out, end = [], iv[0][1]
+        for a, b in iv[1:]:
+            if a > end:
+                out.append((a - end, (a + end) / 2))
+            end = max(end, b)
+        return out
+
+    def rec(idx):
+        if len(idx) <= 1:
+            return list(idx)
+        gy, gx = gaps(idx, 1, 3), gaps(idx, 0, 2)
+        by, bx = max(gy, default=(0, 0)), max(gx, default=(0, 0))
+        if by[0] <= 0 and bx[0] <= 0:
+            return sorted(idx, key=lambda i: ((boxes[i][1] + boxes[i][3]) / 2, boxes[i][0]))
+        lo, hi, cut = (1, 3, by[1]) if by[0] >= bx[0] else (0, 2, bx[1])
+        a = [i for i in idx if (boxes[i][lo] + boxes[i][hi]) / 2 < cut]
+        b = [i for i in idx if i not in a]
+        if not a or not b:
+            return sorted(idx, key=lambda i: ((boxes[i][1] + boxes[i][3]) / 2, boxes[i][0]))
+        if lo == 0 and table(a, b):
+            return rows(idx)
+        return rec(a) + rec(b)
+    return rec(list(range(len(boxes))))
+
+
+def _renumber(L: list, S: list, I: list, logs: list[str]) -> tuple[list, list[str]]:
+    """ĐÁNH SỐ Ô L THEO KHỐI (13/10 run 2638; 12/10 run 320d): OCR trả dòng theo từng hàng ngang qua cả poster, hai cột chữ đứng
+    cạnh nhau bị đánh số xen kẽ (L5 trái, L6 phải, L7 trái...) và VLM gộp theo số liền nhau -- lời dặn "đừng gộp theo số" không
+    giữ được nó. Đánh lại để số liền nhau = cùng một khối; id trong vỏ, quan hệ của chi tiết và log đổi theo. -> (L, logs)."""
+    order = _xy_order([l["box"] for l in L], [l.get("ocr") or "" for l in L])
+    new = {L[i]["id"]: f"L{k}" for k, i in enumerate(order, 1)}
+    if all(a == b for a, b in new.items()):
+        return L, logs
+    sub = lambda t: re.sub(r"(?<![A-Za-z0-9])L\d+(?![0-9])", lambda m: new.get(m.group(0), m.group(0)), t)   # noqa: E731
+    out = [L[i] for i in order]
+    for l in out:
+        l["id"] = new[l["id"]]
+    for s_ in S:
+        s_["lines"] = sorted((new.get(i, i) for i in s_.get("lines") or []), key=lambda i: int(i[1:]))
+    for c in I:
+        if c.get("near"):
+            c["near"] = sub(c["near"])
+    return out, [sub(t) for t in logs]
+
+
 def build(draft: np.ndarray, plate: np.ndarray, product: bool = False) -> dict:
     """Ô của nháp: L# (dòng OCR nguyên khung + số đo nét, vỏ chứa nó), S# vỏ, I# chi tiết nhỏ (overlay.overlay)."""
     H, W = draft.shape[:2]
@@ -288,6 +408,9 @@ def build(draft: np.ndarray, plate: np.ndarray, product: bool = False) -> dict:
             O, S, I, shells, fake = _layers(draft, plate, A, L, masks)
         if geo.RUNS:
             L, glog2 = geo.runs(L)
+    mlog = []
+    if ROWMARK:
+        I, mlog = _row_marks(L, I)
     for s in S:   # dòng trong vỏ: tính lại theo điểm trên dòng (ô đã gộp; dòng cong: điểm giữa chữ, không phải tâm khung thẳng)
         x0, y0, x1, y1 = s["box"]
         s["lines"] = [l["id"] for l in L if x0 <= _anchor(l)[0] <= x1 and y0 <= _anchor(l)[1] <= y1]
@@ -298,7 +421,10 @@ def build(draft: np.ndarray, plate: np.ndarray, product: bool = False) -> dict:
     for c in I:   # quan hệ với dòng gần nhất (gợi ý cho VLM: avatar cạnh tên, sao dưới tên, icon đầu dòng)
         cx, cy = (c["box"][0] + c["box"][2]) / 2, (c["box"][1] + c["box"][3]) / 2
         best = None
-        for l in L:
+        # dòng CÙNG HÀNG trước (13/10 run 1f85: ba icon ngay bên trái ba dòng tính năng đều bị ghi "below L5" vì dòng mô tả dài
+        # phía trên gần hơn theo khoảng cách -> VLM đặt icon lệch hàng), rồi mới tới dòng gần nhất
+        row = [l for l in L if l["box"][1] <= cy <= l["box"][3]]
+        for l in row or L:
             x0, y0, x1, y1 = l["box"]
             dx, dy = max(x0 - cx, 0, cx - x1), max(y0 - cy, 0, cy - y1)
             d = float(np.hypot(dx, dy))
@@ -307,9 +433,10 @@ def build(draft: np.ndarray, plate: np.ndarray, product: bool = False) -> dict:
                     "below" if cy > y1 else "on"
                 best = (d, l["id"], side)
         c["near"] = f"{best[2]} {best[1]}" if best and best[0] <= 3 * max(8.0, c["box"][3] - c["box"][1]) else None
+    L, glog = _renumber(L, S, I, glog + glog2 + mlog)
     # mask: lớp phủ (nháp - bản xoá đã dọn), cho "keep" dán lại trọn mảng bị xoá (không ghi JSON)
     return {"L": L, "S": S, "I": I, "size": [W, H], "by": {m["id"]: m for m in L + S + I}, "mask": O["mask"], "shells": shells,
-            "geo_log": glog + glog2 + [f"vỏ giả (màu lòng = màu chữ) {[round(v) for v in f['box']]} -> bỏ ô vỏ" for f in fake]}
+            "geo_log": glog + [f"vỏ giả (màu lòng = màu chữ) {[round(v) for v in f['box']]} -> bỏ ô vỏ" for f in fake]}
 
 
 def _geo_lines(L: list, I: list, draft: np.ndarray, A: np.ndarray, Bp: np.ndarray, shells: list,
@@ -487,7 +614,7 @@ def attach_shells(M: dict, draft: np.ndarray, plate: np.ndarray) -> dict:
 
 def public(M: dict) -> dict:
     """Ô để ghi JSON."""
-    return {"L": [{k: m[k] for k in ("id", "box", "ocr_box", "ocr", "size", "color", "angle", "shell", "curve", "runs", "geo", "path", "scale", "missed", "poly") if k in m}
+    return {"L": [{k: m[k] for k in ("id", "box", "ocr_box", "ocr", "size", "color", "angle", "shell", "curve", "runs", "geo", "path", "scale", "missed", "mark", "poly") if k in m}
                   for m in M["L"]],
             "S": M["S"], "I": M["I"]}
 
@@ -578,12 +705,17 @@ words or numbers there.
 - Every slot id appears in exactly ONE op -- never leave a slot out (use "skip" to drop it).
 
 TEXT
-- Decide what the model meant to write on each line and write it at about the size it drew, keeping its line breaks (<br> \
-between the lines of a multi-line op). Write about as many characters per line as the model wrote there -- never much more: \
-crammed text gets shrunk and looks bad.
-- A client text longer than the lines the model gave it: shorten or rephrase it so it fits naturally; facts (names, prices, \
-numbers, dates, phones, addresses, emails, links) are never changed, abbreviated or invented -- keep them exact (Quận 3 \
-stays "Quận 3", never "Q.3") or leave them out; the unit belongs to the number (15-25 triệu, 35.000đ, 30 phút, 50%): never drop it. Set \
+- Decide what the model meant to write on each line and write it at the size it drew, keeping its line breaks (<br> \
+between the lines of a multi-line op).
+- FIT -- the room is what the model drew, never what the client wrote. Each line lists how many characters the model wrote \
+there: that is the most the line holds (the model's letters are thin; real letters are wider), fewer is fine. A client text \
+longer than its room is REWRITTEN SHORT, in the client's own words, until it fits at the drawn size: keep the key words, \
+drop the rest. A 20-word description drawn as two short lines becomes one short phrase ("Hỗ trợ nấu cơm chín đều, giữ độ \
+mềm dẻo và giúp việc chuẩn bị bữa ăn hằng ngày trở nên thuận tiện" in a 2 x 22-character slot -> "Cơm chín đều, \
+mềm dẻo<br>mỗi bữa ăn"). Never the full sentence at a smaller size, never extra lines the model did not draw.
+- Facts (names, prices, numbers, dates, phones, addresses, emails, links) are never changed, abbreviated or invented -- keep \
+them exact (Quận 3 stays "Quận 3", never "Q.3") or leave them out; the unit belongs to the number (15-25 triệu, 35.000đ, \
+30 phút, 50%): never drop it. Never swap a client word for a synonym (nghìn stays "nghìn", never "ngàn"). Set \
 "client": "T<i>" on ops writing (part of) a client text; list client texts the model did not draw, or that you dropped, in \
 "missing".
 - Client texts marked OURS are filler copy we wrote (a headline, tagline, button or section label the client did not give): \
@@ -597,11 +729,10 @@ claims a client text.
 - One client text drawn over several stacked lines (MENU / TRÀ SỮA): one op with all those slots, <br> between the lines. \
 Read the OCR letters to find those lines even when garbled: a short slot below a line that ends its sentence ("chainn vi" \
 under "Coffee rang moc") is that text's second line, never the start of another text.
-- COLUMNS: slot numbers run row by row across the whole poster, so two text blocks standing side by side have their lines \
-numbered alternately (L6 left, L7 right, L8 left, L9 right). Never merge by consecutive numbers: check the boxes. The slots of \
-one op must be stacked one under the other in the SAME column (their x ranges overlap); lines side by side at the same height \
-with a wide gap between them belong to different blocks and different ops. (Only pieces of ONE drawn line that OCR cut in \
-two -- same height, same size, a word gap apart -- go together.)
+- BLOCKS: L# numbers follow the reading order block by block -- a column of text is numbered top to bottom before the \
+column beside it starts. The slots of one op are consecutive lines of ONE block, stacked one under the other; lines side by \
+side belong to different ops. (Only pieces of ONE drawn line that OCR cut in two -- same height, same size, a word gap \
+apart -- go together.)
 - List items, steps and item / price rows keep the client's order and pairing (each name with its own price, steps \
 1, 2, 3 in order), even where the draft drew them in another order.
 - Text the model invented: write what it was meant to say from its role, position and the PROMPT, a natural line of about the \
@@ -635,14 +766,14 @@ when the background is busy or mid-tone, add a subtle text-shadow or a shell, in
 no S# slot covers it), recreate it in that text op's box_style (background, border-radius, a little padding) in the draft's \
 colors -- a call-to-action must never end up as bare text. Only then: a line inside an S# shell, or on a shell the BASE still shows, never gets its own background or border (no card inside a card).
 - Alignment: keep the draft's alignment per block -- a centered headline stays centered, a left column stays left.
-- Size: write every line at the size measured for its slot; fine print, labels and footers too -- never smaller "to be safe". \
-If a text does not fit, shorten it (facts stay exact) rather than shrinking it.
+- Size: write every line at the size measured for its slot; fine print, labels and footers too -- never smaller "to be safe".
 - Lists: keep the draft's list structure -- one item per row, each row keeps its own text next to its bullet / check / icon; \
 never merge list rows into one block and never leave a bullet or icon without its text. Every list row (bullet / feature / step) starts with a capital letter, and all rows of one list carry the same "group" name with "group_kind": "list".
-- Row marks: when the draft shows a bullet / check / small icon in front of a row, look at the BASE image. Mark still there \
--> write only the text. Mark erased and no I# slot for it -> draw it yourself at the start of that row's html ("• " or an \
-<i-icon>), the same mark on every row of the group. Copy the mark the draft drew: a small dot -> "• " (a text bullet, the \
-size of the text); an <i-icon> only where the draft drew a real icon or check mark, never a big ring for a dot.
+- Row marks: a line listed with "row mark in front" has a bullet / check / small icon at its left INSIDE the slot. Start that \
+row's html with the mark and a space: "• " for a dot, <i-icon name="..." color="#hex"></i-icon> for a real icon or check \
+mark (drawn at the size of the text) -- the same kind of mark on every row of the list, never a big ring for a dot. A row \
+without that note whose mark the BASE still shows gets only the text; a mark the eraser removed that has no I# slot is \
+drawn the same way, at the start of the row's html.
 - Slanted (italic / oblique) lettering in the draft stays italic; tracked (widely spaced) headlines keep their letter-spacing.
 - Weight and family: a heavy / black headline stays heavy (font-weight 800-900 in a font that has it), a script stays a \
 script font, a wide headline is never set in a condensed font (or the reverse). Unset weight = the weight measured on the draft.
@@ -671,9 +802,8 @@ Fill the rows top to bottom in order and skip only the LAST extra rows -- never 
 drawn bullet, each short enough for its row, first letter capital, in the client's order. Never pack two or three items \
 into one row and never leave a drawn bullet empty while another row is crammed; items that get no row are dropped \
 ("missing") or two short ones share a row only where the draft drew them so.
-- Text in a pill / button / badge / band: the shell fixes the room. A sentence much longer than the line the model drew there \
-is shortened to its key words (facts exact: "Tặng buổi tư vấn đầu cho khách mới") so it stays at the drawn size -- never a \
-full sentence shrunk to fine print inside its shell.
+- Text in a pill / button / badge / band: the shell fixes the room -- FIT applies strictly (facts exact: "Tặng buổi tư vấn \
+đầu cho khách mới"), never a full sentence shrunk to fine print inside its shell.
 - A badge / seal / shell the BASE still shows is never left EMPTY: when the lines the model drew inside it are invented \
 or do not match any client text, write ONE short phrase taken from the client texts there (the key number or benefit: \
 "14 ngày", "1 tỷ lợi khuẩn", "Tặng bình giữ nhiệt") and skip the other lines -- an empty badge is worse than a short one.
@@ -819,7 +949,8 @@ def describe(M: dict) -> str:
     de = "\n".join(f"{c['id']}: detail {_px(c['box'])}, color {c['color']}" + (f", inside {c['shell']}" if c.get("shell") else "")
                    + (f", {c['near']}" if c.get("near") else "") for c in M["I"]) or "(none)"
     tilt = lambda m: (_curve_note(m) if m.get("path") else f", drawn at {m['angle']:.0f} degrees" if abs(m.get("angle") or 0) >= 2   # noqa: E731
-                      else "") + (", OCR missed this line: the letters read here are a guess" if m.get("missed") else "")
+                      else "") + (", OCR missed this line: the letters read here are a guess" if m.get("missed") else "") \
+        + (", row mark in front (inside this slot)" if m.get("mark") else "")
     li = "\n".join(f"{m['id']}: \"{m['ocr']}\" (text ~{m['size']:.0f}px, ~{len(m['ocr'])} characters, color {m['color']}"
                    + (f", inside {m['shell']}" if m.get("shell") else "") + f"{tilt(m)}{_look(m)})" for m in M["L"]) or "(none)"
     return f"Shells:\n{sh}\n\nDetails:\n{de}\n\nText lines:\n{li}"
@@ -988,6 +1119,11 @@ def validate(P: dict, M: dict, texts: list[dict] | None = None, product: bool = 
             log.append(f"{op.get('id')}: bỏ id không có {sorted(set(op.get('marks') or []) - set(mk))}")
         if not mk:
             continue
+        # ICON VIẾT VÀO Ô DÒNG CHỮ (13/10 run 2638: VLM đặt icon vào L9, L11 -- hai dòng của đoạn mô tả): ô L là chữ, icon ở đó
+        # là nhầm ô -> bỏ lệnh (nền đã xoá sạch)
+        if op.get("kind") in ("icon", "stars") and all(m.startswith("L") for m in mk):
+            log.append(f"{op.get('id')}: {op['kind']} viết vào ô dòng chữ {mk} -> skip")
+            op = {**op, "kind": "skip", "html": "", "why": "guard: icon on a text line"}
         # Ô CHỮ CONG ĐI MỘT MÌNH (13/10 run ba93: VLM gộp ô vòm với ô thẳng bên cạnh thành một lệnh -> bộ dựng không có đường
         # nào cho "một vòm + một khung", dựng thành khối chữ thẳng đè lên hình giữa con dấu). Lệnh chữ có ô cong lẫn ô L khác:
         # cả câu viết theo đường cong (dài nhất nếu nhiều), các ô L còn lại để trống -- chữ nén trên vòm vẫn đúng dáng nháp.
@@ -1268,6 +1404,30 @@ def _guard(ops: list[dict], M: dict, texts: list[dict]) -> tuple[list[dict], lis
                 log.append(f"{op.get('id')}: sửa dấu theo câu khách {plain!r} -> {_plain(new)!r}")
                 op = {**op, "html": new}
         if own is not None:
+            # 1a. CHỮ CHỆCH (13/10 run 1f85: VLM viết "ngàn" cho "nghìn"; luật 1b xoá "ngàn", tiêu đề mất một chữ): chữ không có
+            #     trong câu khách nào, đứng đúng chỗ MỘT chữ của câu này (hai bên khớp) -> thay bằng chữ của khách.
+            fv = {_fold(w) for w in vocab_all}
+            parts = re.split(r"(<[^>]+>|&\w+;|&#\d+;)", op["html"])
+            mine = [w for p_ in parts if not p_.startswith(("<", "&")) for w in WORD.findall(p_)]
+            theirs = WORD.findall(own)
+            swap = {}
+            for tag, i1, i2, j1, j2 in SequenceMatcher(None, [_fold(w) for w in mine], [_fold(w) for w in theirs], autojunk=False).get_opcodes():
+                if tag == "replace" and i2 - i1 == j2 - j1:
+                    for a, b in zip(range(i1, i2), range(j1, j2)):
+                        w = mine[a]
+                        if _fold(w) not in fv and not any(ch.isdigit() for ch in w + theirs[b]):
+                            c = theirs[b]
+                            swap[a] = c.upper() if w.isupper() else (c[:1].upper() + c[1:]) if w[:1].isupper() and a == 0 else c
+            if swap:
+                n = [-1]
+
+                def put(m, n=n, swap=swap):
+                    n[0] += 1
+                    return swap.get(n[0], m.group(0))
+                new = "".join(p_ if p_.startswith(("<", "&")) else WORD.sub(put, p_) for p_ in parts)
+                log.append(f"{op.get('id')}: chữ chệch {[mine[a] for a in swap]} -> chữ của khách {list(swap.values())}: {_plain(new)!r}")
+                op = {**op, "html": new}
+                plain = _plain(new)
             # 1b. CHỮ THỪA: lệnh viết câu khách mà chen chữ (chữ cái) không có trong câu khách nào -- chép chữ méo của nháp (09/10
             #     dev2 d24: nháp "CUỐI TUÃ / TUẬN" -> "CUỐI TỬA<br>TUẦN") -> bỏ chữ đó. Số để luật 2b / câu ngắn lo.
             fv = {_fold(w) for w in vocab_all}
