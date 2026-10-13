@@ -34,14 +34,15 @@ with Browser() as B:
             if not m.get("run_id") or (only and cid not in only):
                 continue
             r = f"output/{setn}/{m['run_id']}/v0/"
-            if not (os.path.exists(r + "plan.json") and os.path.exists(r + "draft.png") and os.path.exists(r + "plate.png")):
+            img = lambda k: next((r + k + e for e in (".png", ".jpg") if os.path.exists(r + k + e)), None)   # noqa: E731
+            if not (os.path.exists(r + "plan.json") and img("draft") and img("plate")):
                 continue
             P = json.load(open(r + "plan.json", encoding="utf-8"))
             if not (P.get("slots") or {}).get("L"):
                 continue
             T = json.load(open(f"output/{setn}/{m['run_id']}/brief.json", encoding="utf-8"))["texts"]
-            D = np.asarray(Image.open(r + "draft.png").convert("RGB"))
-            Pl = np.asarray(Image.open(r + "plate.png").convert("RGB").resize((D.shape[1], D.shape[0])))
+            D = np.asarray(Image.open(img("draft")).convert("RGB"))
+            Pl = np.asarray(Image.open(img("plate")).convert("RGB").resize((D.shape[1], D.shape[0])))
             for l in P["slots"]["L"]:
                 if l.get("ocr_box"):
                     l["box"] = list(l["ocr_box"])
@@ -54,7 +55,7 @@ with Browser() as B:
             poster, res, rlog = render.render(B.page, base, P2, M)
             errs = render.check(P2, M, res)
             fl = audit.flags({**P2, "errors": errs, "errors_first": errs, "log": flog + vlog + log + rlog})
-            old = Image.open(r + "poster.jpg" if os.path.exists(r + "poster.jpg") else r + "poster.png").convert("RGB")
+            old = Image.open(img("poster")).convert("RGB")
             tiles = [Image.fromarray(D), old, Image.fromarray(base), Image.fromarray(np.asarray(poster))]
             h = 640
             tiles = [t.resize((round(t.width * h / t.height), h)) for t in tiles]

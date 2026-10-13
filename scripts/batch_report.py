@@ -11,10 +11,9 @@
    tải riêng tệp này về mở bằng trình duyệt là xem được (dưới 24 MB), bấm ảnh để phóng to.
    Mở bằng trình duyệt qua chính máy chủ TextFix đang chạy, không cần tải gì:
        https://<địa-chỉ-jupyter>/user/<tên>/proxy/8088/outputs/_reports/<tập>.html
-3. GÓI MỘT ZIP NHẸ: output/runs_zip/<tập>_report_<giờ>.zip (dưới 24 MB): tờ ảnh ghép + trang HTML + ảnh thu nhỏ (poster cạnh
-   dài 1024 để soi được viền chữ) + plan.json / brief.json /
-   request.json của từng ca + manifest -- đủ để chấm bằng mắt và truy nguyên nhân tại máy cá nhân. Tải MỘT tệp này từ cây thư
-   mục JupyterLab (chuột phải > Download). Cần đo lại ô từ ảnh gốc thì mới phải gói đầy đủ: `dev_batch.py ... --full`.
+3. GÓI MỘT ZIP: output/runs_zip/<tập>_report_<giờ>.zip (dưới 24 MB): mỗi ca nháp + bản xoá + poster (JPG) + plan.json /
+   brief.json / request.json + manifest -- đủ để Claude chấm bằng mắt VÀ dựng lại bước gỡ chữ tại máy cá nhân. Tải MỘT tệp này
+   từ cây thư mục JupyterLab (chuột phải > Download). Ảnh PNG gốc từng điểm ảnh thì mới cần `dev_batch.py ... --full`.
 """
 
 from __future__ import annotations
@@ -217,23 +216,43 @@ def main(argv: list[str] | None = None) -> int:
           f" hoặc mở ngay trong JupyterLab (bấm Trust HTML); qua cổng máy chủ: .../proxy/{port}/outputs/_reports/{name}.html")
     if a.no_zip:
         return 0
-    # ---- một zip nhẹ
+    # ---- MỘT zip đủ để chấm VÀ dựng lại tại máy cá nhân (13/10: người dùng muốn tải ít zip nhất): mỗi ca  nháp + bản xoá + poster
+    # (JPG) + plan / brief / request. Trang HTML, tờ ảnh ghép, ảnh thu nhỏ KHÔNG gói -- xem trên máy chủ, và dựng lại được từ đây.
+    # Vượt 23 MB thì hạ dần chất lượng JPG (nháp / bản xoá để đo màu nên giữ cao nhất có thể).
+    import io
+    from PIL import Image
     zdir = ROOT / "output" / "runs_zip"
     zdir.mkdir(parents=True, exist_ok=True)
     zp = zdir / f"{name}_report_{time.strftime('%m%d_%H%M%S')}.zip"
+
+    def jpg(src: Path, q: int) -> bytes:
+        b = io.BytesIO()
+        Image.open(src).convert("RGB").save(b, "JPEG", quality=q, subsampling=0 if q >= 90 else 2)
+        return b.getvalue()
+
+    for q in (92, 88, 84, 78, 70):
+        items, total = [], 0
+        for key, cid, s_, old, vd, th, run in rows:
+            rd, v = a.runs / run, s_["dir"]
+            for kind in ("draft", "plate", "poster"):
+                src = next((v / n for n in (f"{kind}.png", f"{kind}.jpg") if (v / n).exists()), None)
+                if src is not None:
+                    data = jpg(src, q if kind != "poster" else min(q, 86))
+                    items.append((f"runs/{run}/{v.name}/{kind}.jpg", data))
+                    total += len(data)
+        if total <= 23 * 2**20:
+            break
     with zipfile.ZipFile(zp, "w", zipfile.ZIP_DEFLATED) as z:
-        z.write(rep / f"{name}.html", f"{name}.html")
         z.write(mf, mf.name)
-        for f in sorted(tdir.glob("*.jpg")):
-            z.write(f, f"{name}/{f.name}", compress_type=zipfile.ZIP_STORED)
-        for f in sh:
-            z.write(f, f"sheets/{f.name}", compress_type=zipfile.ZIP_STORED)
-        for key, cid, s, old, vd, th, run in rows:
+        z.writestr("README.txt", f"{head} | JPG chất lượng {q} | giải nén: runs/<lượt>/... -> output/{name}/<lượt>/...")
+        for arc, data in items:
+            z.writestr(arc, data, compress_type=zipfile.ZIP_STORED)
+        for run in sorted({r[6] for r in rows}):
             rd = a.runs / run
-            for f in (rd / "brief.json", rd / "request.json", s["dir"] / "plan.json"):
+            for f in [rd / "brief.json", rd / "request.json", *sorted(rd.glob("v*/plan.json"))]:
                 if f.exists():
                     z.write(f, f"runs/{run}/{f.relative_to(rd).as_posix()}")
-    print(f"Một tệp để tải về (nếu cần Claude chấm): {zp}  ({zp.stat().st_size / 2**20:.1f} MB)")
+    print(f"MỘT tệp để tải về cho Claude (nháp + bản xoá + poster + plan, JPG chất lượng {q}): {zp}  ({zp.stat().st_size / 2**20:.1f} MB)")
     return 0
 
 

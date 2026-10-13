@@ -599,6 +599,20 @@ trang `output/runs/_reports/<tập>.html` (mở qua `.../proxy/8088/outputs/_rep
 Cờ nghi hỏng đo trên 39 poster accept1 chấm mắt: bộ kiểm hình học riêng bắt 6 / 15 poster hỏng, báo nhầm 6 / 24; gộp cờ bắt 11 / 15,
 báo nhầm 6 / 24 -- dùng để theo dõi xu hướng và chọn poster cần xem, chưa đủ để quyết định tự động.
 
+**Mốc `mix1` lượt đầu (chạy bằng 5fad3b5, TRƯỚC bản sửa nút bị lau giữa ef5904e; chấm thô trên tờ ảnh ghép, 34 poster):**
+đẹp 14, dùng được 15, hỏng 5 (accept1 đường cũ: 15 / 39 hỏng; hai bộ đề khác nhau). Năm poster hỏng: c01 con dấu mất vòng
+(gỡ chữ), x04 cầu vồng bị mảng kem cắt ngang (gỡ chữ), p02 mất danh sách + vòng giá và nút trống + nhãn trên gói thứ hai bị
+xoá (VLM bỏ dòng; chữ sản phẩm không được giữ -- phải truy), t03 nút "Tặng Pepsi" trống, chữ chạy xuống đáy (VLM), t02 mất cột
+ngày / buổi học (VLM bỏ dòng). Nhẹ hơn: v05 nút "Trả góp 0%" có khối đen ở giữa, m03 nút có vệt trắng, t01 / f05 mảng mờ đục
+quanh chữ trên nền có vân, i05 huy hiệu trống, i04 / f02 chữ co quá nhỏ. Lỗi chia gần đều giữa GỠ CHỮ và VLM BỎ DÒNG (mỗi dòng
+bỏ = một nút trống).
+
+**Zip báo cáo (13/10 tối, người dùng: tải ít zip nhất, đủ thông tin):** `batch_report.py` gói MỘT tệp
+`output/runs_zip/<tập>_report_<giờ>.zip` = mỗi ca nháp + bản xoá + poster (JPG chất lượng 92, tự hạ nếu vượt 23 MB) + plan /
+brief / request + manifest; trang HTML / tờ ảnh ghép không gói (xem trên máy chủ). 42 poster accept1: 20,9 MB.
+`lonly_replay.py` đọc được .jpg. JPG 92 so với PNG trên 10 poster: 9 / 10 poster giữ nguyên cách xử lý từng dòng, nền lệch trung
+bình 1,06 mức xám -- đủ để thử sửa bước gỡ chữ tại máy, số ngưỡng sát biên thì xác nhận lại trên máy chủ.
+
 **Lượt kế (13/10 tối): tập mới `mix1`, chỉ chế độ chỉ dòng chữ, xem mắt:**
 ```
 source ~/textfix_env.sh; export TEXTFIX_GEO=on TEXTFIX_LONLY=on
