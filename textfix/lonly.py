@@ -42,6 +42,7 @@ def view(M: dict) -> dict:
     return {**M, "L": L, "S": [], "I": [], "shells": {}, "by": {l["id"]: l for l in L}, "lonly": True}
 
 
+LOOSE = 0.4       # ghép dòng bị bỏ với câu khách còn thừa: chữ nháp giống >= 0.4
 COVER_MIN = 0.6   # VLM trả lệnh cho < 60% số dòng = câu trả lời bị cụt (mix1 p02: 1 lệnh / 10 dòng) -> gọi lại một lần
 
 
@@ -64,13 +65,25 @@ def fill_gaps(P: dict, M: dict, texts: list[dict]) -> tuple[dict, list[str]]:
     if not gaps:
         return P, log
     gone = {l["id"] for l in gaps}
+    # câu khách CHƯA lệnh nào viết: ghép một - một với các dòng bị bỏ theo độ giống chữ nháp, ngưỡng thấp (LOOSE) -- chữ nháp méo
+    # nặng ("Tio shard" = "Tiêu chuẩn") không qua được ngưỡng chung, nhưng trong số câu còn thừa thì nó vẫn là câu giống nhất
+    from difflib import SequenceMatcher
+    used = {slots._tid(op.get("client")) for op in P.get("ops") or [] if op.get("kind") == "text" and op.get("html")}
+    wrote = " ".join(slots._flat(re.sub(r"<[^>]+>", " ", op.get("html") or "")) for op in P.get("ops") or [] if op.get("kind") == "text")
+    free = [k for k, t in enumerate(texts) if k not in used and slots._flat(t["text"]) not in wrote]
+    pairs = sorted(((SequenceMatcher(None, slots._flat(l.get("ocr") or ""), slots._flat(texts[k]["text"])).ratio(), l["id"], k)
+                    for l in gaps if not l.get("printed") and len(slots._flat(l.get("ocr") or "")) >= 3 for k in free), reverse=True)
+    loose = {}
+    for sim, lid, k in pairs:
+        if sim >= LOOSE and lid not in loose and k not in loose.values():
+            loose[lid] = k
     for op in P.get("ops") or []:   # gỡ các dòng này khỏi lệnh skip cũ
         mk = [m for m in op.get("marks") or op.get("slots") or [] if m not in gone]
         if op.get("kind") == "skip" and not mk:
             continue
         ops.append({**op, "marks": mk, "slots": mk} if op.get("kind") == "skip" else op)
     for l in gaps:
-        k = None if l.get("printed") else slots._client_like(l.get("ocr") or "", texts)
+        k = None if l.get("printed") else loose.get(l["id"], slots._client_like(l.get("ocr") or "", texts))
         if k is not None:
             ops.append({"id": f"fill_{l['id']}", "kind": "text", "marks": [l["id"]], "slots": [l["id"]], "client": f"T{k}",
                         "html": _html.escape(texts[k]["text"]), "box_style": "", "why": "fill: dòng bị bỏ, chữ nháp giống câu khách"})

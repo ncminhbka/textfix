@@ -641,6 +641,16 @@ lên trần. Cây luật (nền phẳng? bản xoá tin được? ba cách lấp
   vòm chữ plan cũ (g04, còn nửa tiêu đề), nút giá của nệm bị khuyết một góc (f02), vòm cầu vồng bị mờ (g03).
   Bản cuối CHƯA đo lại bằng erase_bench (máy không GPU) -- xác nhận trên máy chủ.
 
+**mix1 lượt ba (bản 363ea25, LaMa trên máy chủ; chấm thô 35 poster):** đẹp 19, dùng được 11, hỏng 5 (lượt đầu 14 / 15 / 5).
+LaMa chạy cả 35 poster, không lỗi; bước dựng + gỡ chữ 6,1 s / poster, VLM 16,2 s. Lỗi đã ĐỔI CHỖ: chỉ 1 poster hỏng vì gỡ chữ (c01
+con dấu); 3 hỏng vì VLM -- i04 và v02 VLM trả kế hoạch RỖNG cả ba lần gọi (chưa rõ vì sao; nay ghi câu trả lời thô vào log), i02
+VLM bỏ dòng -> `fill_gaps` giữ chữ nháp méo, nhìn như chữ rác; t02 sai ngày giữa hai hàng của bảng. LaMa hơn luật: v05 nút cam
+(hết khối đen), t01, f05, x03. LaMa kém luật: f02 nút đỏ nhỏ bị nuốt thành một gạch, x04 cầu vồng nhoè chỗ tiêu đề đè lên.
+- [mã] `fill_gaps`: trước khi giữ chữ nháp, ghép một - một dòng bị bỏ với câu khách CHƯA lệnh nào viết, ngưỡng giống 0,4 (`LOOSE`).
+  Thử lại trên lệnh thật: v02 11 / 11 dòng viết câu khách (trước 9, hai ô giữ chữ méo), i02 2 / 2, i04 6 viết + 4 giữ, f04 2 + 3.
+  Dòng còn "giữ chữ nháp" là dòng THỨ HAI của một câu đã viết ở dòng trên ("Air 3", "30ml") -- chờ người dùng quyết: giữ hay xoá.
+- [mã] VLM trả rỗng: không gọi lần thứ ba; log ghi 300 ký tự đầu của câu trả lời thô.
+
 **Bộ thi `bench/accept2.json` (30 ca, seed 9001-9030):** e nút / thẻ / huy hiệu (6), h nền khó (5), k chữ khó (5), l danh sách /
 bảng / các bước (5), q ảnh sản phẩm (3), r form thường gặp (6). CHỈ chạy và chấm, không sửa mã theo từng ca của bộ này; lỗi
 thấy ở đây chỉ sửa khi nó hiện thành một con số trên tập luyện (mix1, accept1, dev2, dev3, form1).

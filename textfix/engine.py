@@ -14,6 +14,7 @@ Hai trạm dùng riêng được (máy chủ chạy dây chuyền nhiều phiên
 
 from __future__ import annotations
 
+import json
 import time
 
 import numpy as np
@@ -143,7 +144,9 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     if L_ONLY:
         # CÂU TRẢ LỜI CỤT (mix1 p02: 1 lệnh cho 10 dòng -> 9 dòng trống): gọi lại một lần, lấy bản phủ nhiều dòng hơn
         n0 = len(lonly.covered(raw, M))
-        if M["L"] and n0 < lonly.COVER_MIN * len(M["L"]):
+        if empty:   # đã gọi lại một lần ở trên; ghi câu trả lời thô để truy vì sao rỗng
+            llog.append("VLM trả rỗng, câu trả lời thô: " + json.dumps(raw, ensure_ascii=False)[:300])
+        elif M["L"] and n0 < lonly.COVER_MIN * len(M["L"]):
             progress("VLM bỏ sót nhiều dòng, gọi lại")
             again = ask()
             n1 = len(lonly.covered(again, M))
