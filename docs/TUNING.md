@@ -549,13 +549,22 @@ b01, b04, f02, f04, s03), ba kiểu vết đều do bước ghép nền:
   ngoài lõi nên không bị đụng) hoặc mảng nhỏ trong vùng dòng (dấu thanh, chấm đầu dòng); tô các mảng đó + viền 3 px bằng MẶT MÀU
   NỀN khớp từ nháp. Không phẳng -> bản xoá như trước. Bỏ hẳn inpaint và bước lau nét sót sau khi ghép.
 - [mã] hai chốt đoán nhầm nền -> bản xoá: màu nhiều nhất trong lõi là nét chữ (các điểm màu đó đổi hẳn ở bản xoá, phần còn lại
-  nguyên: chữ trắng đậm trên vòm cầu vồng, g03); nét chữ + viền trùm > 60% vùng dòng (`INK_MAX`).
+  nguyên: chữ trắng đậm trên vòm cầu vồng, g03) [sửa tiếp bên dưới: chốt này thêm điều kiện màu đó rời thành nhiều mảng; `INK_MAX` đã bỏ].
 - [mã] người dùng: "không được lem nhem, một số pill có dấu hiệu lem". Soi mọi nút / thẻ có chữ ở cỡ gốc: (1) nút có vệt sáng
   (a02 nút cam, nền tối có quầng đèn) -- mặt bậc hai lệch nền vài ΔE nên chỗ tô hiện hình chữ mờ -> BÙ CỤC BỘ: cộng trung bình có
   trọng số (Gauss 0,35 cao dòng) của (nháp - mặt) trên các điểm nền quanh nét; (2) nút vàng kim có ánh mà bước xoá gỡ (a03): không
   đạt `FIT_MIN` nên dán bản xoá = khoét một lỗ thấy mặt nước trong nút -> khi nền của dòng đã ĐỔI ở bản xoá, thử lại với ngưỡng
   gấp đôi (nền <= 12, lưng chừng 12-24 phải ít): nút có ánh qua, chữ có quầng mờ trên sàn gỗ (f02) vẫn về bản xoá; (3) mẩu nền
   ngoài nút bị mép vùng dòng cắt ra không còn tính là "mảng nhỏ" (phải nằm gọn trong vùng dòng đã co 2 px).
+- [mã] xem mắt 30 nền của dev2 / dev3 / form1: (1) NÚT BỊ LAU TRẮNG GIỮA (d27 "-36%", "Mua ngay"; f13 nút xanh "Gọi 0977...") --
+  chốt "màu nhiều nhất là nét chữ" bắt nhầm: chữ trắng trong nút màu trên nền trắng, bước xoá gỡ nút thì lòng nút "đổi hẳn" còn
+  chỗ chữ trắng "nguyên" -> thêm điều kiện màu đó phải RỜI thành nhiều mảng (chữ cái); lòng nút liền một mảng (mảng lớn nhất
+  >= 60%) thì là nền. Bỏ chốt `INK_MAX` (chữ đậm trong nút nhỏ + viền 3 px vượt 60% vùng dòng là chuyện thường). (2) SÓT CHỮ CÁI
+  CŨ (d07 "5" của "50%"): chữ số to lệch khung OCR, lại dính viền bóng của vòng tròn -> mảng chạm lõi và nằm trọn trong vùng nới
+  0,6 cũng là nét chữ; mảng chạm lõi nhưng bị từ chối thì tách riêng điểm CÙNG MÀU MỰC (<= 25 ΔE, `INK_SAME`) rồi xét lại.
+  Mỗi dòng lấy bản xoá ghi lý do vào log ("bản xoá vì: L3 nền có vân 0.78; ...").
+- GIỚI HẠN thêm: tiêu đề có viền màu đè lên mép nút cùng màu (d12 "SIÊU SALE 11.11" trên nút tím) -- nút bị tô loang lên trên;
+  chữ cong / chữ trên ruy băng mà plan cũ không có đường cong thì sót chữ cái ngoài khung (d10, dev3 g15).
 - Đã thử và gỡ: "bước xoá đổi >= 70% vùng dòng thì ép tô trên nháp" -- không cứu được huy hiệu chữ vòng nhỏ (g05) mà làm khối
   liên hệ có quầng tối trên sàn gỗ (f02) vỡ hạt trở lại.
 - Đã thử và gỡ: "lan dần nền chuyển màu" (khớp mặt, nhận thêm điểm sát mặt, khớp lại) cho nút vàng kim nhiều dải sáng trải ngang
