@@ -86,7 +86,19 @@ def _geom(op: dict, M: dict) -> dict | None:
     if not ids:
         return None
     Ls = [by[m] for m in ids if m.startswith("L")]
-    ang = float(np.median([m.get("angle") or 0.0 for m in Ls])) if Ls else 0.0
+    ang = 0.0
+    if Ls:
+        # GÓC CỦA KHỐI = góc của dòng DÀI nhất so với cao chữ (13/10 dev3 g13: "ĂN" hai chữ cái OCR đo -4 độ, "NGON" bên dưới
+        # -19 độ, cùng một nhãn; trung vị ra -11, sai cả hai). Góc đo trên dòng càng dài càng chắc; dòng vài chữ cái là nhiễu.
+        def reach(m):
+            pl = m.get("poly")
+            if pl and len(pl) == 4:
+                e = sorted(float(np.hypot(pl[i][0] - pl[(i + 1) % 4][0], pl[i][1] - pl[(i + 1) % 4][1])) for i in range(4))
+                return e[-1] / max(1.0, e[0])
+            return (m["box"][2] - m["box"][0]) / max(1.0, m["box"][3] - m["box"][1])
+        tilted = [m for m in Ls if abs(m.get("angle") or 0.0) >= ROT_MIN]
+        if len(tilted) * 2 >= len(Ls):   # đa số dòng nghiêng thì khối nghiêng
+            ang = float(max(tilted, key=reach).get("angle") or 0.0)
     if abs(ang) < ROT_MIN:
         bs = [by[m]["box"] for m in ids]
         r = [max(0.0, min(b[0] for b in bs)), max(0.0, min(b[1] for b in bs)), min(float(W), max(b[2] for b in bs)),
@@ -365,7 +377,12 @@ async (o) => {
     }
     // dòng nghiêng: renderer tự xoay đúng góc đo (bên dưới) -- transform VLM ghi ở khung (rotate(-14deg)) bỏ trước khi đo,
     // không thì "đo trước khi xoay" là đo khối đã xoay (tràn / nét sai)
-    if (e.angle) d.style.transform = 'none';
+    if (e.angle) {
+      d.style.transform = 'none';
+      // ... và transform xoay / xiên VLM ghi ở các thẻ BÊN TRONG (13/10 dev3 g05, g13: span rotate(31deg) + renderer xoay 31 độ
+      // = chữ xoay hai lần, dựng đứng)
+      for (const x of d.querySelectorAll('[style]')) if (/rotate|skew|matrix/.test(x.style.transform)) x.style.transform = 'none';
+    }
     c.appendChild(d);
     const R0 = c.getBoundingClientRect();
     // TRÀN = nội dung thật (mọi con, kể cả SVG) vượt khung ở BẤT KỲ phía nào (nội dung căn giữa tràn cả trái -- scrollWidth chỉ

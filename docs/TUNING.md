@@ -445,9 +445,33 @@ viết lời dặn cho gọn, KHÔNG thêm vòng hỏi lại.
   vào L6-L8.
 - CHƯA đo (cần VLM thật): VLM có hết gộp hai cột không; có viết dấu đầu dòng trong lệnh chữ không; FIT có làm câu ngắn lại không.
 
+### 13/10: chữ nghiêng / xếp chồng (32 nháp chữ khó của dev3, dựng lại bằng lệnh VLM cũ)
+
+Xem mắt 32 nháp: 8 nháp có vòm đều ra ô cong đúng. Hỏng còn lại: nhãn nghiêng nhiều dòng (g05_v0, g13), sticker (g06), tiêu đề
+xếp chồng (g07_v0, g09_v1), chữ vòng quanh huy hiệu (g12), chữ trên ruy băng 3D (g15).
+- [mã] B4 XOAY HAI LẦN: VLM ghi `transform: rotate(31deg)` ở thẻ bên trong, bộ dựng xoay thêm 31 độ (g05_v0 nhãn "GIẢM 30%" dựng
+  đứng; g13_v1 -20 thành -42). Bộ dựng gỡ mọi rotate / skew của VLM trong lệnh nó tự xoay. [prompt VLM] dòng "drawn at N degrees":
+  không tự ghi rotate / skew; các dòng nghiêng xếp chồng trong một nhãn là một lệnh.
+- [mã] B4 góc của khối = góc của dòng DÀI nhất (dài / cao), khi đa số dòng nghiêng; trước là trung vị (g13: "ĂN" hai chữ cái đo
+  -4 độ, "NGON" -19 -> -11).
+- [mã] B3 `validate`: `<br><br>` trong lệnh chữ -> một `<br>` (g09_v1: "CƠM / NGON / (trống) / TẬN / (trống) / NƠI").
+- [mã] B2.5 `_stacked`: vùng "OCR sót" có khe không nét ở giữa -> tách hai dòng. g07_v0 KHÔNG tách được ("FLASH" và "SALLE" của
+  nháp đó chờm lên nhau, không có khe) -- còn là một ô; để ngỏ.
+- Đo: dev3 58 poster dựng lại, danh sách lỗi không đổi ở cả 58; xem mắt g05_v0, g13_v1 đúng góc nháp, g09_v1 hết lỗ. 130 nháp
+  (`geo_measure`): log dò cung / dòng sót không đổi.
+- Chấp nhận cho bản 1 (đề nghị): chữ nhỏ vòng quanh huy hiệu, chữ trên ruy băng 3D. g06_v0: OCR sót hẳn dòng "MỚI" của sticker,
+  bản xoá còn chữ cũ -> chữ mới đè lên chữ sót; chờ xem với GEO bật.
+
 ## Lượt chạy server tiếp theo
 
 Cập nhật mã (docs/SERVER.md), khởi động lại máy chủ **và kernel**, rồi:
+**Bộ nghiệm thu toàn hệ thống: `bench/accept1.json` (42 ca mới, seed cố định, 1 ảnh mỗi ca).** Chạy với chữ cong BẬT:
+`export TEXTFIX_GEO=on`, khởi động lại máy chủ và kernel, rồi `%run scripts/dev_batch.py bench/accept1.json`.
+Nhóm: a (5) đề bài dài -- FIT, khối, danh sách; b (6) danh sách cùng kiểu, dấu đầu dòng, icon to; c (4) hai cột, bảng giá, hai
+thẻ; g (12) chữ khó -- vòm, con dấu, nụ cười, nghiêng, xếp chồng, nhiều cỡ, hai giới hạn đã biết; s (3) vỏ; f (8) form như người
+dùng thật; p (2) ảnh sản phẩm; i (2) ảnh thường / đề bài mơ hồ. Mỗi ca có "why" = điều cần xem. Bộ này thay cho các mục 0a, 0, 1
+bên dưới.
+
 0a. Đề bài dài sau sửa 13/10 (không cần GEO): chạy lại đúng ba đề nồi cơm / studio chụp ảnh / resort trên giao diện, tải
    "Tải debug (zip)" cả ba một lần. Xem: lệnh chữ nhiều ô có cùng một khối không, dòng có "mark" có dấu ở đầu chữ không, lệnh
    nào còn "co còn" dưới 0.7.

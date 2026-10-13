@@ -495,23 +495,26 @@ def _geo_lines(L: list, I: list, draft: np.ndarray, A: np.ndarray, Bp: np.ndarra
         # (b) dòng bị sót: phải là LỚP PHỦ bị gỡ (nét mực chiếm >= 10% vùng; chữ in trên vật / hoạ tiết ảnh còn nguyên trên nền)
         if float((ink & near).sum()) < 0.1 * float(near.sum()):
             continue
-        rect = cv2.minAreaRect(np.c_[xs, ys].astype(np.float32))
-        text = ocr.read_region(draft, rect)
-        if sum(ch.isalnum() for ch in text) < 2:   # hàng sao, hoạ tiết: bộ đọc không ra chữ -> để các ô chi tiết lo như cũ
-            continue
         ang = g["tilt"] if abs(g["tilt"]) >= geo.BAND_TILT else 0.0
-        poly = [[float(a), float(b)] for a, b in cv2.boxPoints(rect)]
-        caps = sum(ch.isupper() or ch.isdigit() for ch in text if ch.isalnum()) >= 0.8 * sum(ch.isalnum() for ch in text)
-        col = np.median(draft[ink & near], axis=0) if (ink & near).any() else np.array([20, 20, 20])
-        new = {"id": f"L{1 + max([int(l['id'][1:]) for l in L] or [0])}", "box": box, "ocr_box": list(box), "poly": poly, "ocr": text,
-               "base": None, "size": float(ext / (CAP_EM if caps else X_EM)), "color": "#%02x%02x%02x" % tuple(int(x) for x in col),
-               "angle": float(ang), "caps": bool(caps), "stroke": None, "stroke_contrast": None, "effect": None, "shell": None,
-               "missed": True}
-        gone = [c for c in I if cen_in(c["box"], near)]
-        I = [c for c in I if c not in gone]
-        L = L + [new]
-        masks[new["id"]] = near
-        log.append(f"dòng OCR sót: vùng chữ {[round(x) for x in box]} đọc {text!r} + {[c['id'] for c in gone]} -> {new['id']}")
+        for part, pext in _stacked(near, ink, g["tilt"], ext):
+            pys, pxs = np.nonzero(part)
+            pbox = [float(pxs.min()), float(pys.min()), float(pxs.max() + 1), float(pys.max() + 1)]
+            rect = cv2.minAreaRect(np.c_[pxs, pys].astype(np.float32))
+            text = ocr.read_region(draft, rect)
+            if sum(ch.isalnum() for ch in text) < 2:   # hàng sao, hoạ tiết: bộ đọc không ra chữ -> để các ô chi tiết lo như cũ
+                continue
+            poly = [[float(a), float(b)] for a, b in cv2.boxPoints(rect)]
+            caps = sum(ch.isupper() or ch.isdigit() for ch in text if ch.isalnum()) >= 0.8 * sum(ch.isalnum() for ch in text)
+            col = np.median(draft[ink & part], axis=0) if (ink & part).any() else np.array([20, 20, 20])
+            new = {"id": f"L{1 + max([int(l['id'][1:]) for l in L] or [0])}", "box": pbox, "ocr_box": list(pbox), "poly": poly, "ocr": text,
+                   "base": None, "size": float(pext / (CAP_EM if caps else X_EM)), "color": "#%02x%02x%02x" % tuple(int(x) for x in col),
+                   "angle": float(ang), "caps": bool(caps), "stroke": None, "stroke_contrast": None, "effect": None, "shell": None,
+                   "missed": True}
+            gone = [c for c in I if cen_in(c["box"], part)]
+            I = [c for c in I if c not in gone]
+            L = L + [new]
+            masks[new["id"]] = part
+            log.append(f"dòng OCR sót: vùng chữ {[round(x) for x in pbox]} đọc {text!r} + {[c['id'] for c in gone]} -> {new['id']}")
     L, I, lg = geo.apply_arcs(L, I, found, CAP_EM)
     edge = np.linalg.norm(A - Bp, axis=2)
     for l in L:
@@ -535,6 +538,47 @@ def _geo_lines(L: list, I: list, draft: np.ndarray, A: np.ndarray, Bp: np.ndarra
             core = sel & (edge >= np.percentile(edge[sel], 60))
             l["color"] = "#%02x%02x%02x" % tuple(int(v) for v in np.median(draft[core], axis=0))
     return L, I, log + lg, masks
+
+
+STACK_VALLEY = 0.2   # hai dòng xếp chồng dính một vùng: giữa vùng có một dải gần như không nét (<= 20% mật độ nét của mỗi dòng)
+
+
+def _stacked(near: np.ndarray, ink: np.ndarray, tilt: float, ext: float) -> list[tuple[np.ndarray, float]]:
+    """Một vùng chữ của bộ dò có thể DÍNH hai dòng xếp chồng sát nhau ("FLASH" trên "SALE", 12/10 dev3 g07: một ô cỡ 244 px).
+    Chiếu nét mực lên trục vuông góc hướng đọc: có một KHE (dải gần như không nét) ở khoảng giữa, hai bên đều có nét -> tách tại
+    khe thành hai vùng (đệ quy cho ba dòng). -> [(vùng, cao chữ)] trên xuống; không có khe: [(near, ext)]."""
+    iy, ix = np.nonzero(ink & near)
+    if len(ix) < 200:
+        return [(near, ext)]
+    t = np.radians(tilt)
+    v = -ix * np.sin(t) + iy * np.cos(t)   # toạ độ vuông góc hướng đọc
+    v0, v1 = np.percentile(v, [1, 99])
+    hgt = v1 - v0
+    if hgt < 20:
+        return [(near, ext)]
+    n = max(8, int(hgt / 3))
+    hist = np.histogram(v, bins=n, range=(v0, v1))[0].astype(np.float64)
+    hist = np.convolve(hist, np.ones(3) / 3, mode="same")
+    best = None
+    for k in range(int(0.25 * n), int(0.75 * n) + 1):
+        up, dn = hist[:k].max(), hist[k + 1:].max() if k + 1 < n else 0.0
+        if hist[k] <= STACK_VALLEY * min(up, dn) and (best is None or hist[k] < hist[best]):
+            best = k
+    if best is None:
+        return [(near, ext)]
+    cut = v0 + (best + 0.5) * hgt / n
+    yy, xx = np.nonzero(near)
+    side = (-xx * np.sin(t) + yy * np.cos(t)) < cut
+    out = []
+    for sel in (side, ~side):
+        m = np.zeros_like(near)
+        m[yy[sel], xx[sel]] = True
+        pv = v[(v < cut) if sel is side else (v >= cut)]
+        if m.sum() < 30 or len(pv) < 50:
+            return [(near, ext)]
+        lo, hi = np.percentile(pv, [5, 95])
+        out += _stacked(m, ink, tilt, float(hi - lo))
+    return out
 
 
 def attach_geo(M: dict, draft: np.ndarray, plate: np.ndarray, product: bool = False) -> list[str]:
@@ -695,6 +739,9 @@ a smile or a ring. Write it as ONE text op with that single slot, one line, no <
 renderer lays your letters along the measured curve. Style it like any headline (font, weight, color, outline). A ring with \
 text on top and at the bottom is two slots, each its own op. Never put a CURVED LINE slot in the same op as any other slot: \
 if the list shows more slots than the phrase needs around the curve, write the whole phrase on the curve and "skip" the others.
+- A line listed "drawn at N degrees" is tilted: the renderer rotates the op to the measured angle itself. Never write \
+transform: rotate / skew anywhere (box_style or html) -- it would be turned twice. Tilted lines stacked in one sticker / \
+ribbon / tag are ONE op (<br> between them).
 - A slot marked "OCR missed this line" is real lettering of the draft (usually a big decorated headline): look at the DRAFT to \
 see which client text it is and write that text there; never skip it because its OCR letters look wrong.
 - "keep" never applies to POSTER lettering, however decorated it is \
@@ -1119,6 +1166,11 @@ def validate(P: dict, M: dict, texts: list[dict] | None = None, product: bool = 
             log.append(f"{op.get('id')}: bỏ id không có {sorted(set(op.get('marks') or []) - set(mk))}")
         if not mk:
             continue
+        # DÒNG TRỐNG TRONG LỆNH GỘP (dev3 g09_v1: "CƠM<br>NGON<br><br>TẬN<br><br>NƠI" -- VLM để trống dòng nó bỏ, khối chữ thủng lỗ):
+        # các dòng của một lệnh chữ luôn liền nhau
+        if op.get("kind") == "text" and re.search(r"(<br\s*/?>\s*){2,}", op.get("html") or "", re.I):
+            log.append(f"{op.get('id')}: bỏ dòng trống giữa các dòng của lệnh")
+            op = {**op, "html": re.sub(r"(<br\s*/?>\s*){2,}", "<br>", op["html"], flags=re.I)}
         # ICON VIẾT VÀO Ô DÒNG CHỮ (13/10 run 2638: VLM đặt icon vào L9, L11 -- hai dòng của đoạn mô tả): ô L là chữ, icon ở đó
         # là nhầm ô -> bỏ lệnh (nền đã xoá sạch)
         if op.get("kind") in ("icon", "stars") and all(m.startswith("L") for m in mk):
