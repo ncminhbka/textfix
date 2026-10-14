@@ -138,7 +138,7 @@ def split_far(P: dict, M: dict) -> tuple[dict, list[str]]:
     return {**P, "ops": ops}, log
 
 
-def fill_gaps(P: dict, M: dict, texts: list[dict]) -> tuple[dict, list[str]]:
+def fill_gaps(P: dict, M: dict, texts: list[dict], product: bool = False) -> tuple[dict, list[str]]:
     """KHÔNG ĐỂ TRỐNG DÒNG NÀO nháp đã vẽ (13/10, người dùng: "cố gắng bịa vào, đừng bỏ trống" -- mix1: mỗi dòng bị bỏ là một
     nút / huy hiệu trống). Dòng chưa có lệnh viết / giữ (VLM bỏ sót, VLM ghi skip, luật chặn đổi thành skip):
       - chữ in trên sản phẩm khách tải -> GIỮ (mix1 p02: VLM bỏ sót, nhãn trên gói bị xoá);
@@ -183,6 +183,12 @@ def fill_gaps(P: dict, M: dict, texts: list[dict]) -> tuple[dict, list[str]]:
         elif l.get("printed"):
             ops.append({"id": f"fill_{l['id']}", "kind": "keep", "marks": [l["id"]], "slots": [l["id"]], "why": "fill: chữ in trên sản phẩm"})
             log.append(f"{l['id']}: dòng bị bỏ ({l.get('ocr')!r}) -> giữ nguyên (chữ in trên sản phẩm)")
+        elif product:
+            # KHÁCH TẢI ẢNH SẢN PHẨM (accept2 q03, 14/10: logo Coca-Cola trên lon bị OCR đọc thành dòng "eo.mg", VLM không nhắc tới,
+            # bộ đọc ảnh sản phẩm không khớp được -> dòng bị xoá trống = mất logo). Chữ trên sản phẩm PHẢI GIỮ: ở poster có ảnh
+            # sản phẩm, dòng không ai viết gì thì giữ nguyên điểm ảnh nháp -- sai về phía này chỉ còn lại một mẩu chữ giun
+            ops.append({"id": f"fill_{l['id']}", "kind": "keep", "marks": [l["id"]], "slots": [l["id"]], "why": "fill: poster có ảnh sản phẩm, không ai viết dòng này"})
+            log.append(f"{l['id']}: dòng bị bỏ ({l.get('ocr')!r}) -> giữ nguyên (poster có ảnh sản phẩm: có thể là chữ trên sản phẩm)")
         else:   # không còn câu nào để viết (dòng nối của một câu đã viết ở dòng trên): XOÁ TRỐNG -- người dùng chốt 14/10, chữ
             # nháp giữ lại là chữ giun (mix1 "SoundBean Air 3")
             ops.append({"id": f"fill_{l['id']}", "kind": "skip", "marks": [l["id"]], "slots": [l["id"]], "html": "",
@@ -372,8 +378,9 @@ HALO_REACH = 0.35   # QUẦNG (viền dày, bóng đổ, quầng sáng): tìm tr
 HALO_DE = 14.0      # ... điểm trong dải khác NỀN CỦA DÒNG > 14 ΔE là quầng. Nền của dòng ước từ vành ngay ngoài dải (vẫn trong
                     # vùng dòng): chữ nằm trong nút / thẻ thì vành đó là lòng nút, nên lòng nút không bị coi là quầng
 HALO_LO = 7.0       # nền của dòng PHẲNG (vành lệch trung vị <= HALO_FLAT): quầng lan tiếp qua các điểm > 7 ΔE liền với nó, ra tới
-HALO_FLAT = 4.0     # mép vùng dòng -- đuôi bóng mờ dần (accept2 e04 chữ 3D đỏ: đuôi < 14 lọt ngoài mặt nạ thì LaMa kéo bóng vào,
-                    # hiện lại hình chữ mờ). Nền có vân / ảnh chụp: không lan (mọi thứ đều "khác nền")
+HALO_FLAT = 8.0     # mép vùng dòng -- đuôi bóng mờ dần (accept2 e04 chữ 3D đỏ: đuôi < 14 lọt ngoài mặt nạ thì LaMa kéo bóng vào,
+                    # hiện lại hình chữ mờ). Nền có vân / ảnh chụp: không lan (mọi thứ đều "khác nền"). Ngưỡng 4 thì nền giấy
+                    # của chính e04 lúc qua lúc không (nén JPG khác nhau); 8: 65 nháp mặt nạ 14,9 -> 15,4% ảnh, 14 poster đổi > 1 điểm
 _LAMA: dict = {}
 
 
@@ -437,6 +444,12 @@ def erase_mask(draft: np.ndarray, ink: np.ndarray, M: dict, kept: set, log: list
         r2, r, r0 = R2[y0:y1, x0:x1], regs[l["id"]][y0:y1, x0:x1], _region(l, H, W, 0.1)[y0:y1, x0:x1]
         hgt = float(l.get("size") or (l["box"][3] - l["box"][1]))
         ik, lab, c_ = ink[y0:y1, x0:x1], A[y0:y1, x0:x1], cc[y0:y1, x0:x1]
+        # CỠ DÒNG KHÔNG VƯỢT 2,2 LẦN CAO NÉT (accept2 q02: khung OCR của một dòng trùm hai hàng, "cỡ" 127 px cho chữ cao 20 px
+        # -> dải quầng rộng 44 px nuốt icon của cả ba hàng).
+        ids0 = [i for i in np.unique(c_[ik & regs[l["id"]][y0:y1, x0:x1]]) if i > 0 and st[i, cv2.CC_STAT_HEIGHT] >= 4]
+        if len(ids0) >= 3:   # mảng CAO (phân vị 90: thân chữ hoa / nét lên), không phải trung vị -- dấu thanh rời kéo trung vị xuống,
+            # tiêu đề chữ hoa có dấu bị ép cỡ nhỏ lại, dải quầng hẹp đi, bóng chữ lộ lại (accept2 e04)
+            hgt = min(hgt, 2.2 * float(np.percentile(st[ids0, cv2.CC_STAT_HEIGHT], 90)))
         got = ik & r
         inside = np.bincount(c_[r], minlength=n_cc)
         whole = [i for i in np.unique(c_[ik & r0]) if i > 0 and inside[i] >= WHOLE * area[i]]
@@ -473,6 +486,11 @@ def erase_mask(draft: np.ndarray, ink: np.ndarray, M: dict, kept: set, log: list
             d = np.where(den > 0.02, np.linalg.norm(lab - bg, axis=2), 0.0)
             halo = near & ~got & (d > HALO_DE)
             halo = cv2.morphologyEx(halo.astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8)).astype(bool)
+            # QUẦNG DÍNH VÀO NÉT: viền, bóng, quầng sáng luôn chạm chữ; icon đứng trước dòng cách chữ một khe nền (accept2 q02: ba
+            # chiếc lá cách chữ ~8 px lọt vào dải sát nét, bị gặm mất nửa). Chỉ giữ mảng quầng chạm phần nét đã nới.
+            _k, c5 = cv2.connectedComponents((halo | grown).astype(np.uint8), connectivity=8)
+            touch = np.unique(c5[grown])
+            halo &= np.isin(c5, touch[touch > 0])
             if halo.any() and float(np.median(d[ring > 0])) <= HALO_FLAT:   # nền phẳng: lan theo đuôi mờ của quầng
                 # chỉ lan qua điểm NHẠT (7-14): đuôi bóng. Điểm đậm ngoài dải sát nét là hình khác (lòng nút nhỏ, hạt cà phê giữa con
                 # dấu, cầu vồng dưới tiêu đề -- thử lan cả điểm đậm 14/10: mix1 f02 nút đỏ bị lau, c01 hạt cà phê nhoè, x04 mất đầu cầu vồng)
@@ -481,10 +499,15 @@ def erase_mask(draft: np.ndarray, ink: np.ndarray, M: dict, kept: set, log: list
                 keep = np.unique(c3[halo])
                 halo = np.isin(c3, keep[keep > 0])
             # dấu câu / gạch nối nằm GỌN trong lõi dòng mà Hi-SAM không coi là nét ("300 Mbps - 245.000đ": gạch còn lại thành "~")
+            # CHỈ ở giữa nét đầu và nét cuối của dòng: thứ đứng TRƯỚC chữ là icon đầu dòng của nháp (accept2 q02: khung OCR ôm cả
+            # chiếc lá trước dòng -> lá bị gỡ như "dấu câu", còn lại một mẩu vụn)
             n4, c4, s4, _x = cv2.connectedComponentsWithStats(((d > HALO_DE) & r0 & ~grown).astype(np.uint8), 8)
             rim = r0 & (cv2.erode(r0.astype(np.uint8), np.ones((3, 3), np.uint8)) == 0)
             edge = np.bincount(c4[rim], minlength=n4)
-            small = [i for i in range(1, n4) if not edge[i] and max(s4[i, cv2.CC_STAT_WIDTH], s4[i, cv2.CC_STAT_HEIGHT]) <= hgt]
+            gx = np.nonzero(got.any(axis=0))[0]
+            lo_x, hi_x = (int(gx.min()), int(gx.max())) if len(gx) else (0, -1)
+            small = [i for i in range(1, n4) if not edge[i] and max(s4[i, cv2.CC_STAT_WIDTH], s4[i, cv2.CC_STAT_HEIGHT]) <= hgt
+                     and s4[i, cv2.CC_STAT_LEFT] >= lo_x and s4[i, cv2.CC_STAT_LEFT] + s4[i, cv2.CC_STAT_WIDTH] - 1 <= hi_x]
             if small:
                 halo |= np.isin(c4, small)
             # quầng của dòng này không lấn vùng của DÒNG KHÁC (nút nhỏ nằm sát dưới một tiêu đề to: mix1 f02 nút đỏ bị tiêu đề

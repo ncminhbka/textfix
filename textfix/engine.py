@@ -150,7 +150,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     raw, flog = lonly.fix_ops(raw, M)
     raw, slog = lonly.split_far(raw, M)
     P, log = slots.validate(raw, M, B["texts"], product=product)
-    P, glog = lonly.fill_gaps(P, M, B["texts"])
+    P, glog = lonly.fill_gaps(P, M, B["texts"], product=product)
     P, mlog = lonly.marks_rule(P, M)
     log = llog + flog + slog + log + glog + mlog
     if empty:

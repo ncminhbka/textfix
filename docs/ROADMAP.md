@@ -49,6 +49,7 @@ Mã
 - [x] `scripts/lonly_replay.py` theo đường mới (dựng lại tại máy với lệnh VLM đã lưu).
 - [x] Xoá khỏi `main`: `cleanup.py`, `overlay.py`, `textmask.py`, `flux.erase`, 12 script chỉ đường cũ dùng.
 - [ ] Cắt nốt trong `slots.py` lời dặn và bộ mô tả của đường ô vỏ / ô chi tiết (`SYSTEM`, `describe`, phần S / I của `validate`).
+- [ ] Bỏ bộ icon: `textfix/icons.py`, `assets/icons/` (1.544 SVG), `scripts/fetch_icons.py`, phần `<i-icon>` / `<i-stars>` của `render.expand`, mục đếm icon trong `check_server.py`. Bộ dựng gỡ thẻ icon khỏi chữ và ghi log thay vì vẽ.
 - [x] `docs/SERVER.md`, `README.md`, mục 14/10 trong `docs/TUNING.md`, `scripts/check_server.py` kiểm tệp Hi-SAM / LaMa.
 - [ ] `docs/DESIGN.md`, `PLAN_BLOCKS.md`, `SLOTS_GT.md` còn tả đường cũ: viết lại hoặc xoá.
 
@@ -59,8 +60,16 @@ Mã
 - [ ] Dựng lại với lệnh VLM đã lưu: 30 poster accept2 với luật quầng đầu (xem 8, không vỡ); chưa dựng đủ 65 với luật cuối -- người dùng chọn chạy thẳng máy chủ.
 
 Máy chủ
-- [ ] Một lượt `accept2` trên `main` mới, một zip. Chấm đẹp / dùng được / hỏng, so với mốc 21 / 7 / 2.
-- [ ] VRAM khi Hi-SAM chạy chung card với FLUX và LaMa.
+- [x] Lượt `accept2` trên main 3ac2285 (zip 1014_040431, giải nén ở `output/accept2h/`): đủ 30, không poster nào lỗi. Trung vị
+  18,5 s / poster không tính LLM (nét chữ 0,2 s, gỡ chữ 1,7 s; trước ~29 s). 248 dòng (trước 242), 3 / 3 dòng cong. VLM không viết
+  icon nào. Không hết VRAM.
+- [x] Nghiệm thu, xem 30 poster: gỡ chữ sạch, vỏ / nút / con dấu / huy hiệu còn nguyên. BA LỖI DO CHẶNG A, đã vá (tại máy):
+  (1) q03 MẤT LOGO Coca-Cola trên lon: OCR đọc logo thành dòng "eo.mg", VLM không nhắc, mã xoá trống -> poster có ảnh sản phẩm thì
+  dòng không ai viết được GIỮ; (2) q02 ba chiếc lá trước dòng bị gặm: quầng nay phải dính vào nét, cỡ dòng không vượt 2,2 lần
+  cao nét, dấu câu chỉ gỡ ở giữa chữ, khung dòng dời khỏi icon đứng trước; (3) h04 "NGÀY • HỘI": chấm đầu dòng cần cả OCR
+  đọc ra ký tự không phải chữ. Thêm: ngưỡng nền phẳng 4 -> 8 (bóng chữ 3D e04 lúc hết lúc không).
+- [ ] Một lượt accept2 nữa với bản vá, xác nhận ba lỗi trên đã hết.
+- [ ] VRAM đỉnh khi Hi-SAM + LaMa + FLUX chung card (lượt này không lỗi, chưa có số).
 
 ## Chặng B -- Khối, bậc cỡ, chỗ trống thật (chưa bắt đầu)
 

@@ -739,6 +739,20 @@ chuyển hẳn, không so hai đường (đường cũ: nhánh `legacy-flux-eras
   luật cuối (người dùng chọn chạy thẳng máy chủ). CHỜ MÁY CHỦ: một lượt accept2, so mốc 21 đẹp / 7 dùng được / 2 hỏng; VRAM khi
   Hi-SAM + LaMa chung card với FLUX.
 
+**accept2 trên main 3ac2285 (14/10, zip 1014_040431 -> `output/accept2h/`):** đủ 30; 18,5 s / poster không tính LLM. Xem 30
+poster (nháp | lượt trước | nét chữ + mặt nạ | poster): gỡ chữ sạch ở mọi nền, con dấu cà phê / huy hiệu giữ nguyên; VLM không viết
+icon; cụm nét lạ: VLM giữ cả 6 (chữ vòng trên huy hiệu trà, dấu trên máy lọc). LỖI DO CHẶNG A (đã vá, đo tại máy):
+- q03 MẤT LOGO Coca-Cola: dòng OCR "eo.mg" (khung 158 x 340 trùm logo) VLM không nhắc, `fill_gaps` xoá trống. [mã] poster có ảnh
+  sản phẩm: dòng không ai viết -> giữ (`fill_gaps(product=)`).
+- q02 lá trước dòng bị gặm nửa (khung OCR một dòng trùm hai hàng, "cỡ" 127 px cho chữ 20 px -> dải quầng 44 px). [mã] quầng phải
+  dính vào nét; cỡ dòng <= 2,2 x phân vị 90 cao mảng nét; dấu câu chỉ gỡ giữa nét đầu và nét cuối; `slots._trim_lead` dời mép trái
+  khung tới nét đầu khi khung ôm icon (22 / 538 dòng của 65 nháp), `render._align_left` theo mép các dòng đó.
+- h04 "NGÀY • HỘI": `_lead_dots` nhận mẩu nét trước "HOI" là chấm. [mã] cần thêm chữ OCR mở đầu bằng ký tự không phải chữ / số.
+- e04 bóng chữ 3D lúc hết lúc không: nền giấy lệch trung vị 4-8 ΔE tuỳ nén JPG. [mã] `HALO_FLAT` 4 -> 8 (65 nháp: mặt nạ 14,9 ->
+  15,4% ảnh); neon h03 cũng sạch hơn.
+- Không do chặng A: l04 VLM trả rỗng hai lần (mã lấp 8 dòng, poster hỏng như lượt trước); e05 VLM lặp "Gội dưỡng", thiếu "Đính đá";
+  r01 "15%" quá nhỏ; k02 câu "HÁI TAY 100%" không có chỗ (chữ vòng trên huy hiệu, VLM giữ nguyên).
+
 **Bộ thi `bench/accept2.json` (30 ca, seed 9001-9030):** e nút / thẻ / huy hiệu (6), h nền khó (5), k chữ khó (5), l danh sách /
 bảng / các bước (5), q ảnh sản phẩm (3), r form thường gặp (6). CHỈ chạy và chấm, không sửa mã theo từng ca của bộ này; lỗi
 thấy ở đây chỉ sửa khi nó hiện thành một con số trên tập luyện (mix1, accept1, dev2, dev3, form1).

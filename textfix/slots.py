@@ -274,6 +274,40 @@ def _anchor(l: dict) -> tuple[float, float]:
     return ((b[0] + b[2]) / 2, (b[1] + b[3]) / 2)
 
 
+LEAD_GAP = (0.6, 4.0)   # khung OCR thừa bên trái nét chữ đầu tiên một khoảng 0,6-4 cao nét = khung ôm cả icon đứng trước dòng
+
+
+def _trim_lead(L: list, ink: np.ndarray) -> list[str]:
+    """KHUNG DÒNG BẮT ĐẦU TỪ NÉT CHỮ ĐẦU TIÊN khi khung OCR ôm cả icon đứng trước dòng (accept2 q02: OCR lấy luôn chiếc lá).
+    Icon là của nháp, không gỡ (lonly.erase_mask), nên chữ mới không được dựng đè lên nó: mép trái khung dời tới nét đầu. Chỉ
+    dời khi Hi-SAM thấy rõ chữ ở dòng đó (>= 3 mảng nét) -- thấy ít thì không biết chữ bắt đầu ở đâu, giữ khung OCR."""
+    import cv2
+    H, W = ink.shape
+    log = []
+    for l in L:
+        if l.get("path") or l.get("orphan") or l.get("vertical") or abs(l.get("angle") or 0) >= 2:
+            continue
+        x0, y0, x1, y1 = (int(round(v)) for v in l["box"])
+        if y1 - y0 < 8 or x1 - x0 < 16:
+            continue
+        sub = ink[max(0, y0):min(H, y1), max(0, x0):min(W, x1)].astype(np.uint8)
+        n, _cc, st, _c = cv2.connectedComponentsWithStats(sub, 8)
+        comps = [st[i] for i in range(1, n) if st[i][4] >= 6 and st[i][3] >= 4]
+        if len(comps) < 3:
+            continue
+        hi = float(np.median([c[3] for c in comps]))
+        first = min(int(c[0]) for c in comps)
+        if LEAD_GAP[0] * hi <= first <= LEAD_GAP[1] * hi:
+            nx = float(max(0, x0) + first - max(1.0, 0.1 * hi))
+            b = l["box"]
+            l["box"] = [nx, b[1], b[2], b[3]]
+            l["ocr_box"] = list(l["box"])
+            l["poly"] = [[nx, b[1]], [b[2], b[1]], [b[2], b[3]], [nx, b[3]]]
+            l["lead_icon"] = True
+            log.append(f"{l['id']}: khung OCR ôm cả thứ đứng trước chữ ({first} px) -> mép trái khung dời tới nét chữ đầu tiên")
+    return log
+
+
 DOT_MAX = 0.5    # chấm tròn đầu dòng: mảng nét đầu tiên của dòng, cạnh <= 0,5 cao dòng, gần vuông (cạnh ngắn >= 0,5 cạnh dài) ...
 DOT_GAP = 0.2    # ... cách mảng nét kế tiếp >= 0,2 cao dòng theo chiều ngang ...
 DOT_MID = (0.2, 0.8)   # ... tâm nằm ở khoảng giữa chiều cao dòng (dấu nháy ở trên, dấu chấm câu ở dưới thì không)
@@ -301,8 +335,11 @@ def _lead_dots(L: list, ink: np.ndarray) -> list[str]:
         bx, by, bw, bh = (int(v) for v in comps[0][:4])
         nxt = min(int(c[0]) for c in comps[1:])
         mid = (by + bh / 2) / max(1, sub.shape[0])
+        # ... VÀ chữ OCR đọc không mở đầu bằng chữ / số (accept2 r04: " Swittch", "• Ket", ": Pin"). Chỉ theo hình thì nhầm:
+        # h04 dòng "HOI" của tiêu đề có một mẩu nét nhỏ đứng trước -> poster ra "NGÀY • HỘI"
+        o1 = (l.get("ocr") or "")[:1]
         if max(bw, bh) <= DOT_MAX * h and min(bw, bh) >= 0.5 * max(bw, bh) and nxt - (bx + bw) >= DOT_GAP * h \
-                and DOT_MID[0] <= mid <= DOT_MID[1]:
+                and DOT_MID[0] <= mid <= DOT_MID[1] and (not o1 or not o1.isalnum()):
             l["dot"] = True
             log.append(f"{l['id']}: chấm tròn đầu dòng (ký tự của dòng, gỡ cùng chữ)")
     return log
@@ -413,7 +450,7 @@ def build(draft: np.ndarray, ink: np.ndarray, product: bool = False) -> dict:
         if geo.RUNS:
             L, glog2 = geo.runs(L)
     L, olog = _orphans(L, draft, ink, masks)
-    mlog = _lead_dots(L, ink)
+    mlog = _lead_dots(L, ink) + _trim_lead(L, ink)
     L, glog = _renumber(L, [], [], glog + glog2 + olog + mlog)
     return {"L": L, "S": [], "I": [], "size": [W, H], "by": {m["id"]: m for m in L}, "mask": ink, "shells": {}, "geo_log": glog}
 
@@ -639,7 +676,7 @@ def _hex_lab(hx: str) -> np.ndarray:
 
 def public(M: dict) -> dict:
     """Ô để ghi JSON."""
-    return {"L": [{k: m[k] for k in ("id", "box", "ocr_box", "ocr", "size", "color", "angle", "shell", "curve", "runs", "geo", "path", "scale", "missed", "orphan", "printed", "dot", "poly") if k in m}
+    return {"L": [{k: m[k] for k in ("id", "box", "ocr_box", "ocr", "size", "color", "angle", "shell", "curve", "runs", "geo", "path", "scale", "missed", "orphan", "printed", "dot", "lead_icon", "poly") if k in m}
                   for m in M["L"]],
             "S": M["S"], "I": M["I"]}
 

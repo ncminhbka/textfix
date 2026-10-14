@@ -613,7 +613,7 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
                     "fit": fix.get("fit") or op.get("fit") or "shrink", "angle": g["angle"], "cls": cls,
                     "condense": fix.get("condense"), "icon": op.get("kind") == "icon" and bool(mk)
                     and all(m.startswith("I") for m in mk), "iset": op.get("icon_set"), "nl": len(lm), "hfit": single,
-                    "path": path_of(op, M)})
+                    "path": path_of(op, M), "lead": any((M["by"].get(m) or {}).get("lead_icon") for m in lm)})
     log += _align_left(els) + _even_icons(els)
     page.set_viewport_size({"width": W, "height": H})
     page_html = lambda: (   # noqa: E731
@@ -948,9 +948,15 @@ def _align_left(els: list[dict]) -> list[str]:
         groups.setdefault(root(i), []).append(e)
     for g in groups.values():
         x = min(e["box"][0] for e in g)
-        moved = [e["id"] for e in g if e["box"][0] - x >= 1]
+        # cột có dòng mà khung đã dời khỏi icon đứng trước (slots._trim_lead): mép cột = mép của các dòng đó -- lấy mép nhỏ nhất
+        # là kéo cả cột đè lên hàng icon (mix1 v04: ba dấu tick, một dòng khung OCR còn ôm tick)
+        lead = [e["box"][0] for e in g if e.get("lead")]
+        if lead:
+            x = float(np.median(lead))
+        moved = [e["id"] for e in g if abs(e["box"][0] - x) >= 1]
         for e in g:
-            e["box"] = [x] + list(e["box"][1:])
+            if x < e["box"][2] - 4:
+                e["box"] = [x] + list(e["box"][1:])
         if len(g) >= 2 and moved:
             log.append(f"căn thẳng mép trái {[e['id'] for e in g]} ở x={x:.0f}")
     return log

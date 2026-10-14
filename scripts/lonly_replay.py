@@ -63,12 +63,15 @@ with Browser() as B:
                     else:
                         l["angle"] = slots._line_angle(l)
             M = lonly.view({"L": P["slots"]["L"], "S": [], "I": [], "size": [W, H], "by": {}})
-            dots = slots._lead_dots(M["L"], ink)
+            for l in M["L"]:
+                l.pop("dot", None)
+            dots = slots._lead_dots(M["L"], ink) + slots._trim_lead(M["L"], ink)
+            prod = bool((cases.get(cid) or {}).get("image"))
             ops = [{k: v for k, v in o.items() if k != "fix"} | {"marks": o.get("slots") or o.get("marks") or []} for o in P["ops"]]
             P2, flog = lonly.fix_ops({**P, "ops": ops}, M)
             P2, slog = lonly.split_far(P2, M)
-            P2, vlog = slots.validate(P2, M, T, product=bool((cases.get(cid) or {}).get("image")))
-            P2, glog = lonly.fill_gaps(P2, M, T)
+            P2, vlog = slots.validate(P2, M, T, product=prod)
+            P2, glog = lonly.fill_gaps(P2, M, T, product=prod)
             P2, mlog = lonly.marks_rule(P2, M)
             log = []
             clean, _all = lonly.erase(D, ink, M)
