@@ -31,8 +31,7 @@ STACK_GAP = 1.0     # các dòng của một khối: khe dọc <= 1 cỡ chữ, 
 ROW_GAP = 2.0       # mẩu cùng hàng của một câu (OCR cắt "NGÀY" / "• HỘI"): chồng dọc >= nửa cao, khe ngang <= 2 cỡ -> một phần tử
 CENTER_TOL = 0.3    # tâm các dòng lệch <= 0,3 cỡ: căn giữa
 EDGE_TOL = 0.6      # mép lệch <= 0,6 cỡ: thẳng mép đó
-LOOSE = 0.4         # dòng chưa ai ghép: chữ OCR giống một câu khách chưa dùng >= 0,4 -> câu đó
-PIECE_SIM = 0.8     # các mẩu chữ VLM (plan cũ) nối lại giống câu khách >= 0,8 = một câu chia nhiều chỗ
+PIECE_SIM = 0.8     # các mẩu chữ VLM nối lại giống câu khách >= 0,8 = một câu chia nhiều chỗ (VLM viết lệch dấu: "TRƢƠNG", i03)
 QUOTES = "\"“”«»'‘’"
 DIFF_RGB = 120.0    # hai màu đo cách nhau > 120 (khoảng cách RGB) = khác hẳn (đỏ / trắng ~ 255, đen / xám đậm ~ 60)
 EFFECT_KEYS = re.compile(r"^\s*(-webkit-)?(text-shadow|text-stroke(-width|-color)?|background(-image|-clip|-color)?|"
@@ -189,11 +188,31 @@ def resolve(A: dict, M: dict, texts: list[dict], product: bool = False) -> tuple
             U.append({**u, "id": u["id"] + "p", "kind": "keep", "marks": pr, "clients": [], "split": None, "text_vlm": ""})
             u["marks"] = [m for m in u["marks"] if m not in pr]
     U = [u for u in U if u["marks"]]
-    # SPLIT chỉ nhận khi các mảnh nối lại đúng câu khách (không thể sai chữ)
-    for u in U:
-        if u["split"] and (len(u["clients"]) != 1 or S._flat("".join(u["split"])) != S._flat(texts[u["clients"][0]]["text"])):
-            log.append(f"{u['id']}: split {u['split']} không nối lại đúng câu khách -> bỏ, code tự ngắt")
+    # MỘT CÂU CHIA Ở NHIỀU ĐƠN VỊ (VLM ghi mỗi mẩu một mục: "Du lịch Mây Ngàn -" | "0283 777 8899", 14/10 mix1 m04): các mẩu nối
+    # lại theo thứ tự đọc ra đúng câu -> gộp thành một đơn vị nhiều dòng, mỗi dòng một mẩu
+    for k in {u["clients"][0] for u in U if len(u["clients"]) == 1 and u["split"]}:
+        us = [u for u in U if u["kind"] == "text" and u["clients"] == [k] and u["split"] and len(u["split"]) == len(u["marks"])]
+        if len(us) < 2:
+            continue
+        us = [us[i] for i in _reading([by[u["marks"][0]]["box"] for u in us])]
+        if sim("".join(p for u in us for p in u["split"]), texts[k]["text"]) < PIECE_SIM:
+            continue
+        us[0].update(marks=[m for u in us for m in u["marks"]], split=[p for u in us for p in u["split"]], split_ok=True)
+        U = [u for u in U if u not in us[1:]]
+        log.append(f"{us[0]['id']}: câu T{k} chia ở {[u['id'] for u in us]} -> một đơn vị {us[0]['marks']}")
+    # SPLIT trong MỘT đơn vị: chỉ dùng mảnh rỗng (VLM nói dòng đó không thuộc câu -- 14/10 mix1 m01: dòng thứ ba là tên máy FLUX
+    # tự vẽ) -> dòng rời đơn vị, xoá trống (VLM đã nhìn dòng và nói không có chữ khách nào ở đó). Ngắt câu vào các dòng là việc
+    # của code (bề rộng nét, layout); split chỉ còn cho chữ cong và phải nối lại đúng câu khách.
+    for u in list(U):
+        if u["split"] and len(u["split"]) == len(u["marks"]) and any(not p.strip() for p in u["split"]):
+            out = [m for m, p in zip(u["marks"], u["split"]) if not p.strip()]
+            u["marks"], u["split"] = [m for m, p in zip(u["marks"], u["split"]) if p.strip()], [p for p in u["split"] if p.strip()]
+            U.append({**u, "id": u["id"] + "x", "kind": "skip", "marks": out, "clients": [], "split": None, "text_vlm": "", "vlm_out": True})
+            log.append(f"{u['id']}: split để trống dòng {out} -> dòng đó rời đơn vị, xoá trống")
+        if u["split"] and not u.get("split_ok") and (len(u["clients"]) != 1
+                                                   or S._flat("".join(u["split"])) != S._flat(texts[u["clients"][0]]["text"])):
             u["split"] = None
+    U = [u for u in U if u["marks"]]
     # MỘT CÂU Ở NHIỀU ĐƠN VỊ: đơn vị có chữ OCR giống câu nhất nhận câu; đơn vị kia: còn câu CÙNG VAI chưa có chỗ thì nhận câu đó
     # (FLUX vẽ lặp một hàng: 5f35 "Gội dưỡng" hai lần, "Đính đá" chưa có chỗ), không thì thành dòng lấp (chữ VLM nếu có)
     used = Counter(k for u in U for k in u["clients"])
@@ -224,35 +243,24 @@ def resolve(A: dict, M: dict, texts: list[dict], product: bool = False) -> tuple
             if bad:
                 log.append(f"{u['id']}: chữ lấp {u['text_vlm']!r} có số không có trong câu khách {bad} -> bỏ")
                 u["text_vlm"] = ""
-    # DÒNG CHƯA AI GHÉP (VLM bỏ sót / ghi text rỗng): cụm nét lạ, chữ trên sản phẩm -> giữ; chữ OCR giống một câu chưa dùng -> câu
-    # đó; poster có ảnh sản phẩm -> giữ (logo Coca-Cola đọc thành "eo.mg", 14/10 q03); còn lại -> xoá trống (chữ giun)
+    # DÒNG CHƯA AI GHÉP (VLM bỏ sót / ghi text rỗng): cụm nét lạ, chữ trên sản phẩm, poster có ảnh sản phẩm -> giữ (logo Coca-Cola
+    # đọc thành "eo.mg", 14/10 q03); còn lại -> xoá trống (chữ giun). KHÔNG đem câu khách còn thiếu ép vào (14/10: FLUX vẽ thiếu
+    # câu thì chịu; ghép lỏng theo chữ OCR đặt "Tiết kiệm điện" -- một ưu điểm -- vào dòng tên máy dưới tiêu đề, m01).
     # VLM chỉ được XOÁ cụm nét lạ (orphan): dòng chữ thường VLM ghi skip cũng là dòng chưa ai ghép (không bỏ dòng nào nháp đã vẽ)
     empty = [u for u in U if u["kind"] == "text" and not u["clients"] and not u["text_vlm"]]
     U = [u for u in U if u not in empty]
     for u in U:
-        if u["kind"] == "skip":
+        if u["kind"] == "skip" and not u.get("vlm_out"):
             u["marks"] = [m for m in u["marks"] if by[m].get("orphan")]
     U = [u for u in U if u["marks"]]
     have = {m for u in U for m in u["marks"]}
-    gaps = [l for l in M["L"] if l["id"] not in have]
-    free = [j for j in range(len(texts)) if not used[j]]
-    pairs = sorted(((sim(l.get("ocr") or "", texts[j]["text"]), l["id"], j) for l in gaps if not l.get("printed") and not l.get("orphan")
-                    and len(S._flat(l.get("ocr") or "")) >= 3 for j in free), reverse=True)
-    loose = {}
-    for s, lid, j in pairs:
-        if s >= LOOSE and lid not in loose and j not in loose.values():
-            loose[lid] = j
-    for l in gaps:
-        base ={"id": f"g_{l['id']}", "marks": [l["id"]], "clients": [], "split": None, "text_vlm": "", "role_vlm": None, "bullet": False}
-        if l.get("orphan") or l.get("printed") or (product and l["id"] not in loose):
+    for l in (l for l in M["L"] if l["id"] not in have):
+        base = {"id": f"g_{l['id']}", "marks": [l["id"]], "clients": [], "split": None, "text_vlm": "", "role_vlm": None, "bullet": False}
+        if l.get("orphan") or l.get("printed") or product:
             U.append({**base, "kind": "keep", "why": "chưa ai ghép: cụm nét lạ / chữ sản phẩm -> giữ"})
             log.append(f"{l['id']}: chưa ai ghép ({l.get('ocr')!r}) -> giữ nguyên")
-        elif l["id"] in loose:
-            U.append({**base, "kind": "text", "clients": [loose[l["id"]]], "why": "chưa ai ghép: chữ nháp giống câu khách"})
-            used[loose[l["id"]]] += 1
-            log.append(f"{l['id']}: chưa ai ghép ({l.get('ocr')!r}) -> câu khách T{loose[l['id']]}")
         else:
-            U.append({**base, "kind": "skip", "why": "chưa ai ghép, không còn câu nào"})
+            U.append({**base, "kind": "skip", "why": "chưa ai ghép"})
             log.append(f"{l['id']}: chưa ai ghép ({l.get('ocr')!r}) -> xoá trống")
     log += order(U, M, texts)
     missing = [j for j in range(len(texts)) if not used[j] and texts[j].get("source") != "ai"]
@@ -321,6 +329,10 @@ def align_of(boxes: list, size: float) -> str | None:
     if len(boxes) < 2:
         return None
     sp = {"left": np.ptp([b[0] for b in boxes]), "right": np.ptp([b[2] for b in boxes]), "center": np.ptp([(b[0] + b[2]) / 2 for b in boxes])}
+    # các dòng dài bằng nhau: thẳng tâm lẫn thẳng mép -- không nói được lề (14/10 mix1 t02: "Tối 2-4-6" / "Tối 3-5-7" kéo cả tập
+    # tên khoá học căn trái thành căn giữa; m01 tiêu đề hai dòng gần bằng nhau căn trái thành giữa) -> None, để chỗ khác quyết
+    if sp["center"] <= CENTER_TOL * size and min(sp["left"], sp["right"]) <= CENTER_TOL * size:
+        return None
     if sp["center"] <= CENTER_TOL * size:
         return "center"
     best = min(sp, key=sp.get)
@@ -343,30 +355,39 @@ def lone_align(b: list, others: list, size: float) -> str:
 def set_align(B: list, size: float) -> str:
     """Lề của TẬP: theo các cặp xếp chồng cùng cột; không có cặp nào (một hàng, lưới thưa, toả tròn) -> giữa."""
     pairs = [(a, b) for i, a in enumerate(B) for b in B[i + 1:] if min(a[2], b[2]) - max(a[0], b[0]) > 0.3 * min(a[2] - a[0], b[2] - b[0])]
-    if not pairs:
-        return "center"
-    return Counter(align_of([a, b], size) for a, b in pairs).most_common(1)[0][0]
+    votes = Counter(x for x in (align_of([a, b], size) for a, b in pairs) if x)
+    return votes.most_common(1)[0][0] if votes else "center"
 
 
-def break_like(text: str, weights: list) -> list[str]:
-    """Chia câu thành len(weights) dòng, độ dài (ký tự) từng dòng theo tỉ lệ weights (số ký tự OCR các dòng nháp)."""
+def break_like(text: str, caps: list, meas=len) -> list[str]:
+    """Chia câu thành len(caps) dòng theo SỨC CHỨA từng dòng nháp: caps = bề rộng nét / cỡ chữ (em), meas = bề rộng em của chữ
+    theo font thật (fonts.advance); dòng cong: caps = số ký tự OCR, meas = len. Chọn cách ngắt cho dòng chật nhất đỡ chật nhất
+    -- cả khối co theo dòng chật nhất, nên đây là cách giữ cỡ to nhất; hoà thì các dòng đều nhau hơn. (14/10 mix1: ngắt theo tỉ
+    lệ số ký tự OCR của chữ giun ra "toàn / bộ / mỹ phẩm / chăm sóc da", "Thời gian của riêng / anh" -- chữ giun sai số ký tự,
+    bề rộng nét thì không.)"""
     w = text.split()
-    n = min(len(weights), len(w))
+    n = min(len(caps), len(w))
     if n <= 1:
         return [text]
-    tw = np.cumsum(weights[:n]) / sum(weights[:n])
-    cl = np.cumsum([len(x) + 1 for x in w]) / sum(len(x) + 1 for x in w)
-    best = {(0, 0): (0.0, [])}
-    for j in range(1, n):
+    caps = caps[:n]
+    # quy hoạch động: (từ đã dùng, số dòng) -> cách ngắt tốt nhất theo (chật nhất, tổng bình phương)
+    best = {0: ((0.0, 0.0), [])}
+    for j in range(n):
         nxt = {}
-        for (i, _), (c, br) in best.items():
-            for e in range(i + 1, len(w) - (n - j) + 1):
-                v = (c + (cl[e - 1] - tw[j - 1]) ** 2, br + [e])
-                if (e, j) not in nxt or v[0] < nxt[(e, j)][0]:
-                    nxt[(e, j)] = v
+        for i, ((mx, sq), br) in best.items():
+            for e in range(i + 1, len(w) - (n - 1 - j) + 1):
+                r = meas(" ".join(w[i:e])) / max(1e-6, caps[j])
+                v = ((max(mx, r), sq + r * r), br + [e])
+                if e not in nxt or v[0] < nxt[e][0]:
+                    nxt[e] = v
         best = nxt
-    cuts = [0] + min(best.values())[1] + [len(w)]
+    cuts = [0] + best[len(w)][1]
     return [" ".join(w[a:b]) for a, b in zip(cuts, cuts[1:])]
+
+
+def _caps(u: dict) -> list[float]:
+    """Sức chứa các dòng nháp của đơn vị: bề rộng nét / cỡ chữ (em)."""
+    return [max(0.5, (b[2] - b[0]) / max(1.0, l["size"])) for b, l in zip(u["ib"], u["Ls"])]
 
 
 def _gaps(ink: np.ndarray, b: list, parts: list[str], size: float) -> list[float] | None:
@@ -442,6 +463,7 @@ def _sanitize(css: str) -> tuple[str, str]:
 
 def layout(U: list[dict], M: dict, ink: np.ndarray, styles: dict, accent: list, texts: list[dict]) -> tuple[list[dict], list[str]]:
     """Đơn vị chữ -> số đo + phần tử dựng (u["els"]): khung nét, cỡ, màu, lề, tập, chữ (nguyên văn, ngắt theo nháp). Sửa U tại chỗ."""
+    from .fonts import advance
     from .render import HEAD, WEIGHT, font_key, op_geom, path_of
     by, log = M["by"], []
     med = float(np.median([l["size"] for l in M["L"]])) if M.get("L") else 0.0
@@ -458,6 +480,7 @@ def layout(U: list[dict], M: dict, ink: np.ndarray, styles: dict, accent: list, 
             u["ib"].append([b[0], min(b[1], l["box"][1]), b[2], max(b[3], l["box"][3])] if b else list(l["box"]))
         u["box"] = [min(b[0] for b in u["ib"]), min(b[1] for b in u["ib"]), max(b[2] for b in u["ib"]), max(b[3] for b in u["ib"])]
         u["color"] = next((l["color"] for l in u["Ls"] if l.get("color")), None)
+        u["color_draft"] = u["color"]   # màu đo trên nét nháp (bộ kiểm tương phản: đúng màu nháp thì giữ, thêm quầng)
         szs = [l["size"] for l in u["Ls"]]
         # CÁCH DỰNG: "lines" = mỗi hàng nháp một phần tử (câu khác cỡ / có split / các dòng không chồng thành khối);
         # "block" = khối nhiều dòng (tự ngắt theo nháp); "line" = một dòng
@@ -480,8 +503,13 @@ def layout(U: list[dict], M: dict, ink: np.ndarray, styles: dict, accent: list, 
         b, xs = u["ib"][0], [u["ib"][0][0]] + cuts + [u["ib"][0][2]]
         subs = []
         for i, k in enumerate(u["clients"]):
+            # khung mẩu ôm đúng nét của nó (không ôm nửa khe): lề / cỡ của mẩu theo chữ nháp (14/10 mix1 t02: tên khoá học căn trái
+            # thành căn giữa vì khung mẩu kéo tới giữa khe)
+            col = np.flatnonzero(ink[max(0, int(b[1])):int(b[3]), max(0, int(xs[i])):int(xs[i + 1])].any(axis=0))
+            o = max(0, int(xs[i]))
+            sx0, sx1 = (float(o + col[0]), float(o + col[-1] + 1)) if len(col) else (xs[i], xs[i + 1])
             v = {**u, "id": f"{u['id']}c{i}", "clients": [k], "text": [texts[k]["text"]], "role": texts[k]["role"],
-                 "ib": [[xs[i], b[1], xs[i + 1], b[3]]], "split": None}
+                 "ib": [[sx0, b[1], sx1, b[3]]], "split": None}
             v["box"] = v["ib"][0]
             subs.append(v)
         U[U.index(u):U.index(u) + 1] = subs
@@ -545,6 +573,8 @@ def layout(U: list[dict], M: dict, ink: np.ndarray, styles: dict, accent: list, 
         u["css"] = (f"font-weight:{int(wt)};font-style:{'italic' if st.get('italic') else 'normal'};text-transform:{case};"
                     + (f"letter-spacing:{float(tr):.3f}em;" if isinstance(tr, (int, float)) else "") + outer)
         u["inner"] = inner
+        # bề rộng chữ theo font thật của đơn vị (ngắt dòng): chữ in hoa đo bản in hoa
+        u["meas"] = lambda t, k=u["font"], up=case == "uppercase": advance(k, t.upper() if up else t)  # noqa: E731
         # chữ: nguyên văn; ngoặc kép FLUX vẽ quanh câu trích (OCR thấy dấu ngoặc ở đầu / cuối) -> giữ ngoặc (probe dc0d)
         first, last = (u["Ls"][0].get("ocr") or "").strip(), (u["Ls"][-1].get("ocr") or "").strip()
         if len(u["text"]) == 1 and u["role"] == "review_quote":   # chỉ câu trích (probe k03: mép cuộn ruy băng đọc ra dấu ngoặc)
@@ -573,32 +603,36 @@ def layout(U: list[dict], M: dict, ink: np.ndarray, styles: dict, accent: list, 
             u["els"] = [{"id": u["id"], "box": g["rect"], "angle": g["angle"], "path": path_of({"kind": "text", "marks": u["marks"]}, M),
                          "lines": pieces, "size": u["size"], "multi": len(pieces) > 1}]
         elif u["mode"] == "lines":
-            pieces = u["split"] if u["split"] and len(u["split"]) == len(u["Ls"]) else \
-                break_like(" ".join(u["text"]), [max(1, len(l.get("ocr") or "")) for l in u["Ls"]])
+            pieces = break_like(" ".join(u["text"]), _caps(u), u["meas"])
+            rank = list(range(len(u["Ls"])))   # thứ tự trong câu của mẩu ở mỗi dòng
+            # một câu VLM ghi thành nhiều mục rồi được gộp (m04 "Du lịch Mây Ngàn -" | "0283 777 8899"): mỗi dòng giữ mẩu của nó
+            if u.get("split_ok") and len(u["split"]) == len(u["Ls"]):
+                rank = [u["marks"].index(l["id"]) for l in u["Ls"]]
+                pieces = [u["split"][i] for i in rank]
             if len(pieces) < len(u["Ls"]):   # câu ít chữ hơn số dòng: dồn vào các dòng đầu
                 pieces += [""] * (len(u["Ls"]) - len(pieces))
             u["els"] = []
             szs = [l["size"] for l in u["Ls"]]
             even = max(szs) / min(szs) <= SPLIT_RATIO   # các hàng nháp vẽ gần cùng cỡ: một cỡ chung; khác cỡ hẳn: mỗi hàng cỡ của nó
             for gi, g in enumerate(_rows(u["Ls"], u["ib"])):
-                txt = " ".join(p for p in (pieces[i] for i in g) if p)
+                txt = " ".join(p for p in (pieces[i] for i in sorted(g, key=lambda i: rank[i])) if p)
                 if not txt:
                     continue
                 b = [min(u["ib"][i][0] for i in g), min(u["ib"][i][1] for i in g), max(u["ib"][i][2] for i in g), max(u["ib"][i][3] for i in g)]
                 sz = u["size"] if even else float(np.median([u["Ls"][i]["size"] for i in g]))
                 # hàng mà khung OCR ôm nhiều dòng chữ (huy chương "vỗng / 2025" chung một khung, 14/10 e03): ngắt theo chiều cao
                 n = int(round((b[3] - b[1]) / (1.25 * sz))) if b[3] - b[1] > TALL * sz else 1
-                parts = break_like(txt, [1.0] * n) if n > 1 else [txt]
+                parts = break_like(txt, [1.0] * n, u["meas"]) if n > 1 else [txt]
                 u["els"].append({"id": f"{u['id']}#{gi}", "box": b, "angle": 0.0, "path": None, "lines": parts, "size": sz,
                                  "multi": len(parts) > 1})
         elif u["mode"] == "block":
             if len(u["text"]) > 1:
                 pieces = u["text"]
             elif len(u["Ls"]) > 1:
-                pieces = break_like(u["text"][0], [max(1, len(l.get("ocr") or "")) for l in u["Ls"]])
+                pieces = break_like(u["text"][0], _caps(u), u["meas"])
             else:   # một khung OCR ôm nhiều dòng chữ: số dòng ước theo chiều cao
                 n = max(1, int(round((u["box"][3] - u["box"][1]) / (1.25 * u["size"]))))
-                pieces = break_like(u["text"][0], [1.0] * n)
+                pieces = break_like(u["text"][0], [1.0] * n, u["meas"])
             u["els"] = [{"id": u["id"], "box": u["box"], "angle": 0.0, "path": None, "lines": pieces, "size": u["size"], "multi": True}]
         else:
             u["els"] = [{"id": u["id"], "box": u["box"], "angle": 0.0, "path": None, "lines": [" ".join(u["text"]) if len(u["text"]) == 1
@@ -607,6 +641,7 @@ def layout(U: list[dict], M: dict, ink: np.ndarray, styles: dict, accent: list, 
             if lead and e is u["els"][0]:
                 e["lines"][0] = lead + e["lines"][0]
             e["html"] = "<br>".join(_markup(x, u, texts) for x in e["lines"])
+        u.pop("meas", None)
     return U, log
 
 

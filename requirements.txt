@@ -15,3 +15,4 @@ fastapi>=0.110
 uvicorn>=0.28
 pydantic>=2.6
 packaging>=23             # scripts/check_server.py so phiên bản gói
+fonttools[woff]>=4.40      # bề rộng chữ theo font thật (fill: ngắt dòng); [woff] kèm brotli đọc .woff2

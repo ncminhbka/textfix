@@ -59,11 +59,12 @@ reading order. Never assign a client text twice.
 2. ONE TEXT, LINES OF CLEARLY DIFFERENT SIZE OR IN SEPARATE PLACES (a small "THANH TOÁN" over a huge "NHANH CHÓNG"; "NGÀY" and \
 "HỘI" in two boxes): one entry with all those lines and "split": the client text cut into one piece per line, in line order \
 -- the pieces joined must give the client text exactly.
-3. EXTRA LINES (the model drew more lines than the client has texts, or repeated one): fill them in this order: (a) a client \
-text that has no line yet; (b) "client": null with "text": a short phrase taken from another client text; (c) "client": null \
-with "text": a short natural phrase that fits that spot and that business, no fact, no number, no promise. A repeated row of a \
-list gets a list item that has no row yet. Steps, name / price rows, dates and contacts are never invented. Give a filled line \
-the "role" it plays (the role of the row it repeats).
+3. EXTRA LINES (the model drew more lines than the client has texts, or repeated one): fill them in this order: (a) a \
+repeated row of a list gets a client text OF THE SAME ROLE that has no line yet -- never move a text of another role into it; \
+(b) "client": null with "text": a short phrase taken from another client text; (c) "client": null with "text": a short phrase \
+of the same kind as the rows around it (another benefit beside benefits) that is true of that business, no fact, no number, \
+no promise. Steps, name / price rows, dates and contacts are never invented. Give a filled line the "role" it plays (the role \
+of the row it repeats).
 4. KEEP / SKIP: kind "keep" ONLY for text printed on a product, package, screen or object in the photo (its pixels stay as \
 drawn). "STRAY LETTERING": "keep" when it is a logo, seal, sign or product text, or decoration that \
 looks fine; "skip" (wiped) only when it is garbled junk; when unsure "keep". Poster lettering, however decorated, is never kept.
@@ -73,8 +74,9 @@ looks fine; "skip" (wiped) only when it is garbled junk; when unsure "keep". Pos
 
 STYLES -- one entry per client-text ROLE (the role is written after each T#): how that kind of text looks in the DRAFT. Every \
 text of the role is set exactly alike, so describe what the role looks like, not one line: "font" (a key from the catalog \
-whose family matches the draft's letterforms -- condensed, rounded, geometric, serif, script, display -- and whose letter width \
-is within about 0.05em of the measured width), "weight" (100-900, as heavy as the draft: a heavy headline stays 800-900), \
+whose family matches the draft's letterforms -- condensed, rounded, geometric, serif, script, display; a condensed or \
+narrow family only when the draft letters are clearly tall and narrow, ordinary lettering gets an ordinary-width family: the \
+code narrows a tight line by itself), "weight" (100-900, as heavy as the draft: a heavy headline stays 800-900), \
 "italic", "case" ("upper" when the draft shows capitals, else "none"), "tracking" (em, only when clearly spaced) and "effect" \
 (CSS only for outlines, shadows, glows or gradient / metallic letters, as strong as the draft: text-shadow, -webkit-text-stroke, \
 background-clip:text with a linear-gradient) and "color" (#hex fill of the letters as drawn -- white letters with a black \

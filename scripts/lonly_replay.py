@@ -43,7 +43,7 @@ with Browser() as B:
             if not (os.path.exists(r + "plan.json") and dr):
                 continue
             P = json.load(open(r + "plan.json", encoding="utf-8"))
-            if not (P.get("slots") or {}).get("L") or not P.get("ops"):
+            if not (P.get("slots") or {}).get("L") or not (P.get("ops") or P.get("assign")):
                 continue
             T = json.load(open(f"output/{setn}/{m['run_id']}/brief.json", encoding="utf-8"))["texts"]
             D = np.asarray(Image.open(dr).convert("RGB"))
@@ -74,13 +74,15 @@ with Browser() as B:
                 l.pop("dot", None)
             glog = slots._lead_dots(M["L"], ink) + slots._trim_lead(M["L"], ink)
             prod = bool((cases.get(cid) or {}).get("image"))
-            cpath = f"{a.out}/cache/{setn}_{cid}_clean.png"
+            cpath = f"{a.out}/cache/{setn.replace('/', '_')}_{cid}_clean.png"
             if os.path.exists(cpath):
                 clean = np.asarray(Image.open(cpath).convert("RGB"))
             else:
                 clean = lonly.erase(D, ink, M)[0]
                 Image.fromarray(clean).save(cpath)
-            A = fill.from_ops(P, T)
+            # plan chặng B: câu trả lời VLM đã ở khuôn ghép; plan cũ: rút từ lệnh html
+            A = {"assign": P["assign"], "styles": P.get("style") or {}, "accent": P.get("accent") or []} if P.get("assign") \
+                else fill.from_ops(P, T)
             U, rlog, miss = fill.resolve(A, M, T, product=prod)
             U, llog = fill.layout(U, M, ink, A["styles"], A["accent"], T)
             elog = []
@@ -109,8 +111,8 @@ with Browser() as B:
             for t in tiles:
                 sheet.paste(t, (x, 0))
                 x += t.width + 8
-            sheet.save(f"{a.out}/{setn}_{cid}.jpg", quality=82)
-            Image.fromarray(np.asarray(poster)).save(f"{a.out}/{setn}_{cid}_poster.jpg", quality=90)
+            sheet.save(f"{a.out}/{setn.replace('/', '_')}_{cid}.jpg", quality=82)
+            Image.fromarray(np.asarray(poster)).save(f"{a.out}/{setn.replace('/', '_')}_{cid}_poster.jpg", quality=90)
             # SỐ ĐO: chữ đặt khác câu khách (phải 0 ngoài dòng lấp), tập dựng lệch cỡ (phải 0), phần tử co < 0,6, câu khách thiếu
             import re   # số bước / ngoặc kép do mã đặt lại không tính là lệch
             placed = lambda u: re.sub(r"^\d{1,2}\.\s+", "", "".join(x for e in u.get("els") or [] for x in e["lines"]).strip().strip("“”"))  # noqa: E731

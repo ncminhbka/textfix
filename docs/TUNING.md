@@ -772,6 +772,23 @@ thứ tự khách; VLM không cần chữ OCR làm gợi ý.
 - CÒN (nguồn lỗi đã dồn về bước ĐO DÒNG): OCR gộp hai cột / một khung hai hàng / đọc tick thành chữ cái (tick sát chữ bị gỡ cùng
   chữ: mix1 m01, có từ khi dùng Hi-SAM; thử luật theo ký tự OCR đầu dòng: bắt 0 / 538 dòng, đã gỡ) / góc nghiêng. Ứng viên: Hi-SAM
   phân cấp (từ / dòng) chia dòng thay OCR. VLM ghép theo khuôn mới chưa đo (cần máy chủ).
+- [máy chủ, mix1 lượt `mix1_report_1014_084429`, lời dặn khuôn ghép] xem đủ 35 poster: chữ đúng câu khách mọi chỗ, tập cùng vai
+  đều cỡ; VLM ghép đúng gần hết (sai: v03 ngày vào mẩu 'ha', m04 một câu ghi thành hai mục, v05 split lệch nháp). Lỗi còn lại theo
+  nguồn: kiểu chữ VLM tả hẹp / đậm hơn nháp (~8 poster), ngắt dòng theo số ký tự OCR chữ giun (4), bộ kiểm tương phản đổi màu nháp
+  (4), chữ lấp vô nghĩa / lặp (f05 "Ngân hàng", m03), FLUX thiếu câu (8, chấp nhận).
+- [mã, sau góp ý "không vá theo ca"] ngắt dòng theo SỨC CHỨA dòng nháp (bề rộng nét / cỡ, em) với bề rộng chữ theo FONT THẬT
+  (`fonts.advance`, fontTools): cách ngắt cho dòng chật nhất đỡ chật nhất; split của VLM chỉ còn cho chữ cong, mảnh rỗng (dòng rời
+  câu -> xoá trống) và câu VLM ghi thành nhiều mục (gộp lại một đơn vị); dòng dài bằng nhau không nói được lề (tập: bỏ phiếu theo
+  cặp khác; một đơn vị: theo dòng kề); mẩu cắt từ dòng gộp ôm sát nét của nó; KHÔNG ép câu thiếu vào dòng thừa (bỏ ghép lỏng
+  `LOOSE`, lời dặn: dòng lặp của list chỉ nhận câu CÙNG VAI); chữ chìm nền mà đúng màu đo trên nháp -> giữ màu + quầng (tiêu đề:
+  viền như cũ); lời dặn: font hẹp chỉ khi chữ nháp hẹp rõ. Thử rồi BỎ (vá theo ca): ngưỡng bỏ split 1,25, OCR xác nhận câu
+  (0,9 / 0,5), bảng bề rộng ký tự tự đặt. Số bước giữ đúng số câu khách (i02 "1., 3., 5." khi FLUX vẽ ba hàng cho năm bước).
+- [đo tại máy, câu trả lời VLM của lượt đó] mix1 35 poster: phần tử co < 0,6: 8 -> 5, poster còn lỗi bộ kiểm: 8 -> 5, chữ lệch câu
+  khách 0, tập lệch cỡ 0. Lời dặn VLM đổi (font, dòng thừa) chưa đo -- cần một lượt máy chủ trên tập luyện.
+- [máy chủ, probe Hi-SAM-L phân cấp, 65 nháp mix1 + accept2] 580 dòng Hi-SAM / 546 dòng OCR, ~96% khớp một-một; Hi-SAM tách đúng
+  khung OCR hai hàng (huy chương, dấu chồng) và cho NHÓM ĐOẠN; thua ở chữ chạy vòng (không ra dòng), tách nhầm chữ khác màu, nối
+  tên ... giá qua dấu chấm dẫn. 4,5 s / poster, đỉnh 8,8 GB. Hướng: kết hợp (tách khung OCR nhiều hàng theo dòng Hi-SAM, nhóm đoạn),
+  không thay OCR; xem trước `hi_sam_l.pth` có cho luôn mặt nạ nét (thay `sam_tss_l`) không.
 
 **Bộ thi `bench/accept2.json` (30 ca, seed 9001-9030):** e nút / thẻ / huy hiệu (6), h nền khó (5), k chữ khó (5), l danh sách /
 bảng / các bước (5), q ảnh sản phẩm (3), r form thường gặp (6). CHỈ chạy và chấm, không sửa mã theo từng ca của bộ này; lỗi

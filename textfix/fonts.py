@@ -127,6 +127,27 @@ WIDTH = {   # em / ký tự (chữ thường lẫn hoa, IN HOA) ở độ đậm
 }
 
 
+@lru_cache(maxsize=64)
+def _metrics(key: str):
+    """(bảng mã ký tự -> bề rộng em, bề rộng em trung bình) đọc từ tệp font của khoá (tệp đầu tiên; font biến thiên: bản mặc định)."""
+    from fontTools.ttLib import TTFont
+    f = TTFont(str(FONTS_DIR / next(iter(CATALOG[key][3].values()))))
+    upm, hm = f["head"].unitsPerEm, f["hmtx"].metrics
+    adv = {cp: hm[g][0] / upm for cp, g in f.getBestCmap().items() if g in hm}
+    return adv, sum(adv.get(ord(c), 0.5) for c in "aeinost") / 7
+
+
+def advance(key: str | None, text: str) -> float:
+    """Bề rộng (em) của chữ theo font THẬT của khoá; khoá lạ -> ước 0,55 em / ký tự."""
+    try:
+        adv, avg = _metrics(key) if key in CATALOG else (None, None)
+    except Exception:   # thiếu fontTools / brotli: ước theo số ký tự
+        adv = None
+    if adv is None:
+        return 0.55 * len(text)
+    return sum(adv.get(ord(c), avg) for c in text)
+
+
 def family(key: str) -> str:
     fam, _, fb, _ = CATALOG[key]
     return f"'{fam}', {fb}"

@@ -535,6 +535,7 @@ def render_units(page, plate: np.ndarray, U: list[dict], M: dict, floor: float |
         s.setProperty('text-shadow', 'none', 'important'); s.setProperty('-webkit-text-stroke-width', '0', 'important'); } }""")
     bg = np.asarray(Image.open(io.BytesIO(page.locator("#c").screenshot())).convert("RGB"))
     color0 = {e["id"]: u.get("color") for u in T for e in u["els"]}
+    drawn = {e["id"]: u.get("color_draft") for u in T for e in u["els"]}
     bad = lambda r: (r["low"] or 0) > (0.6 if r.get("px_based") else CONTRAST_FRAC)   # noqa: E731
     for r in res:
         r["low"] = _low_contrast(r, bg, img)
@@ -548,7 +549,8 @@ def render_units(page, plate: np.ndarray, U: list[dict], M: dict, floor: float |
     fs_med = float(np.median([r["fs"] for r in res if r.get("fs")] or [0]))
     for r in res:
         if bad(r):
-            r["recolor"] = _recolor(r, bg, color0.get(r["id"]), pal, big=bool(r.get("fs") and (r["fs"] >= OUTLINE_HEAD * fs_med or r["fs"] >= OUTLINE_ABS * min(W, H))))
+            r["recolor"] = _recolor(r, bg, color0.get(r["id"]), pal, big=bool(r.get("fs") and (r["fs"] >= OUTLINE_HEAD * fs_med or r["fs"] >= OUTLINE_ABS * min(W, H))),
+                                    drawn=drawn.get(r["id"]))
     return img, res, log
 
 
@@ -556,6 +558,7 @@ OUTLINE_HEAD = 1.4   # chữ cỡ >= 1.4 lần cỡ trung vị poster (tiêu đ�
 OUTLINE_ABS = 0.06   # ... hoặc cỡ >= 6% cạnh ngắn ảnh (poster nhiều chữ to: trung vị cao -- dev3 g12 114 / 95 px)
 CONTRAST_PX = 2.0   # điểm nền mà màu chữ trên đó có tỉ lệ tương phản WCAG < 2 = chữ chìm (chữ thân cần >= 4.5, chữ lớn >= 3)
 CONTRAST_FRAC = 0.25   # > 25% nền sau khối chữ là điểm chìm = lỗi low_contrast (khối chữ không có bóng / viền)
+DRAWN_RGB = 120.0   # màu chữ cách màu đo trên nét nháp <= 120 (khoảng cách RGB) = đúng màu nháp vẽ (fill.DIFF_RGB)
 
 
 def _lum(rgb: np.ndarray) -> np.ndarray:
@@ -603,7 +606,8 @@ def _rgb(c: str | None) -> tuple | None:
     return tuple(float(m.group(i)) for i in (1, 2, 3)) if m else None
 
 
-def _recolor(r: dict, bg: np.ndarray, draft_color: str | None, pal: list | None = None, big: bool = False) -> dict | None:
+def _recolor(r: dict, bg: np.ndarray, draft_color: str | None, pal: list | None = None, big: bool = False,
+             drawn: str | None = None) -> dict | None:
     """Chữ chìm nền: màu chữ thay thế, ưu tiên HỢP BẢNG MÀU (08/10 replay: tiêu đề vàng nhạt -> gần đen, đọc được nhưng thô) --
     màu các chữ đọc tốt khác trên poster, rồi màu nháp tối / sáng dần, cuối cùng trắng / gần đen: màu ĐẦU TIÊN có <= 10% nền
     chìm (tương phản WCAG < CONTRAST_PX). Không màu nào đạt: màu ít chìm nhất + quầng màu ngược độ sáng."""
@@ -613,6 +617,14 @@ def _recolor(r: dict, bg: np.ndarray, draft_color: str | None, pal: list | None 
     if x1 - x0 < 2 or y1 - y0 < 2:
         return None
     lb = _lum(bg[y0:y1, x0:x1].reshape(-1, 3))
+    # MÀU NHÁP VẼ (màu chữ gần màu đo trên nét nháp): nháp là chuẩn thẩm mỹ -> giữ màu, chỉ thêm quầng màu ngược độ sáng cho đọc
+    # được (14/10 mix1: chữ trắng trên pill pastel / nền xanh nhạt bị đổi sang xanh đen, khác hẳn nháp -- x04, v06, f02, f05).
+    # Màu khác hẳn màu nháp (VLM tả sai màu) -> chọn màu như dưới.
+    fg, dc = _rgb(r.get("fg")), _rgb(drawn)
+    if not big and fg and dc and float(np.linalg.norm(np.subtract(fg, dc))) <= DRAWN_RGB:
+        lf = float(_lum(np.array([fg], np.float32))[0])
+        return {"color": "#%02x%02x%02x" % tuple(int(round(v)) for v in fg), "frac": None,
+                "halo": "rgba(0,0,0,.55)" if lf > 0.4 else "rgba(255,255,255,.6)"}
     if big and _rgb(r.get("fg")):
         # TIÊU ĐỀ: đổi hẳn màu làm mất thiết kế (09/10 dev3 g11: cam viền trắng -> nâu ô liu, g12: trắng -> xám) -> giữ màu chữ,
         # viền màu ngược độ sáng của chữ (chữ sáng viền tối, chữ tối viền trắng) -- như nháp hay vẽ chữ có viền
