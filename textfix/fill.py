@@ -180,10 +180,12 @@ def resolve(A: dict, M: dict, texts: list[dict], product: bool = False) -> tuple
             log.append(f"{u['id']}: dòng {lost} đã thuộc đơn vị khác -> bỏ khỏi đơn vị này")
             u["marks"] = [m for m in u["marks"] if owner[m] == i]
     U = [u for u in U if u["marks"]]
-    # CHỮ IN TRÊN SẢN PHẨM KHÁCH TẢI (mark_printed) luôn giữ nguyên điểm ảnh, VLM ghi gì cũng vậy
+    # CHỮ IN TRÊN SẢN PHẨM KHÁCH TẢI (mark_printed: chữ OCR trùng chữ đọc trên ảnh sản phẩm) giữ nguyên điểm ảnh -- trừ khi VLM
+    # ghép dòng đó vào một CÂU KHÁCH: VLM nhìn ảnh thấy đó là chữ poster (14/10 dev2 d39 / d14: tiêu đề "Cà phê hoà tan Classic"
+    # vẽ hai dòng, dòng "Classic" trùng chữ trên gói -> bị giữ dạng giun, câu dồn vào một dòng)
     for u in list(U):
         pr = [m for m in u["marks"] if by[m].get("printed")]
-        if pr and u["kind"] != "keep":
+        if pr and u["kind"] != "keep" and not u["clients"]:
             log.append(f"{u['id']}: {pr} là chữ in trên sản phẩm khách tải -> giữ nguyên")
             U.append({**u, "id": u["id"] + "p", "kind": "keep", "marks": pr, "clients": [], "split": None, "text_vlm": ""})
             u["marks"] = [m for m in u["marks"] if m not in pr]
@@ -221,6 +223,18 @@ def resolve(A: dict, M: dict, texts: list[dict], product: bool = False) -> tuple
         if n < 2:
             continue
         us = [u for u in U if k in u["clients"]]
+        # các chỗ của câu XẾP CHỒNG liền nhau, cùng cỡ (FLUX vẽ một câu thành hai dòng, VLM ghi mỗi dòng một mục -- 14/10 dev2
+        # d31: dòng dưới giữ chữ giun ngay dưới câu đã viết) -> một đơn vị nhiều dòng
+        # (một hàng list FLUX vẽ lặp mà còn câu cùng vai chưa có chỗ thì không gộp: hàng lặp nhận câu đó, như dưới)
+        if all(u["clients"] == [k] and u["kind"] == "text" for u in us) and not any(
+                not used[j] and texts[j]["role"] == texts[k]["role"] for j in range(len(texts))):
+            Ls = sorted((by[m] for u in us for m in u["marks"]), key=lambda l: (l["box"][1], l["box"][0]))
+            if _stacked(Ls) and max(l["size"] for l in Ls) / min(l["size"] for l in Ls) <= SPLIT_RATIO:
+                us[0].update(marks=[l["id"] for l in Ls], split=None)
+                U = [u for u in U if not any(u is x for x in us[1:])]
+                used[k] = 1
+                log.append(f"câu T{k}: {[u['id'] for u in us]} xếp chồng liền nhau -> một đơn vị {us[0]['marks']}")
+                continue
         best = max(us, key=lambda u: (sim(u["text_vlm"], texts[k]["text"]), sim(ocr(u), texts[k]["text"])))
         for u in us:
             if u is best:
@@ -263,8 +277,43 @@ def resolve(A: dict, M: dict, texts: list[dict], product: bool = False) -> tuple
             U.append({**base, "kind": "skip", "why": "chưa ai ghép"})
             log.append(f"{l['id']}: chưa ai ghép ({l.get('ocr')!r}) -> xoá trống")
     log += order(U, M, texts)
-    missing = [j for j in range(len(texts)) if not used[j] and texts[j].get("source") != "ai"]
+    log += _markers(U, M, texts)
+    missing =[j for j in range(len(texts)) if not used[j] and texts[j].get("source") != "ai"]
     return U, log, missing
+
+
+def _markers(U: list[dict], M: dict, texts: list[dict]) -> list[str]:
+    """SỐ THỨ TỰ FLUX VẼ TRƯỚC CÁC HÀNG (số trong vòng tròn / ô vuông đứng riêng một dòng, 14/10 dev2 d20 / d19): chữ giun số
+    bị xoá thì để lại vòng tròn trống, giữ thì số sai (1, 4, 2, 3, 4). -> viết lại số: dòng chỉ 1-2 chữ số, ngay bên trái một
+    hàng chữ đã viết câu khách (cùng hàng, khe <= 3 cỡ). Số = thứ tự câu khách nếu là các bước (brief "ordered"), không thì thứ
+    tự đọc các hàng có số. Không phải các dòng số đứng riêng khác (giá, ngày)."""
+    by = M["by"]
+    rows = [u for u in U if u["kind"] == "text" and u["clients"]]
+    found = []
+    for u, m in [(u, m) for u in U if not (u["kind"] == "text" and (u["clients"] or u["text_vlm"])) for m in u["marks"]]:
+        l = by[m]
+        if not re.fullmatch(r"\s*\d{1,2}\s*[.)]?\s*", l.get("ocr") or ""):
+            continue
+        b, s = l["box"], l["size"]
+        cy = (b[1] + b[3]) / 2
+        nxt = [r for r in rows for m in r["marks"][:1] if by[m]["box"][1] <= cy <= by[m]["box"][3]
+               and 0 <= by[m]["box"][0] - b[2] <= 3 * max(s, by[m]["size"])]
+        if nxt:
+            found.append((u, m, nxt[0]))
+    if len(found) < 2:   # một số lẻ loi không phải đánh số hàng
+        return []
+    ordered = sorted(j for j, t in enumerate(texts) if t.get("ordered"))
+    found.sort(key=lambda p: (by[p[1]]["box"][1], by[p[1]]["box"][0]))
+    out = []
+    for i, (u, m, r) in enumerate(found):
+        k = r["clients"][0]
+        n = 1 + ordered.index(k) if k in ordered else i + 1
+        u["marks"] = [x for x in u["marks"] if x != m]
+        U.append({"id": f"n_{m}", "kind": "text", "marks": [m], "clients": [], "split": None, "text_vlm": str(n),
+                  "role_vlm": "step_no", "bullet": False, "why": "số thứ tự trước hàng"})
+        out.append(f"{m}: số FLUX vẽ trước hàng {r['id']} -> viết lại '{n}'")
+    U[:] = [u for u in U if u["marks"]]
+    return out
 
 
 def _reading(boxes: list) -> list[int]:

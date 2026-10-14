@@ -40,8 +40,11 @@ def describe_l(M: dict) -> str:
         + (", its bullet dot was wiped with the letters (\"bullet\": true puts it back)" if m.get("dot") else "") \
         + (", STRAY LETTERING (letter shapes that may be junk, a logo or decoration)" if m.get("orphan") else "") \
         + (", PRINTED ON THE CLIENT'S PRODUCT: kind \"keep\"" if m.get("printed") else "")
-    # CHỮ OCR KHÔNG GỬI (người dùng 14/10: VLM tự đọc nháp, không cần gợi ý chữ giun): mỗi dòng chỉ còn số đo
-    li = "\n".join(f"{m['id']}: text ~{m['size']:.0f}px, color {m['color']}{note(m)}{slots._look(m)}" for m in M["L"]) or "(none)"
+    # CHỮ OCR GỬI LẠI làm NEO (người dùng 14/10 tối: "đưa OCR hint quay lại nếu thấy performance giảm"; mix1 v03: thiếu chữ OCR,
+    # VLM ghép ngày vào mẩu 21px và xoá dòng OCR đọc đúng "01/12 - 07/12"). Chỉ để VLM biết L# nào là dòng nào -- code không
+    # dùng chữ này để viết.
+    li = "\n".join(f"{m['id']}: machine reading {(m.get('ocr') or '').strip()!r}, ~{m['size']:.0f}px, color {m['color']}{note(m)}"
+                   f"{slots._look(m)}" for m in M["L"]) or "(none)"
     return f"Text lines:\n{li}"
 
 
@@ -85,7 +88,8 @@ ACCENT (optional): a word or number the draft draws bigger or in another color i
 nay"): {"client": "T#", "text": "<exact substring>", "scale": 1.6, "color": "#hex"}.
 
 IMAGES: DRAFT = what the model drew. SLOTS = the draft with every text line marked (red L#). BASE = the draft with the old \
-letters wiped. The list after the images gives each line's measured size, color and look.
+letters wiped. The list after the images gives each line's machine reading of the garbled letters (often wrong, but numbers, \
+dates and short words usually come out right -- use it to tell which L# is which line), measured size, color and look.
 
 OUTPUT: one JSON object
 {"assign": [{"lines": ["L1"], "client": "T0" | ["T5","T6"] | null, "split": ["..."] | null, "text": "..." | null,

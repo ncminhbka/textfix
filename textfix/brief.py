@@ -166,6 +166,25 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
             continue
         # không nguyên văn từ người dùng -> bỏ (không bịa chữ); so không phân biệt hoa / thường (08/10: "Khai trương cửa hàng ..."
         # viết hoa chữ đầu, prompt khách viết thường -> bị bỏ oan, tiêu đề mất khỏi câu khách -> VLM chép chữ nháp "TRƯỞNG")
+        # câu GHÉP TỪ CHỮ KHÁCH: mọi chữ của câu đều có trong lời khách ("Bún bò tái 40.000đ" từ `"Bún bò tái" 40.000đ`,
+        # 14/10 dev2 d05: cả 8 món bị bỏ, FLUX vẫn vẽ menu, chặng B xoá trắng) -> chữ khách
+        if not any(text.casefold() in s.casefold() for s in sources) and all(re.search(r"(?<!\w)" + re.escape(w) + r"(?!\w)", " ".join(sources), flags=re.I)
+                   for w in re.findall(r"\w[\w.,/:%+-]*\w|\w", text)):
+            seen.add(text)
+            out.append({"text": text, "role": t.get("role") if t.get("role") in ROLES else "body", "source": "user"})
+            log.setdefault("joined", []).append(text)
+            continue
+        if not any(text.casefold() in s.casefold() for s in sources):
+            # LLM chép SAI VÀI CHỮ câu khách ("Khánh trương ngày 5/11" cho "khai trương ngày 5/11", 14/10 dev2 d03): câu bị bỏ
+            # nhưng prompt_en vẫn bảo FLUX vẽ -> nháp có dòng, chặng B không có câu, xoá trắng. -> lấy đúng đoạn khách viết
+            # (cùng số chữ, giống >= SNAP), sửa luôn trong prompt_en
+            snap = _snap(text, sources)
+            if snap and snap.casefold() != text.casefold():
+                log.setdefault("snapped", []).append(f"{text} -> {snap}")
+                fix = lambda p: str(p or "").replace(text, snap)   # noqa: E731
+                raw = {**raw, "prompt_en": fix(raw.get("prompt_en")),
+                       "variants": [{**v, "prompt_en": fix(v.get("prompt_en"))} for v in (raw.get("variants") or []) if isinstance(v, dict)]}
+                text = snap
         if not any(text.casefold() in s.casefold() for s in sources):
             role = t.get("role") if t.get("role") in ROLES else "body"
             rest = _strip_values(text, vals)
@@ -297,6 +316,26 @@ def _requote(pe: str, texts: list[dict]) -> str:
     """Chuỗi trong ngoặc kép của prompt trùng một câu trong texts khi không phân biệt hoa / thường -> viết đúng như câu đó."""
     by = {t["text"].casefold(): t["text"] for t in texts}
     return QUOTED.sub(lambda m: '"' + by.get(_norm(m.group(1)).casefold(), m.group(1)) + '"', pe)
+
+
+SNAP = 0.85   # câu LLM giống >= 0,85 một đoạn cùng số chữ trong lời khách = chép sai vài chữ (dấu, một ký tự)
+
+
+def _snap(text: str, sources: list[str]) -> str | None:
+    """Đoạn lời khách (cùng số chữ) giống câu LLM nhất, nếu giống >= SNAP; viết hoa chữ đầu nếu câu LLM viết hoa."""
+    from difflib import SequenceMatcher
+    n, best = len(text.split()), (0.0, None)
+    for s in sources:
+        w = re.sub(r"[\"“”]", " ", s).split()
+        for i in range(len(w) - n + 1):
+            c = " ".join(w[i:i + n]).strip(" ,.;:!?\"'“”")
+            r = SequenceMatcher(None, text.casefold(), c.casefold()).ratio()
+            if r > best[0]:
+                best = (r, c)
+    r, c = best
+    if not c or r < SNAP:
+        return None
+    return _cap_first(c) if text[:1].isupper() else c
 
 
 def _strip_values(text: str, vals: list[str]) -> str | None:

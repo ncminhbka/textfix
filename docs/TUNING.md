@@ -789,6 +789,15 @@ thứ tự khách; VLM không cần chữ OCR làm gợi ý.
   khung OCR hai hàng (huy chương, dấu chồng) và cho NHÓM ĐOẠN; thua ở chữ chạy vòng (không ra dòng), tách nhầm chữ khác màu, nối
   tên ... giá qua dấu chấm dẫn. 4,5 s / poster, đỉnh 8,8 GB. Hướng: kết hợp (tách khung OCR nhiều hàng theo dòng Hi-SAM, nhóm đoạn),
   không thay OCR; xem trước `hi_sam_l.pth` có cho luôn mặt nạ nét (thay `sam_tss_l`) không.
+- [máy chủ, dev2 lượt `dev2_report_1014_095734`, 70 poster] xem đủ. Lỗi CODE (đã sửa, cấu trúc): (1) brief bỏ câu khách khi LLM
+  ghép chữ khách ("Bún bò tái 40.000đ" từ `"Bún bò tái" 40.000đ`, d05: cả menu bị xoá trắng) hoặc chép sai vài chữ ("Khánh
+  trương", d03) mà prompt_en vẫn bảo FLUX vẽ -> câu ghép toàn chữ khách là chữ khách; chép sai -> lấy đúng đoạn khách viết
+  (`brief.SNAP` 0,85) và sửa trong prompt_en; (2) luật "chữ in trên sản phẩm" đè VLM khi chữ poster trùng chữ trên gói (d39 / d14
+  "Classic") -> VLM ghép câu khách thì VLM thắng; (3) một câu VLM ghi cho hai dòng xếp chồng liền nhau (d31) -> một khối; (4) số
+  FLUX vẽ trước các hàng (vòng tròn d20 / d19) bị xoá trống hoặc sai thứ tự -> viết lại số (`fill._markers`). Chữ OCR gửi lại VLM
+  làm neo (người dùng). Lỗi MODEL (ghi nhận): kiểu chữ / hiệu ứng VLM tả (d06 neon, d38), chỗ FLUX vẽ ngắn hơn câu (d09, d11,
+  d12, d16), LLM không gắn cờ bước khi khách chỉ viết prompt (d20). Dựng lại dev2 v0 tại máy: co < 0,6 7 -> 4, poster còn lỗi
+  8 -> 7, chữ lệch câu 0, tập lệch cỡ 0.
 
 **Bộ thi `bench/accept2.json` (30 ca, seed 9001-9030):** e nút / thẻ / huy hiệu (6), h nền khó (5), k chữ khó (5), l danh sách /
 bảng / các bước (5), q ảnh sản phẩm (3), r form thường gặp (6). CHỈ chạy và chấm, không sửa mã theo từng ca của bộ này; lỗi
