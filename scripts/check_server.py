@@ -392,9 +392,7 @@ def main() -> int:
 
     print("4. Tài nguyên trong repo")
     nf = len(list((ROOT / "assets" / "fonts").glob("*")))
-    ni = len(list((ROOT / "assets" / "icons" / "lucide").glob("*.svg")))
     ok(f"{nf} font") if nf >= 40 else bad(f"chỉ có {nf} font trong assets/fonts", "git pull / chép lại assets/fonts")
-    ok(f"{ni} icon Lucide") if ni >= 1500 else bad(f"chỉ có {ni} icon trong assets/icons/lucide", "git pull (đã commit đủ 1544 icon)")
     try:
         from flux2 import util  # noqa: F401
         ok("import flux2 được")

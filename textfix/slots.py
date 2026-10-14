@@ -1174,15 +1174,11 @@ ICON_HINTS = {
 
 def _system(base: str) -> str:
     from .fonts import CATALOG, WIDTH
-    from .icons import available
     fonts = "; ".join(f"{k}: {v[0]} ({v[1]}" + (f", {WIDTH[k][0]:.2f} / caps {WIDTH[k][1]:.2f}em" if k in WIDTH else "") + ")"
                       for k, v in CATALOG.items())
-    have = available()
     if PROMPT_V1 and base is SYSTEM:
-        return SYSTEM_V1.replace("{fonts}", fonts).replace("{icons}", ", ".join(sorted(have)))
-    icons = "; ".join(f"{k}: {', '.join(n for n in v.split() if n in have)}" for k, v in ICON_HINTS.items()) if base is SYSTEM \
-        else ", ".join(sorted(have))
-    return base.replace("{fonts}", fonts).replace("{icons}", icons)
+        return SYSTEM_V1.replace("{fonts}", fonts).replace("{icons}", "")
+    return base.replace("{fonts}", fonts).replace("{icons}", "")   # 14/10: bộ icon đã gỡ, TextFix chỉ sửa chữ
 
 
 def _obj(x) -> dict:

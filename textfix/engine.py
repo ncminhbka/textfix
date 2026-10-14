@@ -236,7 +236,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
                       "kept": sorted(kept), "orphans": [l["id"] for l in M["L"] if l.get("orphan")], "log": elog}}
     ink_img = lonly.ink_image(draft, ink, mask, M, kept)
     steps = _row([draft, slots.marked_image(draft, M), ink_img, base, poster])
-    return {"draft": draft, "ink": ink, "ink_image": ink_img, "clean": clean, "base": base, "mask": mask, "poster": poster,
+    return {"draft": draft, "ink": ink, "ink_image": ink_img, "hisam_image": lonly.hisam_image(draft, ink), "clean": clean, "base": base, "mask": mask, "poster": poster,
             "poster_first": poster_first, "steps": steps, "plan": plan, "timing": {k: round(v, 1) for k, v in T.items()}}
 
 

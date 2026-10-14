@@ -281,8 +281,10 @@ def design_one(job: dict, v: dict, d: dict, Bv: dict, product: bool, vd: Path, u
         v.update(draft_url=f"{url}/draft.png")
         r = design(d, Bv, STATE["vlm"], page(), product=product, progress=lambda m: v.update(stage=m))
         save(r["poster"], vd / "poster.png")
-        save(r["ink_image"], vd / "ink.jpg", 90)
-        save(r["base"], vd / "base.jpg", 92)
+        save(r["hisam_image"], vd / "hisam.jpg", 88)   # Hi-SAM: nét chữ thô
+        save(r["ink_image"], vd / "ink.jpg", 90)       # mặt nạ gỡ chữ (nét, quầng, dòng giữ, nét không thuộc dòng nào)
+        save(r["clean"], vd / "clean.jpg", 92)         # LaMa: gỡ mọi dòng -- nền VLM nhìn
+        save(r["base"], vd / "base.jpg", 92)           # nền dựng: dòng "keep" đã trả về điểm ảnh nháp
         save(r["steps"], vd / "steps.jpg", 88)
         P = r["plan"]
         M = {**P["slots"], "size": [d["draft"].shape[1], d["draft"].shape[0]],
@@ -296,7 +298,7 @@ def design_one(job: dict, v: dict, d: dict, Bv: dict, product: bool, vd: Path, u
         (vd / "plan.json").write_text(json.dumps(jsonable({"seed": v["seed"], "direction": v.get("direction"), "prompt_en": Bv["prompt_en"],
                                                            "timing": timing, **P}), ensure_ascii=False, indent=1), encoding="utf-8")
         v.update(status="done", stage="", poster_url=f"{url}/poster.png", steps_url=f"{url}/steps.jpg", ops_url=f"{url}/ops.jpg",
-                 slots_url=f"{url}/slots.jpg", plan_url=f"{url}/plan.json", ink_url=f"{url}/ink.jpg", base_url=f"{url}/base.jpg", timing=timing, missing=P["missing"],
+                 slots_url=f"{url}/slots.jpg", plan_url=f"{url}/plan.json", hisam_url=f"{url}/hisam.jpg", ink_url=f"{url}/ink.jpg", clean_url=f"{url}/clean.jpg", base_url=f"{url}/base.jpg", timing=timing, missing=P["missing"],
                  errors=len(P["errors"]), ops=sum(o.get("kind") not in ("skip", "keep") for o in P["ops"]),
                  **({"poster_first_url": f"{url}/poster_first.png"} if first else {}))
         log.info("%s v%d xong (gpu %s) %s", job["run_id"], v["index"], v.get("gpu"), timing)
@@ -450,7 +452,7 @@ app.mount("/outputs", StaticFiles(directory=str(RUNS)), name="outputs")
 
 @app.get("/")
 async def ui():
-    return FileResponse(UI, media_type="text/html")
+    return FileResponse(UI, media_type="text/html", headers={"Cache-Control": "no-store"})   # pull mã mới là thấy UI mới
 
 
 @app.get("/api/health")

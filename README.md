@@ -45,14 +45,14 @@ Chạy trên máy chủ bằng ô notebook (`%run scripts/...`): kết quả t�
 | `textfix/slots.py` | Đo dòng chữ, gọi VLM, chặn chữ sai, vòng duyệt |
 | `textfix/render.py` | Dựng HTML đúng khung ô (thẻ tiện ích icon / sao / font), kiểm lỗi |
 | `textfix/ocr.py`, `glyph.py`, `geo.py` | OCR dòng, đo nét (cỡ, màu), chữ cong |
-| `textfix/fonts.py`, `icons.py` | Bộ font OFL đủ dấu tiếng Việt, bộ icon Lucide |
+| `textfix/fonts.py` | Bộ font OFL đủ dấu tiếng Việt |
 | `textfix/ship.py` | Gói kết quả máy chủ thành zip < 24 MB, tự tải về trình duyệt (JupyterLab) |
 | `server/` | Máy chủ FastAPI + giao diện form |
 | `scripts/dev_batch.py`, `batch_report.py` | Chạy một tập qua máy chủ, báo cáo + một zip |
 | `scripts/lonly_replay.py`, `erase_bench.py` | Máy cá nhân: dựng lại poster / đo bước gỡ chữ trên nháp đã lưu |
 | `tools/annotate.html` | Công cụ gán nhãn ô S / I / L / P (Chrome / Edge, ghi thẳng vào repo) |
 | `flux2/` | Mã suy luận FLUX.2 của Black Forest Labs (Apache-2.0), nguyên trạng |
-| `assets/` | Font (OFL) và icon Lucide (ISC) |
+| `assets/` | Font (OFL) |
 
 ## Giấy phép tài nguyên
 

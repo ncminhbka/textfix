@@ -337,11 +337,11 @@ async function poll(id) {
 // ------------------------------------------------------------------ kết quả: ảnh hiện dần + chế độ debug
 let debug = false, lastSig = "";
 try { debug = localStorage.getItem("tf_debug") === "1"; } catch {}
-const PLANS = {}, LAYERS = { L: true, S: true, I: true };
+const PLANS = {}, LAYERS = { L: true };
 function setDebug(on) { debug = on; try { localStorage.setItem("tf_debug", on ? "1" : "0"); } catch {} if (!on && !["poster"].includes(view)) view = "poster"; show(); }
-const VIEWS = [["poster", "Poster", false], ["poster_first", "Lượt đầu (trước sửa)", true], ["draft", "Nháp FLUX", true],
-               ["ink", "Nét chữ + mặt nạ gỡ", true], ["base", "Nền đã gỡ chữ", true], ["ocr", "Dòng + OCR", true],
-               ["ops", "Lệnh designer", true], ["steps", "Các bước", true]];
+const VIEWS = [["poster", "Poster", false], ["poster_first", "Lượt đầu (trước khi mã sửa lỗi)", true], ["draft", "Nháp FLUX", true],
+               ["hisam", "① Hi-SAM: nét chữ", true], ["ink", "② Mặt nạ gỡ chữ", true], ["clean", "③ LaMa: nền sạch (VLM nhìn)", true],
+               ["base", "④ Nền dựng", true], ["ocr", "Dòng + OCR", true], ["ops", "Lệnh designer", true], ["steps", "Các bước", true]];
 const TN = { llm: "LLM", ve_nhap: "vẽ nháp", net_chu: "nét chữ (Hi-SAM)", dong: "đo dòng", go_chu: "gỡ chữ (LaMa)", vlm: "VLM thiết kế", dung: "dựng", duyet: "VLM sửa" };
 function thumb(p, i) {
   const on = i === picked ? " on" : "", lab = `<div class="vlab">${i + 1}. ${esc(p.direction || "")}</div>`;
@@ -365,8 +365,7 @@ function show() {
     h += `<div class="views">${avail.map(([k, n]) => `<button class="${k === view ? "on" : ""}" onclick="view='${k}';show()">${n}</button>`).join("")}
           ${view !== "ocr" ? `<a class="dl" href="${P[view + "_url"]}" download>Tải ảnh này</a>` : ""}</div>`;
     h += view === "ocr" ? `<div class="stage" id="ocrstage"><div class="ocrwrap"><img src="${P.draft_url}" id="ocrimg"><svg id="ocrsvg"></svg></div></div>
-           <div class="layers">${["L", "S", "I"].map(k => `<label><input type="checkbox" ${LAYERS[k] ? "checked" : ""} onchange="LAYERS['${k}']=this.checked;drawOcr()">
-           ${{ L: "L dòng chữ (OCR)", S: "S vỏ", I: "I chi tiết" }[k]}</label>`).join("")}<span class="hint">di chuột lên khung để xem OCR / lệnh</span></div>`
+           <div class="layers"><span class="hint">đỏ = dòng OCR · tím = cụm nét OCR không đọc (VLM quyết) · nét đứt = dòng bị xoá trống · di chuột lên khung để xem OCR / lệnh</span></div>`
          : `<div class="stage"><img src="${P[view + "_url"]}"></div>`;
   } else if (P.status !== "error") h += `<div class="stage"><div class="empty">Ảnh ${picked + 1}: ${esc(P.stage || "đang chờ")}…</div></div>`;
   const t = P.timing || {};
@@ -397,13 +396,13 @@ async function drawOcr() {
   const owner = {};
   (pl.ops || []).forEach(o => (o.marks || o.slots || []).forEach(m => owner[m] = o));
   let g = "";
-  for (const k of ["S", "I", "L"]) {
+  for (const k of ["L"]) {
     if (!LAYERS[k]) continue;
     for (const m of pl.slots[k] || []) {
       const [x0, y0, x1, y1] = m.box, o = owner[m.id];
       const tip = `${m.id}` + (m.ocr !== undefined ? ` · OCR: "${m.ocr}"` : "") + (m.size ? ` · ~${Math.round(m.size)}px` : "") + (m.path ? " · CHỮ CONG" : "") + (m.orphan ? " · NÉT OCR KHÔNG ĐỌC (VLM quyết)" : m.missed ? " · dòng OCR sót" : "") + (m.dot ? " · có chấm đầu dòng" : "") +
         (o ? ` → ${o.id} ${o.kind}${o.html ? `: ${plainHtml(o.html)}` : ""}` : " → (chưa có lệnh)");
-      g += `<g><title>${esc(tip)}</title><rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="${KCOL[k]}22" stroke="${KCOL[k]}"
+      g += `<g><title>${esc(tip)}</title><rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="${m.orphan ? "#ae3ec922" : KCOL[k] + "22"}" stroke="${m.orphan ? "#ae3ec9" : KCOL[k]}"
             stroke-width="${Math.max(2, W / 400)}"${o && o.kind === "skip" ? ' stroke-dasharray="8 6"' : ""}/>
             <text x="${x0 + 3}" y="${Math.max(14, y0 - 4)}" font-size="${Math.max(14, W / 60)}" fill="${KCOL[k]}" font-weight="700">${m.id}</text></g>`;
       if (k === "L" && m.path) {   // ô chữ CONG (TEXTFIX_GEO): vẽ đường chân chữ, đậm, trên khung
@@ -418,6 +417,24 @@ async function drawOcr() {
   }
   svg.innerHTML = g;
 }
+function eraseDebug(P, pl) {   // Hi-SAM + LaMa: số đo, từng dòng được gỡ / giữ, cụm nét lạ VLM quyết gì
+  const e = pl.erase || {}, t = P.timing || {}, by = {}, owner = {};
+  (pl.slots.L || []).forEach(m => by[m.id] = m);
+  (pl.ops || []).forEach(o => (o.marks || o.slots || []).forEach(m => owner[m] = o));
+  const kept = new Set(e.kept || []), orph = e.orphans || [];
+  const orows = orph.map(id => { const m = by[id] || {}, o = owner[id] || {};
+    return `<tr><td class="role">${id}</td><td>${esc(m.ocr || "(không đọc được)")}</td><td class="role">${esc(o.kind || "giữ (VLM không nhắc)")}</td><td class="muted">${esc(o.why || "")}</td></tr>`; }).join("");
+  const special = (pl.slots.L || []).filter(m => m.dot || m.lead_icon || m.printed).map(m =>
+    `${m.id}${m.dot ? " · chấm đầu dòng (gỡ cùng chữ, viết lại •)" : ""}${m.lead_icon ? " · khung đã dời khỏi icon đứng trước" : ""}${m.printed ? " · chữ in trên sản phẩm" : ""}`);
+  return `<h3>Gỡ chữ: ① Hi-SAM → ② mặt nạ → ③ LaMa → ④ nền dựng</h3>
+    <div class="timing"><span>Hi-SAM: <b>${t.net_chu ?? "?"}</b> s</span><span>LaMa: <b>${t.go_chu ?? "?"}</b> s</span>
+      <span>nét chữ: <b>${e.ink_pct ?? "?"}</b>% ảnh</span><span>mặt nạ gỡ: <b>${e.mask_pct ?? "?"}</b>% ảnh</span>
+      <span>dòng giữ nguyên: <b>${kept.size}</b></span><span>cụm nét lạ: <b>${orph.length}</b></span></div>
+    <p class="muted">② xanh lá = nét bị gỡ · vàng = phần nới quanh nét (viền, bóng, quầng) · xanh dương = nét của dòng giữ · hồng = nét không thuộc dòng nào (để nguyên)</p>
+    ${orph.length ? `<table><tr><th>cụm nét</th><th>OCR đọc</th><th>VLM quyết</th><th>vì sao</th></tr>${orows}</table>` : ""}
+    ${special.length ? `<p class="muted">${special.map(esc).join("<br>")}</p>` : ""}
+    <pre class="pe">${esc((e.log || []).join("\n"))}</pre>`;
+}
 function renderDebug(P, pl) {
   const el = $("dbgpanel"); if (!el) return;
   const owner = {};
@@ -429,8 +446,7 @@ function renderDebug(P, pl) {
   const errs = (pl.errors || []).map(e => `<li>${esc(e.type)} ${esc((e.ops || []).join(","))} ${esc(JSON.stringify(Object.fromEntries(Object.entries(e).filter(([k]) => !["type", "ops"].includes(k)))))}</li>`).join("");
   const errs1 = (pl.errors_first || []).length;
   el.innerHTML = `<h3>OCR nháp → ô → lệnh</h3><table><tr><th>ô</th><th>OCR đọc</th><th>cỡ</th><th>lệnh</th><th>viết</th></tr>${rows}</table>
-    <h3>Gỡ chữ (Hi-SAM + LaMa)</h3><p class="muted">xanh lá = nét bị gỡ · vàng = phần nới / quầng · xanh dương = nét của dòng giữ · hồng = nét không thuộc dòng nào (để nguyên)</p>
-    <p class="mono">${esc(JSON.stringify(pl.erase || {}))}</p>
+    ${eraseDebug(P, pl)}
     <h3>Lệnh designer (${(pl.ops || []).length}) · phong cách</h3><p class="mono">${esc(JSON.stringify(pl.style || {}))}</p>
     <table><tr><th>id</th><th>loại</th><th>ô</th><th>chữ</th><th>box_style</th><th>vì sao</th></tr>${ops}</table>
     <h3>Lỗi đo được: lượt đầu ${errs1} → cuối ${(pl.errors || []).length}</h3><ul>${errs || "<li>không</li>"}</ul>

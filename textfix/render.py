@@ -38,7 +38,6 @@ def _accent_below(h: str) -> bool:
     lines = [x for x in lines if x]
     return any(ch.isupper() and any(c in ACCENT_UP for c in unicodedata.normalize("NFD", ch)[1:])
                for x in lines[1:] for ch in x)
-STAR_PATH = "M50 3 L61.8 37.6 L98.1 38.2 L69.1 60.1 L79.4 95 L50 74.2 L20.6 95 L30.9 60.1 L1.9 38.2 L38.2 37.6 Z"
 
 
 def to_data_uri(arr: np.ndarray) -> str:
@@ -206,49 +205,20 @@ def _clip_text_shadow(h: str) -> str:
     return re.sub(r"""style=(["'])(.*?)\1""", fix, h, flags=re.S)
 
 
-def expand(h: str, icons: dict, fonts_used: set) -> tuple[str, list[str]]:
-    """HTML của VLM -> HTML dựng được: an toàn (bỏ script / on* / URL / img) + thay thẻ tiện ích i-icon / i-stars / i-font."""
+def expand(h: str, fonts_used: set) -> tuple[str, list[str]]:
+    """HTML của VLM -> HTML dựng được: an toàn (bỏ script / on* / URL / img) + thay thẻ i-font. TextFix CHỈ SỬA CHỮ (14/10): icon,
+    hàng sao, hình vẽ là điểm ảnh của nháp -- thẻ <i-icon>, <i-stars>, <svg> VLM lỡ viết bị gỡ, ghi log, không vẽ."""
     from .fonts import family
-    from .icons import nearest
     log = []
     h = re.sub(r"<script.*?</script>", "", h or "", flags=re.S | re.I)
     h = re.sub(r"\son\w+\s*=\s*([\"']).*?\1", "", h, flags=re.I)
     h = re.sub(r"url\([^)]*\)", "none", h, flags=re.I)
     h = re.sub(r"<img[^>]*>", "", h, flags=re.I)
-
-    def icon(m):
-        t = m.group(0)
-        name = _attr(t, "name", "")
-        n = nearest(name, icons)
-        if n is None:
-            log.append(f"icon '{name}' không có -> bỏ")
-            return ""
-        if n != name:
-            log.append(f"icon '{name}' -> '{n}'")
-        size, col = _attr(t, "size", "1em"), _attr(t, "color", "currentColor")
-        return (f'<svg viewBox="0 0 24 24" width="{size}" height="{size}" fill="none" stroke="{col}" stroke-width="2" '
-                f'stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;flex:none">{icons[n]}</svg>')
-
-    def stars(m):
-        t = m.group(0)
-        try:
-            n = float(_attr(t, "n", "5"))
-        except ValueError:
-            n = 5.0
-        total = max(1, int(np.ceil(_attr(t, "total", None) and float(_attr(t, "total")) or max(5, np.ceil(n)))))
-        size, fill, empty = _attr(t, "size", "1em"), _attr(t, "fill", "#f5b301"), _attr(t, "empty", "#d9d9d9")
-        parts = []
-        for i in range(total):
-            frac = float(np.clip(n - i, 0, 1))
-            gid = f"g{abs(hash((t, i))) % 10**8}"
-            if 0 < frac < 1:   # nửa sao
-                parts.append(f'<defs><linearGradient id="{gid}"><stop offset="{frac}" stop-color="{fill}"/><stop offset="{frac}" '
-                             f'stop-color="{empty}"/></linearGradient></defs><path transform="translate({i * 112},0)" '
-                             f'fill="url(#{gid})" d="{STAR_PATH}"/>')
-            else:
-                parts.append(f'<path transform="translate({i * 112},0)" fill="{fill if frac >= 1 else empty}" d="{STAR_PATH}"/>')
-        return (f'<svg viewBox="0 0 {total * 112 - 12} 100" height="{size}" style="display:inline-block;vertical-align:middle;'
-                f'height:{size};width:calc({size} * {(total * 112 - 12) / 100:.3f});flex:none">{"".join(parts)}</svg>')
+    for pat in (r"<i-icon\b[^>]*?(/>|>\s*</i-icon>|>)", r"<i-stars\b[^>]*?(/>|>\s*</i-stars>|>)", r"<svg\b.*?</svg>"):
+        h2 = re.sub(pat, "", h, flags=re.I | re.S)
+        if h2 != h:
+            log.append("bỏ icon / hình VLM viết (TextFix chỉ sửa chữ)")
+            h = h2
 
     def font(m):
         t = m.group(0)
@@ -262,8 +232,6 @@ def expand(h: str, icons: dict, fonts_used: set) -> tuple[str, list[str]]:
         fonts_used.add(key)
         return f"<span style=\"font-family:{family(key)};{'font-weight:' + wt + ';' if wt else ''}\">"
 
-    h = re.sub(r"<i-icon\b[^>]*?(/>|>\s*</i-icon>|>)", icon, h, flags=re.I)
-    h = re.sub(r"<i-stars\b[^>]*?(/>|>\s*</i-stars>|>)", stars, h, flags=re.I)
     h = re.sub(r"<i-font\b[^>]*>", font, h, flags=re.I)
     h = re.sub(r"</i-font>", "</span>", h, flags=re.I)
     h = _clip_text_shadow(h)
@@ -505,9 +473,7 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
     khung), màu = màu đo của dòng."""
     from PIL import Image
     from .fonts import faces_for, family
-    from .icons import available
     H, W = plate.shape[:2]
-    icons = available()
     st = P.get("style") or {}
     tfont = font_key(st.get("text_font")) or "bevietnam"
     dfont = font_key(st.get("display_font")) or tfont
@@ -551,9 +517,9 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
             size, bs_raw = float(fsz.group(1)), bs_raw.replace(fsz.group(0), "")
         # VLM ghi cỡ bằng px poster (đọc thẳng từ số đo dòng / khung); đổi sang em theo cỡ khung để vòng co vẫn co đều mọi thứ
         html = re.sub(r"(\d+(?:\.\d+)?)px\b", lambda m: f"{float(m.group(1)) / max(size, 1.0):.4f}em", op.get("html") or "")
-        h, lg = expand(html, icons, used)
+        h, lg = expand(html, used)
         log += [f"{op['id']}: {x}" for x in lg]
-        bs, lg = expand(bs_raw, icons, used)
+        bs, lg = expand(bs_raw, used)
         log += [f"{op['id']}: {x}" for x in lg]
         # EMOJI: không font nào trong bộ font có hình emoji -> ô vuông (09/10 dev2 d10 "MINIGAME 🎁"); bỏ, ghi log
         h2 = EMOJI.sub("", h)
@@ -614,7 +580,7 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
                     "condense": fix.get("condense"), "icon": op.get("kind") == "icon" and bool(mk)
                     and all(m.startswith("I") for m in mk), "iset": op.get("icon_set"), "nl": len(lm), "hfit": single,
                     "path": path_of(op, M), "lead": any((M["by"].get(m) or {}).get("lead_icon") for m in lm)})
-    log += _align_left(els) + _even_icons(els)
+    log += _align_left(els)
     page.set_viewport_size({"width": W, "height": H})
     page_html = lambda: (   # noqa: E731
         f"<html><head><style>{faces_for(tuple(sorted(used)))} *{{margin:0;padding:0;box-sizing:border-box}} #c{{position:relative;"
@@ -781,60 +747,6 @@ def _recolor(r: dict, bg: np.ndarray, draft_color: str | None, pal: list | None 
     c, f, lf = best
     return {"color": c, "frac": round(f, 2), "halo": ("rgba(0,0,0,.55)" if lf > 0.4 else "rgba(255,255,255,.6)")
             if f > CONTRAST_FRAC else None}
-
-
-def _even_icons(els: list[dict]) -> list[str]:
-    """Icon cùng hàng / cùng cột (đầu dòng một danh sách, hàng icon liên hệ): khung đo từng icon trên nháp to nhỏ khác nhau ->
-    dựng ra icon lệch cỡ (08/10 r05, r01). Icon cỡ gần nhau (<= 1.6 lần), thẳng tâm cột / hàng, cách nhau <= 3 cỡ = một nhóm:
-    mọi icon = ô vuông cạnh trung vị, giữ tâm của nó."""
-    I = [e for e in els if e.get("icon") and not e["angle"]]
-    side = lambda e: min(e["box"][2] - e["box"][0], e["box"][3] - e["box"][1])   # noqa: E731
-    cen = lambda e: ((e["box"][0] + e["box"][2]) / 2, (e["box"][1] + e["box"][3]) / 2)   # noqa: E731
-    # BỘ icon của một danh sách VLM khai (slots._icon_sets): cùng cỡ (trung vị) và thẳng MỘT cột (tâm ngang trung vị), bất kể
-    # khung đo trên nháp to nhỏ thế nào (12/10 run 93f1: icon 47 px và 26 px cùng danh sách, lệch quá 1.6 lần nên không được nối)
-    pre, sets = [], {}
-    for e in I:
-        if e.get("iset"):
-            sets.setdefault(e["iset"], []).append(e)
-    for name, g in sets.items():
-        if len(g) < 2:
-            continue
-        m, cx = float(np.median([side(e) for e in g])), float(np.median([cen(e)[0] for e in g]))
-        for e in g:
-            cy = cen(e)[1]
-            e["box"] = [cx - m / 2, cy - m / 2, cx + m / 2, cy + m / 2]
-            e["size"] = m
-        pre.append(f"icon một bộ '{name}' {[e['id'] for e in g]}: {m:.0f}px, cột x={cx:.0f}")
-    I = [e for e in I if not (e.get("iset") and len(sets[e["iset"]]) >= 2)]
-    par = list(range(len(I)))
-
-    def root(i):
-        while par[i] != i:
-            i = par[i]
-        return i
-    for i, a in enumerate(I):
-        for j in range(i + 1, len(I)):
-            b = I[j]
-            s = max(side(a), side(b))
-            if s <= 0 or s / max(1.0, min(side(a), side(b))) > 1.6:
-                continue
-            (ax, ay), (bx, by) = cen(a), cen(b)
-            # cột đầu dòng của danh sách thưa: tâm cách nhau tới 6 cỡ icon (08/10 r01_s1: 4 tick, chỉ 2 được nối)
-            if (abs(ax - bx) <= 0.4 * s and abs(ay - by) <= 6 * s) or (abs(ay - by) <= 0.4 * s and abs(ax - bx) <= 8 * s):
-                par[root(i)] = root(j)
-    groups, log = {}, []
-    for i, e in enumerate(I):
-        groups.setdefault(root(i), []).append(e)
-    for g in groups.values():
-        if len(g) < 2:
-            continue
-        m = float(np.median([side(e) for e in g]))
-        for e in g:
-            cx, cy = cen(e)
-            e["box"] = [cx - m / 2, cy - m / 2, cx + m / 2, cy + m / 2]
-            e["size"] = m
-        log.append(f"icon cùng cỡ {[e['id'] for e in g]}: {m:.0f}px")
-    return pre + log
 
 
 def declared_groups(P: dict, els: list[dict]) -> dict:

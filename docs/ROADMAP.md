@@ -41,7 +41,7 @@ Mã
 - [x] Lời dặn VLM (`SYSTEM_L`): icon không phải việc của VLM, chấm tròn, dòng `orphan` (keep / text / skip). *(chưa chạy VLM thật)*
 - [x] `engine.draw` / `engine.design`: bỏ xoá FLUX và dọn chữ sót, truyền mặt nạ nét. *(chạy trọn trạm thiết kế tại máy với VLM giả)*
 - [x] `server/app.py`: nạp Hi-SAM theo card, kiểm tệp lúc khởi động, lưu `ink.png` / `ink.jpg` / `base.jpg`, bỏ `plate*`. **(CHƯA CHẠY LẦN NÀO)**
-- [x] `server/ui.html`: bỏ hai ô bản xoá; thêm "Nét chữ + mặt nạ gỡ" và "Nền đã gỡ chữ". **(chưa mở trên trình duyệt)**
+- [x] `server/ui.html`: bỏ hai ô bản xoá; bốn ô xem ① Hi-SAM nét chữ thô (`hisam.jpg`), ② mặt nạ gỡ (`ink.jpg`), ③ LaMa nền sạch VLM nhìn (`clean.jpg`), ④ nền dựng (`base.jpg`); bảng "Gỡ chữ" (thời gian Hi-SAM / LaMa, % nét, % mặt nạ, cụm nét lạ VLM quyết gì); bỏ lớp S / I; trang không bị trình duyệt giữ bản cũ. *(dựng thử tại máy bằng Chromium với một lượt giả)*
 - [x] `steps.jpg` năm cột (nháp, dòng, nét chữ, nền, poster); zip báo cáo mang `ink.png` thay bản xoá. **(batch_report chưa chạy)**
 - [ ] Tờ ảnh ghép và trang HTML của `batch_report`: thêm cột nét chữ / nền.
 - [x] `audit.flags`: cờ cho dòng `orphan`, dòng gỡ theo lõi khung, lệnh gộp bị tách.
@@ -49,7 +49,7 @@ Mã
 - [x] `scripts/lonly_replay.py` theo đường mới (dựng lại tại máy với lệnh VLM đã lưu).
 - [x] Xoá khỏi `main`: `cleanup.py`, `overlay.py`, `textmask.py`, `flux.erase`, 12 script chỉ đường cũ dùng.
 - [ ] Cắt nốt trong `slots.py` lời dặn và bộ mô tả của đường ô vỏ / ô chi tiết (`SYSTEM`, `describe`, phần S / I của `validate`).
-- [ ] Bỏ bộ icon: `textfix/icons.py`, `assets/icons/` (1.544 SVG), `scripts/fetch_icons.py`, phần `<i-icon>` / `<i-stars>` của `render.expand`, mục đếm icon trong `check_server.py`. Bộ dựng gỡ thẻ icon khỏi chữ và ghi log thay vì vẽ.
+- [x] Bỏ bộ icon: `textfix/icons.py`, `assets/icons/` (1.544 SVG), `scripts/fetch_icons.py`, phần `<i-icon>` / `<i-stars>` của `render.expand`, mục đếm icon trong `check_server.py`. Bộ dựng gỡ thẻ icon / sao / svg khỏi chữ và ghi log thay vì vẽ.
 - [x] `docs/SERVER.md`, `README.md`, mục 14/10 trong `docs/TUNING.md`, `scripts/check_server.py` kiểm tệp Hi-SAM / LaMa.
 - [ ] `docs/DESIGN.md`, `PLAN_BLOCKS.md`, `SLOTS_GT.md` còn tả đường cũ: viết lại hoặc xoá.
 
@@ -68,7 +68,7 @@ Máy chủ
   dòng không ai viết được GIỮ; (2) q02 ba chiếc lá trước dòng bị gặm: quầng nay phải dính vào nét, cỡ dòng không vượt 2,2 lần
   cao nét, dấu câu chỉ gỡ ở giữa chữ, khung dòng dời khỏi icon đứng trước; (3) h04 "NGÀY • HỘI": chấm đầu dòng cần cả OCR
   đọc ra ký tự không phải chữ. Thêm: ngưỡng nền phẳng 4 -> 8 (bóng chữ 3D e04 lúc hết lúc không).
-- [ ] Một lượt accept2 nữa với bản vá, xác nhận ba lỗi trên đã hết.
+- [x] ~~Một lượt accept2 nữa với bản vá~~ -- người dùng bỏ (14/10); bản vá kiểm tại máy trên đúng các ca lỗi.
 - [ ] VRAM đỉnh khi Hi-SAM + LaMa + FLUX chung card (lượt này không lỗi, chưa có số).
 
 ## Chặng B -- Khối, bậc cỡ, chỗ trống thật (chưa bắt đầu)

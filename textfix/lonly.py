@@ -565,6 +565,14 @@ def draft_base(draft: np.ndarray, ink: np.ndarray, M: dict, P: dict | None = Non
     return settle(draft, clean, ink, M, P, log)[0]
 
 
+def hisam_image(draft: np.ndarray, ink: np.ndarray) -> np.ndarray:
+    """Ảnh xem đầu ra THÔ của Hi-SAM: nháp nhạt đi, mọi điểm Hi-SAM coi là nét chữ tô HỒNG."""
+    vis = draft.astype(np.float32) * 0.55 + 255 * 0.45
+    ink = np.asarray(ink, bool)
+    vis[ink] = vis[ink] * 0.15 + np.asarray((235, 0, 200), np.float32) * 0.85
+    return vis.round().clip(0, 255).astype(np.uint8)
+
+
 def ink_image(draft: np.ndarray, ink: np.ndarray, mask: np.ndarray, M: dict, kept: set) -> np.ndarray:
     """Ảnh xem bước gỡ chữ: nét bị gỡ XANH LÁ, phần nới / quầng quanh nét VÀNG, nét của dòng giữ XANH DƯƠNG, nét không thuộc dòng
     nào (để nguyên) HỒNG."""
