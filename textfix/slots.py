@@ -119,6 +119,7 @@ def lines(img: np.ndarray) -> list[dict]:
     # "dòng" không có chữ cái / chữ số (hàng sao "★★★★★", gạch, chấm) không phải chữ: để lớp phủ tách thành chi tiết I
     raw = [l for l in read_lines(img) if any(ch.isalnum() for ch in l["text"])]
     raw = [_vertical(img, q) for l in raw for q in _split_gaps(img, l)]
+    raw_ang = [float(l.get("angle") or 0.0) for l in raw]   # góc OCR đo, trước khi bỏ nhiễu (ghi lại cho debug)
     angs = [_line_angle(l) for l in raw]
     for k, l in enumerate(raw):   # góc dựng chốt ở đây: mọi nơi dùng l["angle"] thấy cùng một góc
         a = angs[k]
@@ -153,7 +154,8 @@ def lines(img: np.ndarray) -> list[dict]:
                   "size": float(size), "color": m["color"] if m else None, "angle": ang,
                   "caps": caps, "stroke": round(float(m["stroke"]), 1) if m else None,
                   "stroke_contrast": round(float(m["contrast"]), 2) if m else None,
-                  "effect": {k: v for k, v in (m.get("effect") or {}).items() if k in ("dx", "dy", "color")} if m and m.get("effect") else None})
+                  "effect": {k: v for k, v in (m.get("effect") or {}).items() if k in ("dx", "dy", "color")} if m and m.get("effect") else None,
+                  "angle_ocr": round(raw_ang[i - 1], 1), **({"vertical": True} if l.get("vertical") else {})})
     return L
 
 
@@ -452,7 +454,54 @@ def build(draft: np.ndarray, ink: np.ndarray, product: bool = False) -> dict:
     L, olog = _orphans(L, draft, ink, masks)
     mlog = _lead_dots(L, ink) + _trim_lead(L, ink)
     L, glog = _renumber(L, [], [], glog + glog2 + olog + mlog)
+    _typo_notes(L, glog)
     return {"L": L, "S": [], "I": [], "size": [W, H], "by": {m["id"]: m for m in L}, "mask": ink, "shells": {}, "geo_log": glog}
+
+
+GEO_NAME = {"arc": "cung tròn", "wave": "lượn sóng", "grow": "to dần / nhỏ dần"}
+
+
+def _typo_notes(L: list, logs: list[str]) -> None:
+    """CHỮ KHÓ, ghi cho debug (người dùng 14/10: "debug chưa in các ca typography khó được phát hiện và xử lý thế nào"): mỗi dòng
+    l["typo"] = [{"kind", "how"}] -- loại chữ khó và bằng chứng mã đã dùng để nhận ra nó. Cách dựng ghi ở plan["render"]."""
+    for l in L:
+        notes = []
+        lg = [x for x in logs if re.search(rf"(?<![A-Za-z0-9]){l['id']}(?![0-9])", x)]
+        if l.get("path"):
+            how = []
+            if l.get("sag") is not None:
+                how.append(f"vùng chữ của bộ dò võng {l['sag']:.2f} cao chữ")
+            if l.get("merged"):
+                how.append(f"gộp {len(l['merged'])} mẩu OCR {l['merged']}")
+            c = l.get("curve") or {}
+            if c.get("r"):
+                how.append(f"khớp đường tròn bán kính {c['r']:.0f} px, chữ {'trên' if c.get('up') else 'dưới'} vòm")
+            notes.append({"kind": f"chữ cong ({GEO_NAME.get(l.get('geo'), l.get('geo') or '?')})", "how": "; ".join(how) or "phần hình học (geo.py)"})
+        if l.get("vertical"):
+            bw, bh = l["box"][2] - l["box"][0], l["box"][3] - l["box"][1]
+            notes.append({"kind": "chữ dọc", "how": f"khung OCR cao gấp {bh / max(1.0, bw):.1f} lần rộng; đọc lại theo {l['angle']:+.0f}° ra {l.get('ocr')!r}"})
+        a, ao = float(l.get("angle") or 0.0), l.get("angle_ocr")
+        if not l.get("vertical") and not l.get("path") and abs(a) >= 2:
+            rule = "từ 10° trở lên là nghiêng thật" if abs(a) >= TILT_SURE else \
+                "4-10°: giữ vì có dòng khác nghiêng cùng góc (lệch <= 2,5°) và dòng đủ dài"
+            notes.append({"kind": f"nghiêng {a:+.0f}°", "how": f"OCR đo {ao if ao is not None else a:+.1f}°; {rule}"})
+        elif ao is not None and abs(ao) >= 2 and abs(a) < 2 and not l.get("vertical") and not l.get("path"):
+            why = "dưới 4° là nhiễu đo của OCR" if abs(ao) < TILT_MIN else "4-10° ở dòng ngắn / không có dòng nào nghiêng cùng góc"
+            notes.append({"kind": "dựng thẳng", "how": f"OCR đo {ao:+.1f}°, {why}"})
+        if l.get("missed") and not l.get("orphan"):
+            notes.append({"kind": "dòng OCR sót", "how": "; ".join(x for x in lg if "OCR sót" in x)[:300] or "vùng chữ của bộ dò không có dòng OCR, bộ đọc đọc ra chữ"})
+        if l.get("orphan"):
+            notes.append({"kind": "cụm nét OCR không đọc", "how": "; ".join(x for x in lg if "cụm nét" in x)[:300] or "nét Hi-SAM ngoài mọi dòng OCR"})
+        if l.get("dot"):
+            notes.append({"kind": "chấm đầu dòng", "how": "mảng nét đầu dòng nhỏ, tròn, cách chữ; OCR đọc ký tự đầu không phải chữ"})
+        if l.get("lead_icon"):
+            notes.append({"kind": "khung dời khỏi icon", "how": "; ".join(x for x in lg if "khung OCR ôm" in x)[:300]})
+        if l.get("printed"):
+            notes.append({"kind": "chữ in trên sản phẩm", "how": "chữ OCR khớp chữ đọc được trên ảnh sản phẩm khách tải"})
+        if notes:
+            l["typo"] = notes
+        else:
+            l.pop("typo", None)
 
 
 def _orphans(L: list, draft: np.ndarray, ink: np.ndarray, masks: dict) -> tuple[list, list[str]]:
@@ -676,7 +725,7 @@ def _hex_lab(hx: str) -> np.ndarray:
 
 def public(M: dict) -> dict:
     """Ô để ghi JSON."""
-    return {"L": [{k: m[k] for k in ("id", "box", "ocr_box", "ocr", "size", "color", "angle", "shell", "curve", "runs", "geo", "path", "scale", "missed", "orphan", "printed", "dot", "lead_icon", "poly") if k in m}
+    return {"L": [{k: m[k] for k in ("id", "box", "ocr_box", "ocr", "size", "color", "angle", "shell", "curve", "runs", "geo", "path", "scale", "missed", "orphan", "printed", "dot", "lead_icon", "vertical", "angle_ocr", "sag", "merged", "typo", "poly") if k in m}
                   for m in M["L"]],
             "S": M["S"], "I": M["I"]}
 

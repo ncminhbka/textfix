@@ -111,6 +111,8 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     progress("đo dòng (OCR + nét chữ)")
     M0 = slots.build(draft, ink, product=product)
     printed = slots.mark_printed(M0, d.get("product_ocr")) if product else []
+    if printed:
+        slots._typo_notes(M0["L"], M0.get("geo_log") or [])   # ghi lại phần "chữ khó" cho dòng in trên sản phẩm
     geo_log = list(M0.get("geo_log") or [])
     M = lonly.view(M0)
     T["dong"] = time.time() - t0
@@ -230,7 +232,10 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     missing = [B["texts"][i]["text"] for i in sorted(set(miss_i) | set(code_miss))]
     base, mask = base_of(P)   # nền của kế hoạch cuối (vòng sửa / duyệt có thể đã đổi dòng giữ)
     kept = lonly.kept_of(P)
-    plan = {"style": P.get("style"), "ops": P["ops"], "missing": missing, "notes": P.get("notes"), "errors": errs, "log": log,
+    # DỰNG THẾ NÀO, từng lệnh (debug "chữ khó"): cỡ, co, nén ngang, xoay, theo đường cong
+    rinfo = [{"id": r["id"], "fs": round(float(r.get("fs") or r.get("size") or 0), 1), "shrink": round(float(r.get("shrink") or 1), 2),
+              "sx": r.get("sx", 1), "angle": round(float(r.get("angle") or 0), 1), "path": bool(r.get("path"))} for r in res or []]
+    plan = {"style": P.get("style"), "ops": P["ops"], "render": rinfo, "missing": missing, "notes": P.get("notes"), "errors": errs, "log": log,
             "slots": slots.public(M), "slots_mode": "L", "errors_first": errs_first,
             "erase": {"mask_pct": round(100 * float(mask.mean()), 2), "ink_pct": round(100 * float(ink.mean()), 2),
                       "kept": sorted(kept), "orphans": [l["id"] for l in M["L"] if l.get("orphan")], "log": elog}}

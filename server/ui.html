@@ -365,7 +365,7 @@ function show() {
     h += `<div class="views">${avail.map(([k, n]) => `<button class="${k === view ? "on" : ""}" onclick="view='${k}';show()">${n}</button>`).join("")}
           ${view !== "ocr" ? `<a class="dl" href="${P[view + "_url"]}" download>Tải ảnh này</a>` : ""}</div>`;
     h += view === "ocr" ? `<div class="stage" id="ocrstage"><div class="ocrwrap"><img src="${P.draft_url}" id="ocrimg"><svg id="ocrsvg"></svg></div></div>
-           <div class="layers"><span class="hint">đỏ = dòng OCR · tím = cụm nét OCR không đọc (VLM quyết) · nét đứt = dòng bị xoá trống · di chuột lên khung để xem OCR / lệnh</span></div>`
+           <div class="layers"><span class="hint">đỏ = dòng OCR · cam = dòng nghiêng / dọc (đa giác thật) · hồng = đường chân chữ cong · tím = cụm nét OCR không đọc (VLM quyết) · nét đứt = dòng bị xoá trống · di chuột lên khung để xem OCR / lệnh</span></div>`
          : `<div class="stage"><img src="${P[view + "_url"]}"></div>`;
   } else if (P.status !== "error") h += `<div class="stage"><div class="empty">Ảnh ${picked + 1}: ${esc(P.stage || "đang chờ")}…</div></div>`;
   const t = P.timing || {};
@@ -400,8 +400,12 @@ async function drawOcr() {
     if (!LAYERS[k]) continue;
     for (const m of pl.slots[k] || []) {
       const [x0, y0, x1, y1] = m.box, o = owner[m.id];
-      const tip = `${m.id}` + (m.ocr !== undefined ? ` · OCR: "${m.ocr}"` : "") + (m.size ? ` · ~${Math.round(m.size)}px` : "") + (m.path ? " · CHỮ CONG" : "") + (m.orphan ? " · NÉT OCR KHÔNG ĐỌC (VLM quyết)" : m.missed ? " · dòng OCR sót" : "") + (m.dot ? " · có chấm đầu dòng" : "") +
+      const tip = `${m.id}` + (m.ocr !== undefined ? ` · OCR: "${m.ocr}"` : "") + (m.size ? ` · ~${Math.round(m.size)}px` : "") + (m.typo ? " · " + m.typo.map(t => t.kind).join(", ") : "") + (m.orphan ? " · NÉT OCR KHÔNG ĐỌC (VLM quyết)" : m.missed ? " · dòng OCR sót" : "") + (m.dot ? " · có chấm đầu dòng" : "") +
         (o ? ` → ${o.id} ${o.kind}${o.html ? `: ${plainHtml(o.html)}` : ""}` : " → (chưa có lệnh)");
+      const tilt = !m.path && m.poly && Math.abs(m.angle || 0) >= 2;
+      g += tilt ? `<g><title>${esc(tip)}</title><polygon points="${m.poly.map(q => q[0] + "," + q[1]).join(" ")}" fill="${KCOL[k]}22" stroke="#f08c00"
+            stroke-width="${Math.max(2, W / 400)}"/><text x="${x0 + 3}" y="${Math.max(14, y0 - 4)}" font-size="${Math.max(14, W / 60)}" fill="#f08c00" font-weight="700">${m.id} ${Math.round(m.angle)}°</text></g>` : "";
+      if (tilt) continue;
       g += `<g><title>${esc(tip)}</title><rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="${m.orphan ? "#ae3ec922" : KCOL[k] + "22"}" stroke="${m.orphan ? "#ae3ec9" : KCOL[k]}"
             stroke-width="${Math.max(2, W / 400)}"${o && o.kind === "skip" ? ' stroke-dasharray="8 6"' : ""}/>
             <text x="${x0 + 3}" y="${Math.max(14, y0 - 4)}" font-size="${Math.max(14, W / 60)}" fill="${KCOL[k]}" font-weight="700">${m.id}</text></g>`;
@@ -416,6 +420,22 @@ async function drawOcr() {
     }
   }
   svg.innerHTML = g;
+}
+function typoDebug(pl) {   // chữ khó: mã nhận ra thế nào -> VLM / mã quyết gì -> dựng thế nào
+  const owner = {}, R = {};
+  (pl.ops || []).forEach(o => (o.marks || o.slots || []).forEach(m => owner[m] = o));
+  (pl.render || []).forEach(r => R[r.id] = r);
+  const L = (pl.slots.L || []).filter(m => (m.typo || []).length);
+  if (!L.length) return `<h3>Chữ khó (typography)</h3><p class="muted">Không có dòng cong, dọc, nghiêng, OCR sót, cụm nét lạ hay chấm đầu dòng.</p>`;
+  const rows = L.map(m => { const o = owner[m.id] || {}, r = R[o.id] || {};
+    const how = [r.path ? "theo đường cong (SVG textPath)" : "", r.angle ? `xoay ${r.angle}°` : "", r.fs ? `cỡ ${Math.round(r.fs)}px` : "",
+                 r.shrink && r.shrink < 0.97 ? `co ${r.shrink}` : "", r.sx && r.sx < 0.995 ? `nén ngang ${r.sx}` : ""].filter(Boolean).join(" · ");
+    return `<tr><td class="role">${m.id}</td><td>${esc(m.ocr || "")}</td>
+      <td>${m.typo.map(t => `<b>${esc(t.kind)}</b><br><span class="muted">${esc(t.how)}</span>`).join("<br>")}</td>
+      <td class="role">${esc(o.id || "—")} ${esc(o.kind || "")}<br>${esc(plainHtml(o.html))}<br><span class="muted">${esc(o.why || "")}</span></td>
+      <td>${esc(how || (o.kind === "keep" ? "giữ điểm ảnh nháp" : o.kind === "skip" ? "xoá trống" : ""))}</td></tr>`; }).join("");
+  return `<h3>Chữ khó (typography): phát hiện → quyết → dựng</h3>
+    <table><tr><th>dòng</th><th>OCR đọc</th><th>mã nhận ra thế nào</th><th>lệnh (VLM / mã)</th><th>dựng thế nào</th></tr>${rows}</table>`;
 }
 function eraseDebug(P, pl) {   // Hi-SAM + LaMa: số đo, từng dòng được gỡ / giữ, cụm nét lạ VLM quyết gì
   const e = pl.erase || {}, t = P.timing || {}, by = {}, owner = {};
@@ -446,6 +466,7 @@ function renderDebug(P, pl) {
   const errs = (pl.errors || []).map(e => `<li>${esc(e.type)} ${esc((e.ops || []).join(","))} ${esc(JSON.stringify(Object.fromEntries(Object.entries(e).filter(([k]) => !["type", "ops"].includes(k)))))}</li>`).join("");
   const errs1 = (pl.errors_first || []).length;
   el.innerHTML = `<h3>OCR nháp → ô → lệnh</h3><table><tr><th>ô</th><th>OCR đọc</th><th>cỡ</th><th>lệnh</th><th>viết</th></tr>${rows}</table>
+    ${typoDebug(pl)}
     ${eraseDebug(P, pl)}
     <h3>Lệnh designer (${(pl.ops || []).length}) · phong cách</h3><p class="mono">${esc(JSON.stringify(pl.style || {}))}</p>
     <table><tr><th>id</th><th>loại</th><th>ô</th><th>chữ</th><th>box_style</th><th>vì sao</th></tr>${ops}</table>

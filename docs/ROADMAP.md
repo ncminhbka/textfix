@@ -42,6 +42,7 @@ Mã
 - [x] `engine.draw` / `engine.design`: bỏ xoá FLUX và dọn chữ sót, truyền mặt nạ nét. *(chạy trọn trạm thiết kế tại máy với VLM giả)*
 - [x] `server/app.py`: nạp Hi-SAM theo card, kiểm tệp lúc khởi động, lưu `ink.png` / `ink.jpg` / `base.jpg`, bỏ `plate*`. **(CHƯA CHẠY LẦN NÀO)**
 - [x] `server/ui.html`: bỏ hai ô bản xoá; bốn ô xem ① Hi-SAM nét chữ thô (`hisam.jpg`), ② mặt nạ gỡ (`ink.jpg`), ③ LaMa nền sạch VLM nhìn (`clean.jpg`), ④ nền dựng (`base.jpg`); bảng "Gỡ chữ" (thời gian Hi-SAM / LaMa, % nét, % mặt nạ, cụm nét lạ VLM quyết gì); bỏ lớp S / I; trang không bị trình duyệt giữ bản cũ. *(dựng thử tại máy bằng Chromium với một lượt giả)*
+- [x] UI debug "Chữ khó (typography)": mỗi dòng cong / dọc / nghiêng / dựng thẳng / OCR sót / cụm nét lạ / chấm đầu dòng / khung dời khỏi icon / chữ in trên sản phẩm -- mã nhận ra bằng bằng chứng gì (`l["typo"]`), lệnh VLM / mã, dựng thế nào (`plan["render"]`: xoay, đường cong, cỡ, co, nén); khung xem dòng vẽ dòng nghiêng theo đa giác thật.
 - [x] `steps.jpg` năm cột (nháp, dòng, nét chữ, nền, poster); zip báo cáo mang `ink.png` thay bản xoá. **(batch_report chưa chạy)**
 - [ ] Tờ ảnh ghép và trang HTML của `batch_report`: thêm cột nét chữ / nền.
 - [x] `audit.flags`: cờ cho dòng `orphan`, dòng gỡ theo lõi khung, lệnh gộp bị tách.

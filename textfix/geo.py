@@ -394,6 +394,7 @@ def apply_arcs(L: list[dict], I: list[dict], found: list[dict], cap_em: float) -
         new = {**first, "box": a["box"], "ocr_box": a["box"], "ocr": " ".join(l["ocr"] for l in cov_L),
                "size": float(a["h"] / (cap_em if caps else 0.6)), "angle": 0.0, "geo": a["geo"], "path": a["path"],
                "scale": a.get("scale"), **({"curve": a["curve"]} if a.get("curve") else {}),
+               "sag": a.get("sag"), "merged": [l.get("ocr") or "" for l in cov_L],   # bằng chứng, ghi cho debug
                "poly": [[a["box"][0], a["box"][1]], [a["box"][2], a["box"][1]], [a["box"][2], a["box"][3]], [a["box"][0], a["box"][3]]]}
         zone = mk.copy()   # vùng chữ của ô: vùng dò được + khung các mẩu đã gộp (slots._geo_lines thêm dải dọc đường chân)
         for m in cov_L + cov_I:
