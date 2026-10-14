@@ -806,6 +806,12 @@ thứ tự khách; VLM không cần chữ OCR làm gợi ý.
   các bước trong prompt tự do) = mục list có thứ tự. Thử lại trên 263 brief: 262 có mỗi câu khách đúng một lần trong ngoặc (1 còn
   lại do hoa / thường, bước `_requote` của luồng thật xử lý). Còn: 13 / 263 brief nhắc câu khách TRẦN (không ngoặc: "SALE",
   "MENU", tên sản phẩm) rồi câu đó được nối trong ngoặc ở cuối -- chưa xử lý.
+- [lời dặn LLM, người dùng 14/10 tối: "LLM chỉ dặn vẽ chữ, đừng dặn vẽ thế nào, để FLUX sáng tạo; làm đúng chuẩn prompt enhancer
+  của BFL"] mục prompt_en theo đúng 3 ý của `SYSTEM_MESSAGE_UPSAMPLING_T2I` (repo black-forest-labs/flux2): giữ chủ thể / ý định,
+  thêm chi tiết hình ảnh, mọi chữ trong ngoặc kép -- bỏ dặn font / cỡ / vị trí chữ, bố cục poster, "chữ ở vùng yên"; variants khác
+  nhau ở cảnh / khung / nền / ánh sáng / màu. Thêm: từ tả tiếng Anh trong ngoặc (không số, không dấu) chỉ bỏ ngoặc thay vì bỏ câu;
+  câu nhắc ảnh tham chiếu không bị bỏ, chỉ bỏ chuỗi lạ trong nó. Thử trên 263 brief: 263 mỗi câu khách đúng một lần trong ngoặc,
+  0 chuỗi lạ còn lại, 24 / 24 câu tả sản phẩm giữ, 10 brief bỏ câu (giá bị đè, địa chỉ bịa, "5 stars", "Địa chỉ quán"...).
 
 **Bộ thi CUỐI `bench/final2.json` (32 ca, seed 15001-15032, tạo 14/10 tối, chưa chạy lần nào):** 10 ca chỉ prompt (menu tên +
 giá, list, banner ngang, đề ngắn, pill, story, sang trọng, lịch hai cột, câu trích, các bước trong prompt), 15 ca chỉ form (đủ 6

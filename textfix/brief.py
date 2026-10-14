@@ -433,8 +433,17 @@ def _fix_prompt(pe: str, texts: list[dict]) -> tuple[str, list[str]]:
     bị bỏ khỏi texts) -> bỏ cả câu chứa nó: FLUX vẫn vẽ, VLM chép lại thành chữ không ai duyệt (08/10: địa chỉ bịa "123 Đường Số
     1, Quận 1, TP. HCM" bị bỏ khỏi texts nhưng còn trong prompt -> lên cả 4 poster)."""
     bad_q = set(_quoted_extra(pe, texts))
+    # TỪ TẢ tiếng Anh LLM để trong ngoặc ('tree pose', 'before/after', 'sticker' -- 10 / 263 brief đã lưu): không chữ số, không
+    # chữ có dấu -> không phải chữ in, chỉ bỏ ngoặc (giữ câu tả cảnh). Chữ có số / tiếng Việt không phải chữ khách (giá bị đè,
+    # địa chỉ bịa) -> bỏ cả câu như cũ.
+    desc = {q for q in bad_q if q.isascii() and not re.search(r"\d", q)}
+    if desc:
+        pe = QUOTED.sub(lambda m: m.group(1) if m.group(1) in desc else m.group(0), pe)
+        bad_q -= desc
     if bad_q:
-        keep = [s for s in _sentences(pe) if not set(QUOTED.findall(s)) & bad_q]
+        # câu nhắc ẢNH THAM CHIẾU (sản phẩm khách tải) không bỏ: chỉ bỏ chuỗi lạ trong nó (nhãn LLM tả trên sản phẩm)
+        keep = [QUOTED.sub(lambda m: "" if m.group(1) in bad_q else m.group(0), s) if IMAGE_REF.search(s) else s
+                for s in _sentences(pe) if IMAGE_REF.search(s) or not set(QUOTED.findall(s)) & bad_q]
         pe = "".join(keep)
     # MỖI CHỮ MỘT LẦN TRONG NGOẶC: FLUX vẽ mọi chuỗi trong ngoặc nó đọc -> câu nhắc lại thì bỏ ngoặc (41 / 263 brief đã lưu LLM
     # tự nhắc một câu hai lần: tên tiệm, câu trích -> nháp có dòng lặp)
