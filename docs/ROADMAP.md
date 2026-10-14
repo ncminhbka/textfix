@@ -85,12 +85,24 @@ khai; không cắt câu khách, chữ dài thì co; nháp thiếu câu thì ch�
 - [x] UI debug: đơn vị chữ (màu = tập), bảng câu ↔ dòng, cỡ / co từng phần tử; `scripts/lonly_replay.py` dựng lại plan cũ qua `fill.from_ops`.
 - [x] Dựng lại tại máy 30 accept2 + 35 mix1c (lệnh VLM cũ qua `fill.from_ops`): 0 tập lệch cỡ, chữ đúng nguyên văn; câu thiếu đều đã thiếu trong lệnh cũ.
 - [x] VLM không nhận chữ OCR (người dùng 14/10); số bước đặt lại theo thứ tự khách; `engine.design` chạy trơn với VLM giả.
-- [ ] Hi-SAM phân cấp (từ / dòng) chia dòng thay OCR: tick sát chữ, hai cột gộp, một khung hai hàng.
-- [ ] Máy chủ: một lượt accept2 với lời dặn mới, xem 100% ảnh, so lượt 1014_040431.
+- [x] Sau mix1 / dev2 (14/10 tối): ngắt dòng theo bề rộng nét + font thật, không ép câu thiếu, giữ màu nháp, brief không làm mất
+  câu khách (ghép chữ khách / chép sai vài chữ), số trước hàng viết lại, dòng xếp chồng một câu gộp khối, chữ OCR gửi lại VLM làm neo.
+- [ ] Hi-SAM phân cấp (từ / dòng) chia dòng thay OCR: tick sát chữ, hai cột gộp, một khung hai hàng (probe 65 nháp: khớp OCR ~96%,
+  thắng khung hai hàng + nhóm đoạn, thua chữ chạy vòng) -- thay cụm luật vá OCR của `slots.py` (`_split_gaps`, `_trim_lead`,
+  `_lead_dots`, `TILT_*`, `_stacked`, `_orphans`, `fill.TALL`). Sau deadline.
+- [ ] CHỮ TRÊN SẢN PHẨM KHÁCH TẢI bị VLM viết đè (dev2 d13: "Chai 650ml" đè dòng "For Damaged Hair" trên nhãn Dove; luật dò theo
+  chữ OCR không bắt vì OCR không đọc ra chữ trùng ảnh khách). Hướng: định vị sản phẩm trên nháp bằng HÌNH HỌC (SIFT + RANSAC
+  với ảnh khách) -> dòng trong vùng sản phẩm không bao giờ gỡ / viết. Probe 14 nháp (14/10): FLUX chép sát thì chữ nhãn khớp
+  15-76 điểm, chữ poster ~0; FLUX vẽ lại sản phẩm (d24v1, d31) thì 0-3; một tiêu đề báo nhầm 16 điểm -> CHƯA có ngưỡng tách sạch,
+  cần vùng sản phẩm chắc + tập gán nhãn trước khi dùng. Tạm thời: dò theo chữ OCR + VLM keep; VLM ghép câu khách thì VLM thắng.
+- [ ] Ngưỡng chặng B chọn theo vài ca, chưa đo trên tập luyện: `DIFF_RGB` (ac10), `OUTLINE_HEAD / OUTLINE_ABS` (dev3 g12, phá hiệu
+  ứng neon dev2 d06), `brief.SNAP` (d03), `PIECE_SIM`. `SET_RATIO 1,25` đã đo lại trên mix1 + dev2: 129 / 150 cặp cùng vai <= 1,2,
+  khe thưa 1,2-1,4 -> giữ.
 
 ## Chặng C -- Thi
 
-- [ ] `bench/final1.json`, một lượt, chấm. Ngưỡng: hỏng <= 10%, không mất chữ sản phẩm, không số / giá / liên hệ bịa.
+- [ ] `bench/final2.json` (32 ca mới, người dùng chọn thi bộ này), một lượt, chấm; so cùng seed với nhánh `legacy-ops-html`.
+- [ ] (cũ) `bench/final1.json`, một lượt, chấm. Ngưỡng: hỏng <= 10%, không mất chữ sản phẩm, không số / giá / liên hệ bịa.
 
 ## Giới hạn đã biết, chưa xử lý
 

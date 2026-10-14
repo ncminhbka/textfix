@@ -14,7 +14,7 @@ import json
 import re
 
 ROLES = ["headline", "subheadline", "body", "price", "old_price", "offer", "date", "info", "contact", "cta", "list_item",
-         "review_quote", "review_name", "label"]
+         "review_quote", "review_name", "label", "step"]
 TECH_KEYS = {"image_base64", "seed", "num_images", "aspect_ratio", "primary_color", "style_pref", "has_product_image"}
 QUOTED = re.compile(r'"([^"]+)"')
 STAR_TEXT = re.compile(r"^\d+(?:[.,]\d+)?\s*(?:sao|stars?)$", re.I)   # câu CHỈ ghi số sao ("5 sao")
@@ -52,14 +52,14 @@ Input: the user's poster form (category + filled fields, JSON) and/or a free pro
 1. prompt_en -- an English prompt for FLUX.2 that draws the WHOLE poster including its text. Follow the official FLUX.2 prompt-upsampling guidelines:
    - Strictly preserve the user's subject and intent. Convert the request into a detailed paragraph.
    - Add concrete visual specifics: subject, form, materials, textures, lighting (quality, direction, color), shadows, spatial relationships, environment, mood, and a clean professional poster layout (where the headline, price / offer, list and footer sit; flat graphic text, badges, pills or cards where suitable).
-   - Text in images: put EVERY text of the poster in double quotes, EXACTLY as written in "texts" below (Vietnamese with full diacritics), and say its role, typographic style and its place (e.g. headline "..." in a bold condensed sans-serif at the top center). Never add any text that is not in "texts".
+   - Text in images: put EVERY text of the poster in double quotes, EXACTLY as written in "texts" below (Vietnamese with full diacritics), and say its role, typographic style and its place (e.g. headline "..." in a bold condensed sans-serif at the top center). Quote each text ONCE (the image model draws every quoted string it reads, so a text quoted twice is drawn twice); refer back to it without quotes ("the shop name"). Never add any text that is not in "texts".
    - Put texts on calm areas, never on the main subject.
    - A star rating the user asks for ("đánh giá 5 sao", "review 5 sao") is a PICTURE: describe a row of gold stars; never make
      "5 sao" a text and never quote it.
    - Never invent commercial claims: no price, discount, promotional offer, deadline / date, phone number, address or warranty that the user did not give.
    - Never write aspect ratios, resolutions or sizes (e.g. 9:16, 4k, 1080p).
 2. texts -- the texts the poster must show, each with "source". source "user" = the user's own words: copy every text EXACTLY character for character from the form values or from the quoted strings / explicit texts of the prompt (same case, accents, punctuation). Never invent, translate, shorten or rewrite text. Every filled content field appears in full (store name, phone, address, website included). The form fields "highlights" and "feedback_highlights" are lists: ALWAYS one text per comma-separated item (role list_item). A comma-separated list of highlights / features in the free prompt becomes one text per item ONLY if the user separated them; copy each item exactly, except that every list item (role list_item: a bullet / feature / step row) STARTS WITH A CAPITAL LETTER ("nhận phản hồi trực tiếp" -> "Nhận phản hồi trực tiếp"), in texts and inside the quotes of prompt_en alike.
-   - role: one of """ + ", ".join(ROLES) + """ (old_price = an original price shown crossed out next to the new price).
+   - role: one of """ + ", ".join(ROLES) + """ (old_price = an original price shown crossed out next to the new price; step = one step of a numbered how-to sequence the user wrote, e.g. "4 bước: ...", in the user's order).
    - SUPPORT COPY (source "ai"): most users fill the facts and nothing else, so the poster lacks its basic parts. You may
      WRITE up to 4 short Vietnamese texts yourself to complete it -- a headline when the user gave none (<= 7 words), one short
      tagline, a call-to-action button ("Đặt lịch ngay", "Xem thêm", "Liên hệ ngay"), a section label ("Điểm nổi bật", "Ưu đãi",
@@ -140,6 +140,13 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
         user.append("Design hints (not texts, never draw them as words):\n- " + "\n- ".join(hints))
     user.append(f"Alternative design directions asked (variants): {max(0, int(n_variants))}")
     raw = llm(SYSTEM, ["\n\n".join(user)])
+    # MỌI KIỂU NGOẶC trong prompt_en -> ngoặc kép, trước mọi bước kiểm: lời dặn bảo chữ nằm trong "...", nhưng LLM hay viết '...'
+    # (45 / 263 brief đã lưu). Chữ trong ngoặc đơn lọt khỏi mọi phép kiểm: FLUX vẫn vẽ chữ không có trong texts (giá form bị đè
+    # accept1 "185.000đ", menu dev2 d05), và câu khách bị nối thêm lần nữa ở cuối -> FLUX vẽ hai lần (dev2 d31 phụ đề lặp).
+    if isinstance(raw, dict):
+        raw = {**raw, "prompt_en": _unify_quotes(str(raw.get("prompt_en") or "")),
+               "variants": [{**v, "prompt_en": _unify_quotes(str(v.get("prompt_en") or ""))} for v in (raw.get("variants") or [])
+                            if isinstance(v, dict)]}
     sources = [_norm(prompt or "")] + [_norm(v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)) for k, v in form.items()
                                        if k != "category"]
     must = list(dict.fromkeys(QUOTED.findall(prompt or "") + CURLY.findall(prompt or "")))
@@ -224,7 +231,9 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
     for q in must:   # chuỗi người dùng viết trong ngoặc kép mà LLM bỏ sót -> thêm lại nguyên văn (trừ khi đã tách thành các ý)
         qn = _norm(q)
         parts = [t for t in seen if t.casefold() in qn.casefold()]   # mục danh sách đã viết hoa chữ đầu vẫn là một phần của chuỗi
-        if qn not in seen and not (parts and sum(len(p) for p in parts) >= 0.8 * len(qn)):
+        # chuỗi đã NẰM TRONG một câu khách (`"Bún bò tái" 40.000đ` -> câu "Bún bò tái 40.000đ") thì không thêm lần nữa
+        inside = any(qn.casefold() in t.casefold() for t in seen)
+        if qn not in seen and not inside and not (parts and sum(len(p) for p in parts) >= 0.8 * len(qn)):
             # LLM dùng chuỗi đó làm TỪ TẢ trong prompt_en (không ngoặc kép): khách đặt ngoặc cho phong cách, không phải chữ in
             # (09/10 dev2 d06: phong cách "Y2K", "vintage" -> "Y2K-style t-shirt with a vintage aesthetic") -> không thêm lại
             if re.search(r"(?<!\w)" + re.escape(qn.casefold()) + r"(?!\w)", pe_open):
@@ -281,6 +290,10 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
             t["text"] = c
             log.setdefault("list_capitalized", []).append(c)
         # CÁC BƯỚC luôn theo thứ tự khách (người dùng chốt 14/10, kể cả khi FLUX vẽ hình minh hoạ lệch thứ tự): fill.order đọc cờ này
+        # vai "step" (LLM nhận ra các bước trong prompt tự do, dev2 d20 "quy trình 8 bước" không có form hướng dẫn) = mục list
+        # có thứ tự: cùng tập với các mục list, số bước theo thứ tự khách
+        if t.get("role") == "step":
+            t["role"], t["ordered"] = "list_item", True
         if steps and t.get("role") == "list_item":
             t["ordered"] = True
     raw = {**raw, "prompt_en": _requote(raw.get("prompt_en", ""), out),
@@ -372,6 +385,15 @@ def _cap_first(s: str) -> str:
     return s
 
 
+OTHER_QUOTES = re.compile(r"“([^”\n]{1,120})”|‘([^’\n]{1,120})’|(?<![\w'])'(?=\S)([^'\n]{2,120}?)(?<=\S)'(?![\w'])")
+
+
+def _unify_quotes(pe: str) -> str:
+    """'...', ‘...’, “...” -> "..." (chữ trong ngoặc là chữ in). Dấu nháy trong từ tiếng Anh ("shop's", "customers'") không phải
+    ngoặc: ngoặc mở không đứng sau chữ cái, ngoặc đóng không đứng trước chữ cái."""
+    return OTHER_QUOTES.sub(lambda m: '"' + next(g for g in m.groups() if g is not None) + '"', pe)
+
+
 def _approved(q: str, texts: list[dict]) -> bool:
     """Chuỗi trong ngoặc kép của prompt_en là chữ khách: trùng một câu, nằm trong một câu, hoặc ghép từ các câu khách."""
     q = _norm(q).casefold()
@@ -408,6 +430,17 @@ def _fix_prompt(pe: str, texts: list[dict]) -> tuple[str, list[str]]:
     if bad_q:
         keep = [s for s in _sentences(pe) if not set(QUOTED.findall(s)) & bad_q]
         pe = "".join(keep)
+    # MỖI CHỮ MỘT LẦN TRONG NGOẶC: FLUX vẽ mọi chuỗi trong ngoặc nó đọc -> câu nhắc lại thì bỏ ngoặc (41 / 263 brief đã lưu LLM
+    # tự nhắc một câu hai lần: tên tiệm, câu trích -> nháp có dòng lặp)
+    seen_q = set()
+
+    def _once(m):
+        k = _norm(m.group(1)).casefold()
+        if k in seen_q:
+            return m.group(1)
+        seen_q.add(k)
+        return m.group(0)
+    pe = QUOTED.sub(_once, pe)
     parts = pe.split('"')
     bad = re.compile(r"\b(?:1:1|9:16|16:9|4:5|5:4|2:3|3:2|4:3|3:4|21:9)\b|\b\d{3,4}p\b|\b[248]k\b", re.I)
     pe = '"'.join(bad.sub("", p) if i % 2 == 0 else p for i, p in enumerate(parts))

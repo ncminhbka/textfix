@@ -798,6 +798,14 @@ thứ tự khách; VLM không cần chữ OCR làm gợi ý.
   làm neo (người dùng). Lỗi MODEL (ghi nhận): kiểu chữ / hiệu ứng VLM tả (d06 neon, d38), chỗ FLUX vẽ ngắn hơn câu (d09, d11,
   d12, d16), LLM không gắn cờ bước khi khách chỉ viết prompt (d20). Dựng lại dev2 v0 tại máy: co < 0,6 7 -> 4, poster còn lỗi
   8 -> 7, chữ lệch câu 0, tập lệch cỡ 0.
+- [audit LLM đầu luồng, 263 brief đã lưu] phòng thủ "prompt_en <-> texts" chỉ đọc ngoặc kép, LLM viết ngoặc đơn ở 45 / 263 brief:
+  7 brief có chữ tiếng Việt FLUX được bảo vẽ mà không có trong texts (giá form bị đè accept1 "185.000đ", menu dev2 d05), 21 brief
+  câu khách bị nối thêm lần nữa ở cuối -> FLUX vẽ hai lần (dev2 d31); 41 / 263 brief LLM tự đặt một câu hai lần trong ngoặc.
+  [mã] mọi kiểu ngoặc -> ngoặc kép trước mọi bước kiểm (`brief._unify_quotes`); mỗi chữ chỉ một lần trong ngoặc (lần nhắc lại bỏ
+  ngoặc) + lời dặn "quote each text ONCE"; chuỗi khách đã nằm trong một câu khách thì không thêm lần nữa; vai `step` (LLM nhận ra
+  các bước trong prompt tự do) = mục list có thứ tự. Thử lại trên 263 brief: 262 có mỗi câu khách đúng một lần trong ngoặc (1 còn
+  lại do hoa / thường, bước `_requote` của luồng thật xử lý). Còn: 13 / 263 brief nhắc câu khách TRẦN (không ngoặc: "SALE",
+  "MENU", tên sản phẩm) rồi câu đó được nối trong ngoặc ở cuối -- chưa xử lý.
 
 **Bộ thi CUỐI `bench/final2.json` (32 ca, seed 15001-15032, tạo 14/10 tối, chưa chạy lần nào):** 10 ca chỉ prompt (menu tên +
 giá, list, banner ngang, đề ngắn, pill, story, sang trọng, lịch hai cột, câu trích, các bước trong prompt), 15 ca chỉ form (đủ 6
