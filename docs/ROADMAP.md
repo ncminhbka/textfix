@@ -134,6 +134,41 @@ OCR quyết móng của chặng B (mọi khung, cỡ, lề lấy từ dòng L#) 
   FLUX (chỗ ngắn / thiếu câu ~15-20%), VLM (~15%), LLM (~15-20% brief) nhưng là nguồn lỗi chính còn lại PHÍA CODE.
 - Hướng: dòng thẳng theo Hi-SAM phân cấp, OCR chỉ bù chữ cong và đọc chữ trên sản phẩm; bỏ gần hết cụm luật vá. Sau deadline.
 
+## AUDIT 14/10 khuya: VLM ghép + dựng + kiểm + engine -- SỬA NGÀY 15/10 (người dùng: "phải vá hết trước khi demo cho sếp")
+
+P0 -- có thể làm hỏng cả poster khi demo:
+- [ ] A1. CACHE LLM / VLM (`llm.json_call`, ~/.cache/textfix): mọi lời gọi lưu theo nội dung đầu vào -> "gọi lại VLM" khi ghép
+  rỗng / cụt (`engine.design`) gửi y hệt đầu vào, LẤY LẠI ĐÚNG câu trả lời cũ: hai luật gọi lại KHÔNG BAO GIỜ có tác dụng.
+- [ ] A2. VLM trả JSON hỏng / quá giờ: `json.loads` ném lỗi -> `design` lỗi -> phiên bản không có poster (server ghi "error").
+  Không có đường lui.
+- [ ] A3. Dòng VLM bỏ sót (hoặc ghi skip cho dòng chữ thường) bị XOÁ TRẮNG, kể cả dòng trên pill / một hàng của list -- trái tinh
+  thần TextFix ("đứng trên pill hoặc cùng cấp chữ khác mà xoá thì khoảng trống rất xấu"). Hướng: hỏi lại VLM riêng các dòng đó.
+- [ ] A4. Chữ lấp VLM viết cho dòng thừa chỉ chặn SỐ (`fill.resolve`), không chặn lời hứa / ưu đãi ("Miễn phí", "Giảm giá"), tên,
+  độ dài -- brief có `AI_BAN_WORDS` / `AI_MAX_CHARS` nhưng chặng B không dùng. Ví dụ chữ lấp vô nghĩa: dev2 f05 "Ngân hàng".
+- [ ] A5. Chữ co tới sàn 12 px (1,2% cạnh ngắn) vẫn xuất: `too_small` không phải lỗi nặng, vòng sửa không đụng (dev2 d26v0 tập liên
+  hệ co 0,13; d14v1 0,22). Chính sách "không cắt chữ" -> cần đường khác: thêm dòng khi khung đủ cao / nới khung trong vùng trống.
+- [ ] A6. Chữ trên sản phẩm khách tải bị VLM viết đè (dev2 d13) -- xem mục "CHỮ TRÊN SẢN PHẨM" ở chặng B.
+
+P1 -- xấu thấy rõ, gặp thường:
+- [ ] B1. KIỂU CHỮ VLM tả sai (~8 / 35 poster mix1: font hẹp / đậm hơn nháp, serif thành không chân). Một nguồn: `slots._look` đo
+  "letters ~0.40em wide (condensed)" từ SỐ KÝ TỰ OCR của chữ giun (chữ giun hẹp hơn chữ thật ~11%) -> nhãn "condensed" đẩy VLM
+  chọn font hẹp. Code không đối chiếu lớp font VLM chọn (serif / sans) với độ tương phản nét đo được (`stroke_contrast`).
+- [ ] B2. HIỆU ỨNG CSS VLM tả (viền / bóng / quầng) không đối chiếu với quầng đo được trên nháp (`l["effect"]`): dev2 d06 neon
+  thành chữ mảnh, d38 viền tối.
+- [ ] B3. `render.OUTLINE_HEAD / OUTLINE_ABS`: tiêu đề chìm nền -> thêm viền đen, phá hiệu ứng (d06). Nên theo luật chung "đúng
+  màu nháp thì giữ màu + quầng".
+- [ ] B4. Lời dặn VLM THỪA so với code: mục 2 bắt VLM chia "split" nhưng code đã bỏ split trong một đơn vị (ngắt theo bề rộng
+  nét), chỉ còn dùng mảnh rỗng + câu ghi nhiều mục. Mục 3(b) "lấy cụm từ câu khách khác" sinh lặp nội dung (mix1 m03 tiêu đề hai
+  lần). Màu: lời dặn "màu phổ biến nhất" nhưng code đổi sang màu đo từng dòng khi lệch > 120 -- hai nguồn sự thật.
+- [ ] B5. Chồng lấn giữa hai đơn vị còn lại sau vòng sửa (dev2 d37v0, d14v1); tràn khung còn sau nén 0,75 (mix1 v03): chữ thò khỏi
+  pill.
+
+P2 -- nhỏ / hiếm:
+- [ ] C1. `accent` (từ nhấn to / khác màu) không kiểm tỉ lệ, có thể phóng quá khung.
+- [ ] C2. Luật theo ký tự OCR: thêm ngoặc kép cho câu trích, đặt lại số bước trong dòng ("1. ...").
+- [ ] C3. Kiểu theo VAI ép một kiểu cho cả vai dù nháp vẽ hai kiểu (khi LLM gộp hai loại vào một vai -- mix1 t02).
+- [ ] C4. "missing" của VLM và của code khác nhau chỉ ghi nhật ký.
+
 ## Giới hạn đã biết, chưa xử lý
 
 - Chữ neon quầng rộng: còn bóng mờ sau khi gỡ.
