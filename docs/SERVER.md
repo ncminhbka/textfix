@@ -151,6 +151,18 @@ Thêm `--full` khi cần cả nháp / bản xoá cỡ gốc (các zip < 24 MB nh
 | VLM `400` / `too many images` / `maximum context length` | Tăng `--limit-mm-per-prompt` / `--max-model-len` phía máy chủ VLM |
 | Poster thiếu câu (giao diện báo "Không vẽ") | Model không chừa chỗ cho câu đó, hoặc designer rút gọn cho vừa: đổi seed, thêm ảnh |
 
+## Hi-SAM (thử nghiệm: mặt nạ nét chữ; chưa nối vào dây chuyền)
+
+Máy chủ không ra internet: tải ở máy khác rồi đưa lên `~/persistent-data/hisam/` (đổi chỗ: `export TEXTFIX_HISAM=<thư mục>`).
+- mã nguồn: https://github.com/ymy-k/Hi-SAM/archive/refs/heads/main.zip -> giải nén thành `hisam/Hi-SAM/`
+- nền SAM ViT-L (1.249.524.607 byte): https://dl.fbaipublicfiles.com/segment_anything/sam_vit_l_0b3195.pth
+  -> `hisam/Hi-SAM/pretrained_checkpoint/sam_vit_l_0b3195.pth`
+- phần nét chữ, bản TextSeg (122.756.163 byte): `sam_tss_l_textseg.pth` (README của Hi-SAM, mục Model Zoo, dòng SAM-TS-L /
+  TextSeg; bản sao: https://huggingface.co/creative-graphic-design/hi-sam-checkpoints) -> `hisam/sam_tss_l_textseg.pth`
+- thư viện: `torch` + `einops`. KHÔNG cài `requirements.txt` của Hi-SAM (ghim numpy / opencv bản cũ).
+
+Đo thời gian + VRAM trên mọi GPU: `python scripts/hisam_test.py --check` rồi `python scripts/hisam_test.py accept2 mix1`.
+
 ## LaMa (gỡ chữ của chế độ chỉ dòng chữ)
 
 Tệp `big-lama.pt` (196 MB): `wget -O ~/persistent-data/lama/big-lama.pt https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt`.
