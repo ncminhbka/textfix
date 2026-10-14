@@ -104,6 +104,24 @@ khai; không cắt câu khách, chữ dài thì co; nháp thiếu câu thì ch�
 - [ ] `bench/final2.json` (32 ca mới, người dùng chọn thi bộ này), một lượt, chấm; so cùng seed với nhánh `legacy-ops-html`.
 - [ ] (cũ) `bench/final1.json`, một lượt, chấm. Ngưỡng: hỏng <= 10%, không mất chữ sản phẩm, không số / giá / liên hệ bịa.
 
+## Bước LLM đầu luồng (brief) -- ghi nhận 14/10 tối, CHỜ người dùng chọn hướng
+
+Việc của LLM (người dùng chốt): bịa chữ phụ khi đề sơ sài; phân loại có chữ / không chữ; viết trung thực chữ khách; KHAI TRUNG
+THỰC những chữ đã bảo FLUX vẽ; prompt_en theo đúng chuẩn làm giàu prompt của BFL (không dặn font / cỡ / vị trí -- đã sửa).
+Lỗi đo trên 263 brief đã lưu:
+- 45 / 263 viết chữ trong NGOẶC ĐƠN -> lọt phép kiểm prompt_en <-> texts: FLUX vẽ chữ không có trong texts (giá bị đè accept1
+  "185.000đ", menu dev2 d05) và câu khách bị nối lặp ở cuối (dev2 d31 phụ đề vẽ hai lần).
+- 41 / 263 LLM tự đặt MỘT câu HAI LẦN trong ngoặc -> FLUX vẽ lặp (gốc của nhiều ca "dòng lặp" chặng B phải xử lý hộ).
+- LLM ghép chữ khách ("Bún bò tái 40.000đ") / chép sai vài chữ ("Khánh trương") -> câu bị bỏ mà FLUX vẫn vẽ -> chặng B xoá trắng.
+- 13 / 263 nhắc câu khách TRẦN (không ngoặc) rồi câu được nối trong ngoặc ở cuối -> có thể vẽ hai lần (chưa xử lý).
+- Vai (nhóm của chặng B) không ai kiểm: t02 tên khoá học + giờ học cùng "info" -> một tập.
+Hiện đã vá (commit 266fd31 / 223033c / 0aab432): đổi mọi ngoặc về ngoặc kép, mỗi chữ một lần, ghép chữ khách / chép sai -> đoạn
+khách viết, vai "step", từ tả tiếng Anh chỉ bỏ ngoặc, câu nhắc ảnh sản phẩm không bị xoá. Người dùng: "rối quá, user không rảnh
+viết dấu ngoặc" -> HƯỚNG ĐỀ XUẤT (chưa duyệt): LLM viết prompt_en CHỈ TẢ CẢNH, không chữ; CODE nối "The poster shows these texts:
+"A", "B"" đúng một lần (đúng ý 3 của BFL) -> chữ FLUX vẽ = texts theo cấu trúc, bỏ toàn bộ phần đối chiếu ngoặc; phòng thủ còn 3
+luật: câu nguồn khách gồm chữ khách viết, câu AI ngắn không số / lời hứa, trường form bị sót thêm lại + tách trường danh sách.
+Câu hỏi mở: có ghi vai trước mỗi câu ("headline "A"") không; cần đo trên máy chủ (5 ca dev2 so lượt cũ).
+
 ## Giới hạn đã biết, chưa xử lý
 
 - Chữ neon quầng rộng: còn bóng mờ sau khi gỡ.
