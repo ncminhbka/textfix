@@ -71,7 +71,7 @@ Chạy từ ô notebook thay vì terminal: `%env TEXTFIX_MODEL=...` cho từng b
 python scripts/check_server.py --fix 2>&1 | tee check.log
 ```
 
-Kiểm: thư mục, gói pip (in một lệnh pip cho gói thiếu, không đụng torch), GPU, trọng số FLUX, font / icon, Chromium (giải nén
+Kiểm: thư mục, gói pip (in một lệnh pip cho gói thiếu, không đụng torch), GPU, trọng số FLUX, font, Chromium (giải nén
 zip, `ldd` báo thư viện hệ thống thiếu, mở thử), OCR, LLM / VLM (danh sách model, JSON, 1 và 12 ảnh), cổng.
 Mục nào `[LỖI]` thì làm theo dòng `SỬA:` ngay dưới.
 

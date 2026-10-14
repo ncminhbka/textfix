@@ -43,7 +43,7 @@ Chạy trên máy chủ bằng ô notebook (`%run scripts/...`): kết quả t�
 | `textfix/hisam.py` | Hi-SAM: mặt nạ nét chữ của nháp |
 | `textfix/lonly.py` | Đường chỉ dòng chữ: gỡ chữ (mặt nạ + LaMa), lời dặn VLM, rà lệnh |
 | `textfix/slots.py` | Đo dòng chữ, gọi VLM, chặn chữ sai, vòng duyệt |
-| `textfix/render.py` | Dựng HTML đúng khung ô (thẻ tiện ích icon / sao / font), kiểm lỗi |
+| `textfix/render.py` | Dựng HTML đúng khung dòng (thẻ font), kiểm lỗi |
 | `textfix/ocr.py`, `glyph.py`, `geo.py` | OCR dòng, đo nét (cỡ, màu), chữ cong |
 | `textfix/fonts.py` | Bộ font OFL đủ dấu tiếng Việt |
 | `textfix/ship.py` | Gói kết quả máy chủ thành zip < 24 MB, tự tải về trình duyệt (JupyterLab) |
@@ -58,4 +58,3 @@ Chạy trên máy chủ bằng ô notebook (`%run scripts/...`): kết quả t�
 
 - `flux2/`: Apache-2.0 (Black Forest Labs), xem `flux2/LICENSE.md`.
 - Font trong `assets/fonts/`: SIL Open Font License.
-- Icon trong `assets/icons/lucide/`: ISC (Lucide).
