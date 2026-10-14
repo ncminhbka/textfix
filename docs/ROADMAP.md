@@ -169,6 +169,16 @@ P2 -- nhỏ / hiếm:
 - [ ] C3. Kiểu theo VAI ép một kiểu cho cả vai dù nháp vẽ hai kiểu (khi LLM gộp hai loại vào một vai -- mix1 t02).
 - [ ] C4. "missing" của VLM và của code khác nhau chỉ ghi nhật ký.
 
+## AUDIT 14/10 khuya: bước vẽ + máy chủ
+
+- [ ] D1. (P0) Một lỗi bất kỳ trong trạm thiết kế (VLM JSON hỏng / quá giờ, Hi-SAM, LaMa, Chromium) -> phiên bản "error", không
+  có poster; yêu cầu MỘT ảnh thì cả job lỗi. Không có đường lui -- cần chọn: thử lại không cache, rồi trả gì (nháp? báo lỗi rõ?).
+- [ ] D2. (P0) Brief (LLM) hỏng JSON / quá giờ -> cả job lỗi, không thử lại (cache + `max_retries=1` chỉ cho lỗi mạng).
+- [ ] D3. (P1) Cache brief theo nội dung: cùng yêu cầu -> cùng brief mãi mãi (kể cả brief lỗi đã lưu); muốn "thử lại" phải xoá
+  ~/.cache/textfix. Khi demo: bấm tạo lại cùng yêu cầu ra y hệt brief.
+- [ ] D4. (P2) Không có bước kiểm FLUX đã vẽ đủ câu / có vẽ sản phẩm khách tải (giới hạn model; chỉ ghi "missing").
+- Chặng A (Hi-SAM + LaMa): người dùng chốt, không audit lại; giới hạn đã biết ở mục cuối.
+
 ## Giới hạn đã biết, chưa xử lý
 
 - Chữ neon quầng rộng: còn bóng mờ sau khi gỡ.
