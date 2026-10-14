@@ -799,6 +799,12 @@ thứ tự khách; VLM không cần chữ OCR làm gợi ý.
   d12, d16), LLM không gắn cờ bước khi khách chỉ viết prompt (d20). Dựng lại dev2 v0 tại máy: co < 0,6 7 -> 4, poster còn lỗi
   8 -> 7, chữ lệch câu 0, tập lệch cỡ 0.
 
+**Bộ thi CUỐI `bench/final2.json` (32 ca, seed 15001-15032, tạo 14/10 tối, chưa chạy lần nào):** 10 ca chỉ prompt (menu tên +
+giá, list, banner ngang, đề ngắn, pill, story, sang trọng, lịch hai cột, câu trích, các bước trong prompt), 15 ca chỉ form (đủ 6
+loại: khuyến mãi, sản phẩm -- 2 ca ảnh tải lên lon Coca / bánh pía --, khai trương, phản hồi, tuyển dụng, hướng dẫn 4 / 5 / 6
+bước), 2 ca prompt + form (thêm chữ, đè ngày), 5 ca khác (giá gạch, sự kiện, ba thẻ gói, không dấu, Tết). Chạy MỘT lần, chấm theo
+nguồn lỗi (VLM / FLUX / LLM / code), không sửa mã theo ca của bộ này.
+
 **Bộ thi `bench/accept2.json` (30 ca, seed 9001-9030):** e nút / thẻ / huy hiệu (6), h nền khó (5), k chữ khó (5), l danh sách /
 bảng / các bước (5), q ảnh sản phẩm (3), r form thường gặp (6). CHỈ chạy và chấm, không sửa mã theo từng ca của bộ này; lỗi
 thấy ở đây chỉ sửa khi nó hiện thành một con số trên tập luyện (mix1, accept1, dev2, dev3, form1).
