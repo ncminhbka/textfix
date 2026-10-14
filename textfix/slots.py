@@ -493,7 +493,7 @@ def _typo_notes(L: list, logs: list[str]) -> None:
         if l.get("orphan"):
             notes.append({"kind": "cụm nét OCR không đọc", "how": "; ".join(x for x in lg if "cụm nét" in x)[:300] or "nét Hi-SAM ngoài mọi dòng OCR"})
         if l.get("dot"):
-            notes.append({"kind": "chấm đầu dòng", "how": "mảng nét đầu dòng nhỏ, tròn, cách chữ; OCR đọc ký tự đầu không phải chữ"})
+            notes.append({"kind": "chấm đầu dòng", "how": "mảng nét đầu dòng nhỏ, tròn, cách chữ; OCR đọc ký tự đầu không phải chữ -> Hi-SAM gỡ chấm cùng chữ, VLM được viết lại"})
         if l.get("lead_icon"):
             notes.append({"kind": "khung dời khỏi icon", "how": "; ".join(x for x in lg if "khung OCR ôm" in x)[:300]})
         if l.get("printed"):

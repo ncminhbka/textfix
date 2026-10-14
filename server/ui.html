@@ -445,7 +445,7 @@ function eraseDebug(P, pl) {   // Hi-SAM + LaMa: số đo, từng dòng được
   const orows = orph.map(id => { const m = by[id] || {}, o = owner[id] || {};
     return `<tr><td class="role">${id}</td><td>${esc(m.ocr || "(không đọc được)")}</td><td class="role">${esc(o.kind || "giữ (VLM không nhắc)")}</td><td class="muted">${esc(o.why || "")}</td></tr>`; }).join("");
   const special = (pl.slots.L || []).filter(m => m.dot || m.lead_icon || m.printed).map(m =>
-    `${m.id}${m.dot ? " · chấm đầu dòng (gỡ cùng chữ, viết lại •)" : ""}${m.lead_icon ? " · khung đã dời khỏi icon đứng trước" : ""}${m.printed ? " · chữ in trên sản phẩm" : ""}`);
+    `${m.id}${m.dot ? " · chấm đầu dòng (Hi-SAM gỡ cùng chữ: VLM được viết •)" : ""}${m.lead_icon ? " · khung đã dời khỏi icon đứng trước" : ""}${m.printed ? " · chữ in trên sản phẩm" : ""}`);
   return `<h3>Gỡ chữ: ① Hi-SAM → ② mặt nạ → ③ LaMa → ④ nền dựng</h3>
     <div class="timing"><span>Hi-SAM: <b>${t.net_chu ?? "?"}</b> s</span><span>LaMa: <b>${t.go_chu ?? "?"}</b> s</span>
       <span>nét chữ: <b>${e.ink_pct ?? "?"}</b>% ảnh</span><span>mặt nạ gỡ: <b>${e.mask_pct ?? "?"}</b>% ảnh</span>

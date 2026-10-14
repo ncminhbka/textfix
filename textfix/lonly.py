@@ -50,8 +50,9 @@ BR = re.compile(r"<br\s*/?>", re.I)
 def marks_rule(P: dict, M: dict) -> tuple[dict, list[str]]:
     """TEXTFIX CHỈ SỬA CHỮ (người dùng chốt 14/10): icon / tick / hình nhỏ trước mỗi dòng là điểm ảnh của nháp, không gỡ, không vẽ
     lại -> lệnh chữ không được mở đầu bằng icon (gỡ, nếu không sẽ có hai dấu cạnh nhau). CHẤM TRÒN đầu dòng thì khác: OCR gộp nó
-    vào khung dòng và Hi-SAM coi nó là nét chữ (đo accept2 r04: 3 / 3), tức nó bị gỡ cùng chữ -- nó là một KÝ TỰ của dòng. Dòng
-    mã đo thấy có chấm (slots._lead_dots: l["dot"]) thì dòng chữ mới mở đầu bằng "• "; dòng không có thì không.
+    vào khung dòng và Hi-SAM coi nó là nét chữ (đo accept2 r04: 3 / 3), tức nó bị gỡ cùng chữ -- nó là một KÝ TỰ của dòng.
+    Người dùng chốt 14/10: chấm không phải icon -- Hi-SAM đã gỡ chấm (l["dot"]) thì VLM ĐƯỢC viết "• " (nó quyết, mã không tự
+    thêm); dòng mà chấm của nháp còn trên nền thì chấm VLM viết bị gỡ, không thì thành hai chấm.
     Lệnh nhiều dòng: xét từng dòng khi số dòng html khớp số ô, không thì chỉ dòng đầu."""
     log, ops = [], []
     for op in P.get("ops") or []:
@@ -71,9 +72,6 @@ def marks_rule(P: dict, M: dict) -> tuple[dict, list[str]]:
             if had and not l.get("dot"):
                 h2 = DOT_LEAD.sub(lambda m: m.group(1), h2)
                 did.append(f"{l['id']} bỏ chấm đầu dòng (nháp không có)")
-            elif l.get("dot") and not had:
-                h2 = "• " + h2.lstrip()
-                did.append(f"{l['id']} thêm chấm đầu dòng (nháp có, đã gỡ cùng chữ)")
             out.append(h2)
         if did:
             log.append(f"{op.get('id')}: " + "; ".join(did))
@@ -201,7 +199,7 @@ def describe_l(M: dict) -> str:
     from . import slots
     note = lambda m: (slots._curve_note(m) if m.get("path") else f", drawn at {m['angle']:.0f} degrees" if abs(m.get("angle") or 0) >= 2   # noqa: E731
                       else "") + (", OCR missed this line: the letters read here are a guess" if m.get("missed") and not m.get("orphan") else "") \
-        + (", starts with a bullet dot that was wiped with the letters: begin with \"• \"" if m.get("dot") else "") \
+        + (", its bullet dot was wiped with the letters: you may start it with \"• \"" if m.get("dot") else "") \
         + (", STRAY LETTERING the reader could not read" if m.get("orphan") else "") \
         + (", PRINTED ON THE CLIENT'S PRODUCT: kind \"keep\"" if m.get("printed") else "")
     li = "\n".join(f"{m['id']}: \"{m['ocr']}\" (text ~{m['size']:.0f}px, ~{len(m['ocr'])} characters, color {m['color']}"
@@ -259,9 +257,9 @@ lines stacked in one sticker / ribbon are ONE op.
 - "OCR missed this line": real lettering of the draft (usually a big decorated headline). Look at the DRAFT to see which \
 client text it is and write it there.
 - ICONS ARE NOT YOURS. Every icon, check mark, tick, leaf, arrow or little picture in front of a line is still on the BASE, \
-exactly as the model drew it: never write an icon, never an <i-icon>, never an svg. The one exception is a plain BULLET DOT: \
-when the list says a line "starts with a bullet dot", the dot was wiped with the letters -- start that line with "• ". No \
-other line starts with a dot.
+exactly as the model drew it: never write an icon, never an <i-icon>, never an svg. A plain BULLET DOT is not an icon: \
+when the list says a line's "bullet dot was wiped with the letters", you may start that line with "• " (the same on every \
+row of that list). On any other line a dot the draft drew is still on the BASE: never add one there.
 - "STRAY LETTERING the reader could not read": letter shapes the stroke detector found where OCR read nothing (the listed \
 letters may be empty). Look at the DRAFT and decide: kind "keep" when it is lettering on a product, logo, seal, sign or \
 object in the picture, or decoration that looks fine; kind "text" when it is clearly one of the client texts drawn there; \
