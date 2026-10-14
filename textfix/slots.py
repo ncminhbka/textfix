@@ -1,19 +1,16 @@
-"""DÒNG CHỮ của nháp và việc của VLM: code đo mỗi dòng chữ thành một Ô L# đúng toạ độ; VLM chỉ quyết viết gì vào từng ô; code dựng
-đúng khung từng ô (render.py). Đường đang chạy là "chỉ dòng chữ" (lonly.py); tệp này còn giữ lời dặn và bộ mô tả của đường ô
-vỏ / ô chi tiết cũ (SYSTEM, describe, review) -- chưa cắt, xem docs/ROADMAP.md.
+"""DÒNG CHỮ của nháp: code đo mỗi dòng chữ thành một ô L# đúng toạ độ (OCR + số đo nét + chữ cong + cụm nét "orphan"), vẽ ảnh
+đánh dấu, gửi VLM một lời gọi. Ghép câu <-> dòng và dựng ở fill.py / render.py (chặng B).
 
-  M = build(draft, ink)                           # L# dòng chữ: OCR nguyên khung + số đo nét + chữ cong + cụm nét "orphan"
-  P = plan(draft, M, prompt, texts, call)         # VLM: {style, ops: [{slots, kind, html, box_style, client}], missing}
-  P, log = validate(P, M, texts)                 # + chặn chữ: dấu theo câu khách, chữ bịa, dòng lặp
+  M = build(draft, ink)                           # L# dòng chữ
+  A = fill.parse(plan(draft, M, prompt, texts, call, system, desc, base))   # VLM: {assign, styles, accent, missing}
 
-VLM không đưa toạ độ: chỉ trỏ id ô. Mỗi ô thuộc đúng một lệnh (lệnh chữ được gộp nhiều dòng xếp chồng thành một khối).
+VLM không đưa toạ độ: chỉ trỏ id dòng.
 """
 
 from __future__ import annotations
 
 import io
 import json
-import os
 import re
 
 import numpy as np
@@ -270,7 +267,7 @@ DOT_MID = (0.2, 0.8)   # ... tâm nằm ở khoảng giữa chiều cao dòng (d
 
 def _lead_dots(L: list, ink: np.ndarray) -> list[str]:
     """CHẤM TRÒN ĐẦU DÒNG LÀ KÝ TỰ CỦA DÒNG (14/10): OCR gộp "•" vào khung dòng và Hi-SAM coi nó là nét chữ, nên nó bị gỡ cùng
-    chữ. Ghi l["dot"] = True để dòng chữ mới mở đầu bằng "• " (lonly.marks_rule). Icon, tick, hình nhỏ trước dòng KHÔNG phải nét
+    chữ. Ghi l["dot"] = True: VLM được đặt lại chấm ("bullet": true, fill.layout). Icon, tick, hình nhỏ trước dòng KHÔNG phải nét
     chữ: không dò, không gỡ, không vẽ lại -- TextFix chỉ sửa chữ (người dùng chốt 14/10)."""
     import cv2
     H, W = ink.shape
@@ -387,7 +384,7 @@ def build(draft: np.ndarray, ink: np.ndarray, product: bool = False) -> dict:
       1. dòng OCR nguyên khung + số đo nét;
       2. hình học (geo.py): chữ chạy theo cung -> một ô L có đường chân; vùng chữ của bộ dò mà OCR không trả dòng nào -> ô L mới;
       3. CỤM NÉT CHƯA DÒNG NÀO NHẬN (Hi-SAM thấy chữ, OCR không): thành ô L "orphan" để VLM quyết giữ / viết lại / xoá
-         (người dùng chốt 14/10). VLM không nhắc tới thì GIỮ nguyên điểm ảnh nháp (lonly.fill_gaps)."""
+         (người dùng chốt 14/10). VLM không nhắc tới thì GIỮ nguyên điểm ảnh nháp (fill.resolve)."""
     H, W = draft.shape[:2]
     ink = np.asarray(ink, bool)
     L = lines(draft)
@@ -759,20 +756,6 @@ def _obj(x) -> dict:
     return x if isinstance(x, dict) else {}
 
 
-def _to_marks(P) -> dict:
-    """slots -> marks (render dùng marks). Lệnh không phải object (VLM trả sai khuôn) bị bỏ, ghi vào "dropped"."""
-    P = _obj(P)
-    ops, bad = [], []
-    for raw in P.get("ops") or []:
-        op = _obj(raw) if isinstance(raw, str) else raw
-        if not isinstance(op, dict) or not op:
-            bad.append(str(raw)[:80])
-            continue
-        sl = op.get("slots") or op.get("marks") or []
-        ops.append({**op, "marks": [m for m in (sl if isinstance(sl, list) else [sl]) if isinstance(m, str)]})
-    return {**P, "ops": ops, **({"dropped": bad} if bad else {})}
-
-
 def _texts(texts: list[dict]) -> str:
     # câu "ai" = chữ phụ trợ bước brief tự viết (tiêu đề / khẩu hiệu / nút / nhãn khi khách chỉ điền sự thật): không phải lời khách
     return "\n".join(f"T{i} ({t.get('role', '')}{', OURS' if t.get('source') == 'ai' else ''}): {t['text']}"
@@ -789,7 +772,7 @@ PRODUCT_NOTE = ("The client uploaded a photo of their product and the image mode
 def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, system: str, desc: str, base: np.ndarray,
          product: bool = False, meta: dict | None = None) -> dict:
     """Một lời gọi VLM: lời dặn (system), PROMPT của FLUX, câu khách, bảng mô tả dòng (desc), ba ảnh DRAFT / SLOTS / BASE.
-    meta: nhận số token / thời gian (llm.json_call). -> kế hoạch đã chuẩn hoá ô (_to_marks)."""
+    meta: nhận số token / thời gian (llm.json_call). -> câu trả lời JSON (fill.parse đọc)."""
     mk = marked_image(draft, M)
     W, H = mk.size
     imgs = ["DRAFT:", _png(draft), "SLOTS (marked):", _png(mk),
@@ -797,11 +780,9 @@ def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, syste
     user = (f"PROMPT given to the image model:\n{prompt}\n\nClient texts (exact words):\n{_texts(texts)}\n\nPoster size: {W}x{H}px.\n\n"
             + (PRODUCT_NOTE + "\n\n" if product else "") + desc)
     args = (system, [user, *imgs]) + ((meta,) if meta is not None else ())
-    return _to_marks(call(*args))
+    return _obj(call(*args))
 
-SWAP_SIM = 0.6      # chữ VLM viết chệch được thay bằng chữ khách khi giống >= 0.6 và cùng chữ cái đầu
 CLIENT_LIKE = 0.6   # chữ OCR của ô giống câu khách >= 0.6 (bỏ dấu, chữ thường) = chữ poster chứa câu khách
-PRINTED = re.compile(r"\b(printed|on (the )?(product|package|packaging|label|can|bottle|jar|box|screen))\b", re.I)
 
 
 def _client_like(ocr: str, texts: list[dict]) -> int | None:
@@ -822,192 +803,11 @@ def _client_like(ocr: str, texts: list[dict]) -> int | None:
     return None
 
 
-def validate(P: dict, M: dict, texts: list[dict] | None = None, product: bool = False) -> tuple[dict, list[str]]:
-    """Phòng ngừa nhẹ, có ghi log: id ô không có -> bỏ id; lệnh không còn ô nào -> bỏ lệnh; một ô một lệnh. texts (câu khách): chặn chữ (_guard).
-    product: khách tải ảnh sản phẩm (chữ in trên sản phẩm có thật)."""
-    log, ops = [f"bỏ lệnh sai khuôn: {d}" for d in P.get("dropped") or []], []
-    by = M["by"]
-    # MỘT Ô, MỘT LỆNH (13/10 accept1 b05: VLM ghi thêm lệnh keep / skip cho ô đã có lệnh chữ -> chữ nháp dán lại nằm dưới chữ mới,
-    # hai lớp chữ đè nhau): ô nằm ở nhiều lệnh thuộc về lệnh "nặng" nhất -- viết chữ > giữ > bỏ; ngang nhau: lệnh
-    # đứng trước. Các lệnh kia mất ô đó.
-    rank = {"text": 0, "keep": 1, "skip": 2}
-    src, owner = list(P.get("ops", [])), {}
-    for i, op in enumerate(src):
-        for m in op.get("marks") or []:
-            k = (rank.get(op.get("kind"), 3) if op.get("kind") != "text" or op.get("html") else 3, i)
-            if m in by and (m not in owner or k < owner[m]):
-                owner[m] = k
-    for i, op in enumerate(src):
-        lost = [m for m in op.get("marks") or [] if m in owner and owner[m][1] != i]
-        if lost:
-            log.append(f"{op.get('id')}: ô {lost} đã thuộc lệnh {[src[owner[m][1]].get('id') for m in lost]} -> bỏ khỏi lệnh này")
-            src[i] = {**op, "marks": [m for m in op["marks"] if m not in lost], "slots": [m for m in op["marks"] if m not in lost]}
-    for op in src:
-        mk = [m for m in op.get("marks") or [] if m in by]
-        if len(mk) < len(op.get("marks") or []):
-            log.append(f"{op.get('id')}: bỏ id không có {sorted(set(op.get('marks') or []) - set(mk))}")
-        if not mk:
-            continue
-        # DÒNG TRỐNG TRONG LỆNH GỘP (dev3 g09_v1: "CƠM<br>NGON<br><br>TẬN<br><br>NƠI" -- VLM để trống dòng nó bỏ, khối chữ thủng lỗ):
-        # các dòng của một lệnh chữ luôn liền nhau
-        if op.get("kind") == "text" and re.search(r"(<br\s*/?>\s*){2,}", op.get("html") or "", re.I):
-            log.append(f"{op.get('id')}: bỏ dòng trống giữa các dòng của lệnh")
-            op = {**op, "html": re.sub(r"(<br\s*/?>\s*){2,}", "<br>", op["html"], flags=re.I)}
-        # Ô CHỮ CONG ĐI MỘT MÌNH (13/10 run ba93: VLM gộp ô vòm với ô thẳng bên cạnh thành một lệnh -> bộ dựng không có đường
-        # nào cho "một vòm + một khung", dựng thành khối chữ thẳng đè lên hình giữa con dấu). Lệnh chữ có ô cong lẫn ô L khác:
-        # cả câu viết theo đường cong (dài nhất nếu nhiều), các ô L còn lại để trống -- chữ nén trên vòm vẫn đúng dáng nháp.
-        arc = [m for m in mk if m.startswith("L") and by[m].get("path")]
-        if op.get("kind") == "text" and arc and sum(m.startswith("L") for m in mk) > 1:
-            plen = lambda m: float(sum(np.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(by[m]["path"][:-1], by[m]["path"][1:])))   # noqa: E731
-            main = max(arc, key=plen)
-            rest = [m for m in mk if m.startswith("L") and m != main]
-            log.append(f"{op.get('id')}: lệnh gộp ô cong {main} với {rest} -> viết cả câu theo đường cong {main}, {rest} để trống")
-            ops.append({"id": f"{op.get('id')}x", "kind": "skip", "marks": rest, "slots": rest, "why": "guard: merged with a curved line"})
-            mk = [m for m in mk if m not in rest]
-            op = {**op, "html": re.sub(r"\s*<br\s*/?>\s*", " ", op.get("html") or "")}
-        # chữ / logo IN TRÊN SẢN PHẨM mà VLM cho skip (tự ghi lý do "printed logo on product") -> bản xoá đã xoá nó, skip là mất
-        # luôn (09/10 dev2 d25: con dấu trên bánh pía) -> keep (dán lại pixel nháp)
-        # CHỈ khi khách tải ảnh sản phẩm: không có ảnh sản phẩm thì "chữ in trên ruy băng / sản phẩm" là chữ POSTER FLUX vẽ (09/10
-        # dev3 g15: dải ruy băng "QUÀ TẶNG TRI ÂN" -> keep dán lại chữ nháp sai chính tả "QUẢ TỆNG")
-        if product and op.get("kind") == "skip" and PRINTED.search(op.get("why") or "") and                 not re.search(r"duplicat|junk|garbl", op.get("why") or "", re.I):
-            log.append(f"{op.get('id')}: skip chữ in trên sản phẩm ({op.get('why')!r}) -> keep")
-            op = {**op, "kind": "keep"}
-        # CHỮ IN TRÊN SẢN PHẨM KHÁCH TẢI (13/10): dòng mã nhận ra trên sản phẩm (mark_printed) luôn giữ nguyên điểm ảnh, VLM
-        # ghi gì cũng vậy; lệnh chữ gộp cả dòng đó thì dòng đó tách ra thành lệnh giữ riêng
-        pr = [m for m in mk if by[m].get("printed")]
-        if pr and op.get("kind") != "keep":
-            log.append(f"{op.get('id')}: {pr} là chữ in trên sản phẩm khách tải -> giữ nguyên (VLM ghi {op.get('kind')})")
-            ops.append({"id": f"{op.get('id')}p", "kind": "keep", "marks": pr, "slots": pr, "why": "guard: printed on the client's product"})
-            mk = [m for m in mk if m not in pr]
-            if not mk:
-                continue
-        # KEEP CHỮ KHÁCH: ô giữ pixel nháp mà chữ OCR của nó gần trùng một câu khách = chữ poster model vẽ (thường sai chính tả)
-        # -> viết lại bằng câu khách (09/10 dev3 g15 v0: VLM keep "QUÀ TẶNG TRI ÂN" trên ruy băng). KHÔNG làm khi khách tải ảnh
-        # sản phẩm: tên sản phẩm in trên vỏ hộp trùng câu khách là chuyện thường, và chữ trên sản phẩm phải giữ
-        if op.get("kind") == "keep" and texts and not product:
-            ocr = " ".join(by[m].get("ocr", "") for m in mk if m.startswith("L"))
-            k = _client_like(ocr, texts)
-            if k is not None:
-                log.append(f"{op.get('id')}: keep chữ nháp {ocr!r} trùng câu khách T{k} -> viết lại {texts[k]['text']!r}")
-                op = {**op, "kind": "text", "html": texts[k]["text"], "client": f"T{k}", "why": "guard: client text was kept"}
-        ops.append({**op, "marks": mk, "slots": mk})
-    if texts:
-        ops, lg = _guard(ops, M, texts)
-        log += lg
-    log += _pack_lists(ops, by)
-    if texts:
-        log += _list_order(ops, by)
-    return {**P, "ops": ops}, log
-
-
-def _lists(ops: list[dict], by: dict) -> dict:
-    """Danh sách VLM khai: {tên nhóm: [chỉ số lệnh chữ]} (group_kind "list", >= 2 lệnh, mỗi lệnh có dòng L, không nghiêng)."""
-    G = {}
-    for i, op in enumerate(ops):
-        if op.get("kind") == "text" and op.get("html") and op.get("group") and op.get("group_kind") == "list":
-            G.setdefault(op["group"], []).append(i)
-
-    def ok(i):
-        lm = [m for m in ops[i]["marks"] if m.startswith("L")]
-        return bool(lm) and all(abs(by[m].get("angle") or 0) < 2 for m in lm)
-    return {g: idx for g, idx in G.items() if len(idx) >= 2 and all(ok(i) for i in idx)}
-
-
-def _list_order(ops: list[dict], by: dict) -> list[str]:
-    """THỨ TỰ KHÁCH CHO (13/10 accept1 f06: VLM xếp bước 4 trước bước 3 cho khớp hình minh hoạ của nháp): các hàng của một danh
-    sách VLM khai, xếp một cột, mỗi hàng viết một câu khách khác nhau -> từ trên xuống phải tăng dần theo thứ tự câu khách. Sai
-    thì hoán nội dung giữa các hàng (chữ + câu khách), ô và kiểu của từng hàng giữ nguyên."""
-    log = []
-    for name, idx in _lists(ops, by).items():
-        ks = [_tid(ops[i].get("client")) for i in idx]
-        if any(k is None for k in ks) or len(set(ks)) != len(ks):
-            continue
-        top = lambda i: min(by[m]["box"][1] for m in ops[i]["marks"] if m.startswith("L"))   # noqa: E731
-        bot = lambda i: max(by[m]["box"][3] for m in ops[i]["marks"] if m.startswith("L"))   # noqa: E731
-        rows = sorted(idx, key=top)
-        if any(top(b) < (top(a) + bot(a)) / 2 for a, b in zip(rows, rows[1:])):   # không phải một cột (lưới, hàng ngang)
-            continue
-        cur = [_tid(ops[i].get("client")) for i in rows]
-        if cur == sorted(cur):
-            continue
-        if any(len([m for m in ops[i]["marks"] if m.startswith("L")]) != len([m for m in ops[rows[0]]["marks"] if m.startswith("L")])
-               for i in rows):
-            continue   # hàng một dòng và hàng hai dòng: hoán chữ làm lệch số dòng
-        content = sorted(((_tid(ops[i].get("client")), ops[i]["html"], ops[i].get("client")) for i in rows), key=lambda t: t[0])
-        for i, (k, html, cl) in zip(rows, content):
-            ops[i] = {**ops[i], "html": html, "client": cl}
-        log.append(f"danh sách '{name}': thứ tự {['T%d' % k for k in cur]} -> theo thứ tự khách {['T%d' % c[0] for c in content]}")
-    return log
-
-
-def _pack_lists(ops: list[dict], by: dict) -> list[str]:
-    """HÀNG TRỐNG GIỮA DANH SÁCH (12/10 run 38ef: nháp vẽ một ý hai lần, VLM bỏ hàng lặp ở giữa -> danh sách thủng một hàng):
-    hàng bị bỏ nằm GIỮA các hàng của một danh sách VLM khai, cùng cột, cùng số dòng -> dồn các ý lên theo thứ tự, hàng trống
-    xuống cuối. Chỉ đổi ô giữa các lệnh (ý nào viết vào hàng nào); chữ, kiểu, nhóm giữ nguyên."""
-    log = []
-
-    def box(lm):
-        return [min(by[m]["box"][0] for m in lm), min(by[m]["box"][1] for m in lm),
-                max(by[m]["box"][2] for m in lm), max(by[m]["box"][3] for m in lm)]
-    for name, idx in _lists(ops, by).items():
-        if any(not all(m.startswith("L") for m in ops[i]["marks"]) for i in idx):
-            continue
-        mb = {i: box(ops[i]["marks"]) for i in idx}
-        x0, x1 = min(b[0] for b in mb.values()), max(b[2] for b in mb.values())
-        y0, y1 = min(b[1] for b in mb.values()), max(b[3] for b in mb.values())
-        holes = []
-        for j, op in enumerate(ops):
-            lm = op.get("marks") or []
-            if op.get("kind") != "skip" or not lm or not all(m.startswith("L") for m in lm):
-                continue
-            b = box(lm)
-            if y0 < (b[1] + b[3]) / 2 < y1 and min(b[2], x1) - max(b[0], x0) >= 0.5 * (b[2] - b[0]) \
-                    and not any(min(b[3], q[3]) - max(b[1], q[1]) > 0.5 * (b[3] - b[1]) for q in mb.values()):
-                holes.append(j)
-        if not holes:
-            continue
-        units = sorted(idx + holes, key=lambda i: box(ops[i]["marks"])[1])
-        mem = [i for i in units if i in idx]
-        rest = [i for i in units if i not in idx]
-        marks = [list(ops[i]["marks"]) for i in units]
-        if any(len(marks[k]) != len(ops[mem[k]]["marks"]) for k in range(len(mem))):
-            continue   # hàng trống có số dòng khác ý sẽ dồn vào: để nguyên
-        for k, i in enumerate(mem):
-            ops[i] = {**ops[i], "marks": marks[k], "slots": marks[k]}
-        for k, i in enumerate(rest):
-            ops[i] = {**ops[i], "marks": marks[len(mem) + k], "slots": marks[len(mem) + k]}
-        log.append(f"danh sách '{name}': hàng trống ở giữa -> dồn các ý lên, hàng trống xuống cuối ({[ops[i].get('id') for i in rest]})")
-    return log
-
-
-def uncovered(P: dict, texts: list[dict]) -> list[int]:
-    """Câu khách KHÔNG có trên poster, đo bằng mã (09/10 dev2 d05: VLM bỏ "Thêm huyết 5.000đ" mà không khai "missing"): câu
-    có chữ (bỏ dấu, chữ thường) không nằm trong chữ của mọi lệnh viết / giữ. -> chỉ số câu."""
-    have = set()
-    for op in P.get("ops", []):
-        if op.get("kind") == "text" and op.get("html"):   # thẻ inline nối chữ ("TR<span>Ư</span>ỜNG") hoặc
-            h = op["html"]                                                        # tách cột ("<span>tên</span><span>giá</span>")
-            have |= set(WORD.findall(_fold(_plain(h)))) | set(WORD.findall(_fold(_plain(re.sub(r"<[^>]+>", " ", h)))))
-    out = []
-    for i, t in enumerate(texts):
-        w = set(WORD.findall(_fold(t["text"])))
-        if w and not w <= have:
-            out.append(i)
-    return out
-
-
 def _fold(s: str) -> str:
     """Bỏ dấu tiếng Việt, chữ thường: "TRƯỞNG" == "trương" == "TRUONG"."""
     import unicodedata
     s = unicodedata.normalize("NFD", s.replace("đ", "d").replace("Đ", "D"))
     return "".join(c for c in s if not unicodedata.combining(c)).lower()
-
-
-def _plain(h: str) -> str:
-    import html as H
-    # <br> / <BR> / thẻ khối = dấu cách; thẻ inline (span, i-font) không tách chữ (08/10 m01: "FLASH<BR>SALE" thành "FLASHSALE")
-    h = re.sub(r"<\s*(br|/?div|/?p)\b[^>]*>", " ", h or "", flags=re.I)
-    return " ".join(H.unescape(re.sub(r"<[^>]+>", "", h)).split())
 
 
 def _flat(s: str) -> str:
@@ -1017,152 +817,3 @@ def _flat(s: str) -> str:
 def _tid(c) -> int | None:
     c = str(c or "")
     return int(c[1:]) if c[:1] in "Tt" and c[1:].isdigit() else int(c) if c.isdigit() else None
-
-
-WORD = re.compile(r"\w+", re.UNICODE)
-
-
-def _guard(ops: list[dict], M: dict, texts: list[dict]) -> tuple[list[dict], list[str]]:
-    """CHẶN CHỮ SAI bằng mã (08/10, BX 23 ảnh dev: VLM chép chữ từ ảnh nháp thay vì câu khách):
-    1. DẤU: chữ khớp một chữ của câu khách khi bỏ dấu nhưng khác dấu ("TRƯỞNG", "TRƯỜNG" cho "TRƯƠNG") -> thay bằng chữ của
-       khách (giữ hoa / thường). Chỉ xét lệnh đang viết câu khách: có "client", hoặc cả dòng (bỏ dấu) nằm trong một câu khách.
-    2. CHỮ BỊA: lệnh khai viết câu khách T# mà không chữ nào có trong bất kỳ câu khách nào ("SƯ PRING" chép từ mẩu OCR vỡ) -> skip.
-    2b. SỐ BỊA: lệnh không khai câu khách mà có số không nằm trong câu khách nào -> skip.
-    3. LẶP: nháp hay vẽ một dòng hai lần (ngày, giá, nhãn huy hiệu); hai lệnh viết cùng một chữ (bỏ dấu, >= 3 ký tự) mà câu
-       khách không lặp -> giữ lệnh có chữ OCR của ô giống nhất, lệnh kia skip (nền xoá sạch ở đó)."""
-    from difflib import SequenceMatcher
-    log, txt = [], [t["text"] for t in texts]
-    ftxt = [" ".join(WORD.findall(_fold(t))) for t in txt]
-    vocab_all = {w for t in txt for w in WORD.findall(t)}
-    out = []
-    for op in ops:
-        if op.get("kind") != "text" or not op.get("html"):
-            out.append(op)
-            continue
-        plain = _plain(op["html"])
-        fp = " ".join(WORD.findall(_fold(plain)))
-        k = _tid(op.get("client"))
-        own = txt[k] if k is not None and 0 <= k < len(txt) else None
-        words = WORD.findall(plain)
-        if own is not None and words and not any(c.isdigit() for c in plain) and \
-                not {_fold(w) for w in words} & {_fold(w) for w in vocab_all} and \
-                not any(_flat(plain) in _flat(t) for t in txt):   # chữ dính / tách khác câu khách vẫn là chữ khách
-            log.append(f"{op.get('id')}: chữ không có trong câu khách ({plain!r} khai {op.get('client')}) -> skip")
-            out.append({**op, "kind": "skip", "html": "", "why": "guard: invented text"})
-            continue
-        nums = re.findall(r"\d+", plain)
-        # so NGUYÊN số (không phải chuỗi con: "00" nằm trong "1.590.000đ", "36" trong "-36%" -> "00:36" trên màn hình nồi cơm lọt
-        # qua, 09/10 dev2 d27)
-        tnums = {n for t in txt for n in re.findall(r"\d+", t)}
-        if own is None and nums and not all(n in tnums for n in nums):
-            # SỐ BỊA: lệnh không khai câu khách mà viết số không có trong câu khách nào (địa chỉ / giá / điện thoại / ngày nháp tự
-            # vẽ, 08/10 "123 Đường Số 1, Quận 1, TP. HCM") -> skip: dữ kiện không bao giờ bịa
-            log.append(f"{op.get('id')}: số không có trong câu khách ({plain!r}) -> skip")
-            out.append({**op, "kind": "skip", "html": "", "why": "guard: invented fact"})
-            continue
-        src = [own] if own is not None else [t for t, f in zip(txt, ftxt) if fp and f" {fp} " in f" {f} "]
-        if src:
-            cand = {}   # chữ bỏ dấu -> các dạng có dấu trong câu của lệnh
-            for t in src:
-                for w in WORD.findall(t):
-                    cand.setdefault(_fold(w), set()).add(w.lower())
-
-            def fix(m):
-                w = m.group(0)
-                opts = cand.get(_fold(w)) or set()
-                if len(opts) != 1 or w.lower() in opts:
-                    return w
-                c = next(iter(opts))
-                return c.upper() if w.isupper() else (c[:1].upper() + c[1:]) if w[:1].isupper() else c
-            parts = re.split(r"(<[^>]+>|&\w+;|&#\d+;)", op["html"])
-            new = "".join(p if p.startswith("<") or p.startswith("&") else WORD.sub(fix, p) for p in parts)
-            if new != op["html"]:
-                log.append(f"{op.get('id')}: sửa dấu theo câu khách {plain!r} -> {_plain(new)!r}")
-                op = {**op, "html": new}
-        if own is not None:
-            # 1a. CHỮ CHỆCH (13/10 run 1f85: VLM viết "ngàn" cho "nghìn"; luật 1b xoá "ngàn", tiêu đề mất một chữ): chữ không có
-            #     trong câu khách nào, đứng đúng chỗ MỘT chữ của câu này (hai bên khớp) -> thay bằng chữ của khách.
-            fv = {_fold(w) for w in vocab_all}
-            parts = re.split(r"(<[^>]+>|&\w+;|&#\d+;)", op["html"])
-            mine = [w for p_ in parts if not p_.startswith(("<", "&")) for w in WORD.findall(p_)]
-            theirs = WORD.findall(own)
-            swap = {}
-            for tag, i1, i2, j1, j2 in SequenceMatcher(None, [_fold(w) for w in mine], [_fold(w) for w in theirs], autojunk=False).get_opcodes():
-                if tag == "replace" and i2 - i1 == j2 - j1:
-                    for a, b in zip(range(i1, i2), range(j1, j2)):
-                        w = mine[a]
-                        # chỉ khi hai chữ GẦN GIỐNG nhau (ngàn / nghìn: 0.67; 13/10 accept1 a01: VLM viết lại câu cho ngắn,
-                        # luật thay bừa "nguyên" -> "giúp", "hương" -> "việc", câu thành vô nghĩa)
-                        if _fold(w) not in fv and not any(ch.isdigit() for ch in w + theirs[b]) and _fold(w)[:1] == _fold(theirs[b])[:1] \
-                                and SequenceMatcher(None, _fold(w), _fold(theirs[b])).ratio() >= SWAP_SIM:
-                            c = theirs[b]
-                            swap[a] = c.upper() if w.isupper() else (c[:1].upper() + c[1:]) if w[:1].isupper() and a == 0 else c
-            if swap:
-                n = [-1]
-
-                def put(m, n=n, swap=swap):
-                    n[0] += 1
-                    return swap.get(n[0], m.group(0))
-                new = "".join(p_ if p_.startswith(("<", "&")) else WORD.sub(put, p_) for p_ in parts)
-                log.append(f"{op.get('id')}: chữ chệch {[mine[a] for a in swap]} -> chữ của khách {list(swap.values())}: {_plain(new)!r}")
-                op = {**op, "html": new}
-                plain = _plain(new)
-            # 1b. CHỮ THỪA: lệnh viết câu khách mà chen chữ (chữ cái) không có trong câu khách nào -- chép chữ méo của nháp (09/10
-            #     dev2 d24: nháp "CUỐI TUÃ / TUẬN" -> "CUỐI TỬA<br>TUẦN") -> bỏ chữ đó. Số để luật 2b / câu ngắn lo.
-            fv = {_fold(w) for w in vocab_all}
-            parts = re.split(r"(<[^>]+>|&\w+;|&#\d+;)", op["html"])
-            drop = [w for p in parts if not p.startswith(("<", "&")) for w in WORD.findall(p)
-                    if not any(c.isdigit() for c in w) and _fold(w) not in fv]
-            if drop and len(drop) < len(WORD.findall(plain)):
-                new = "".join(p if p.startswith(("<", "&")) else
-                              re.sub(r"[ \t]{2,}", " ", WORD.sub(lambda m: "" if m.group(0) in drop else m.group(0), p))
-                              for p in parts)
-                log.append(f"{op.get('id')}: bỏ chữ không có trong câu khách {drop} -> {_plain(new)!r}")
-                op = {**op, "html": new}
-        out.append(op)
-    # 3. lặp
-    groups = {}
-    for i, op in enumerate(out):
-        if op.get("kind") == "text" and op.get("html"):
-            f = " ".join(WORD.findall(_fold(_plain(op["html"]))))
-            if len(f.replace(" ", "")) >= 3:
-                groups.setdefault(f, []).append(i)
-    for f, idx in groups.items():
-        # cùng cụm chữ nằm trong HAI câu khách khác nhau (tên "An Gia Tổng Vệ Sinh" và ưu đãi "... đặt lịch tổng vệ sinh trước Tết",
-        # 12/10 run 5d27: dòng giữa huy hiệu bị xoá oan) -> mỗi lệnh khai một câu khách riêng có chứa cụm đó là một lần viết hợp lệ
-        own = {k for i in idx for k in [_tid(out[i].get("client"))] if k is not None and k < len(ftxt) and f" {f} " in f" {ftxt[k]} "}
-        allowed = max(1, sum(1 for t in ftxt if t == f), len(own))
-        if len(idx) <= allowed:
-            continue
-        ocr = lambda i: _fold(" ".join(M["by"][m].get("ocr", "") for m in out[i]["marks"] if m.startswith("L")))   # noqa: E731
-        # ô nào nháp vẽ đúng câu đó thì giữ; NHIỀU ô cùng giống (>= 0.5) -> giữ ô chữ TO nhất (13/10 accept1 p02: tên sản phẩm
-        # nháp vẽ cả ở tiêu đề lẫn hàng đầu danh sách; giữ hàng danh sách thì vùng tiêu đề trống)
-        big = lambda i: max((M["by"][m].get("size") or 0.0) for m in out[i]["marks"] if m.startswith("L")) if any(   # noqa: E731
-            m.startswith("L") for m in out[i]["marks"]) else 0.0
-        sim = {i: SequenceMatcher(None, ocr(i), f).ratio() for i in idx}
-        idx = sorted(idx, key=lambda i: (-(sim[i] >= 0.5), -big(i) if sim[i] >= 0.5 else 0.0, -sim[i]))
-        # nháp vẽ câu đó hai chỗ thì viết cả hai: bỏ một là một nút trống (mix1 i05) -- không bỏ dòng nào nháp đã vẽ
-        log.append(f"lặp chữ {f!r} ở {[out[i].get('id') for i in idx]}: giữ cả (nháp vẽ nhiều chỗ)")
-    # 4. CÂU NGẮN (<= 3 chữ: lương "15-25 triệu", giá, nhãn) không được cắt bớt -- câu dài mới được rút gọn (08/10 h06: vòng sửa
-    #    bỏ "triệu" cho vừa ô). Một lệnh viết câu đó mà thiếu chữ -> trả nguyên câu khách vào đúng chỗ chữ trong html.
-    for k, t in enumerate(txt):
-        tw = WORD.findall(t)
-        mine = [i for i, op in enumerate(out) if op.get("kind") == "text" and op.get("html") and _tid(op.get("client")) == k]
-        if not tw or len(tw) > 3 or len(mine) != 1:
-            continue
-        op = out[mine[0]]
-        plain = _plain(op["html"])
-        lost = {_fold(w) for w in tw} - {_fold(w) for w in WORD.findall(plain)}
-        if not lost or not plain or plain not in op["html"]:
-            continue
-        near = {_fold(w) for o in out if o is not op and o.get("kind") == "text" for w in WORD.findall(_plain(o.get("html") or ""))}
-        if lost & near:   # chữ thiếu đã nằm ở lệnh khác (huy hiệu tách "Giảm" / "50%" thành hai ô)
-            continue
-        log.append(f"{op.get('id')}: câu ngắn bị cắt {plain!r} -> {t!r}")
-        out[mine[0]] = {**op, "html": op["html"].replace(plain, t, 1)}
-    return out, log
-
-
-SEVERE = ("empty_plan", "unassigned", "content_overlap", "boxes_overlap", "overflow", "low_contrast", "mark_twice")
-
-

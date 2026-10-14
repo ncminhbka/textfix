@@ -341,7 +341,7 @@ const PLANS = {}, LAYERS = { L: true };
 function setDebug(on) { debug = on; try { localStorage.setItem("tf_debug", on ? "1" : "0"); } catch {} if (!on && !["poster"].includes(view)) view = "poster"; show(); }
 const VIEWS = [["poster", "Poster", false], ["poster_first", "Lượt đầu (trước khi mã sửa lỗi)", true], ["draft", "Nháp FLUX", true],
                ["hisam", "① Hi-SAM: nét chữ", true], ["ink", "② Mặt nạ gỡ chữ", true], ["clean", "③ LaMa: nền sạch (VLM nhìn)", true],
-               ["base", "④ Nền dựng", true], ["ocr", "Dòng + OCR", true], ["ops", "Lệnh designer", true], ["steps", "Các bước", true]];
+               ["base", "④ Nền dựng", true], ["ocr", "Dòng + OCR", true], ["ops", "Đơn vị chữ (màu = tập)", true], ["steps", "Các bước", true]];
 const TN = { llm: "LLM", ve_nhap: "vẽ nháp", net_chu: "nét chữ (Hi-SAM)", dong: "đo dòng", go_chu: "gỡ chữ (LaMa)", vlm: "VLM thiết kế", dung: "dựng" };
 function thumb(p, i) {
   const on = i === picked ? " on" : "", lab = `<div class="vlab">${i + 1}. ${esc(p.direction || "")}</div>`;
@@ -424,7 +424,7 @@ async function drawOcr() {
 function typoDebug(pl) {   // chữ khó: mã nhận ra thế nào -> VLM / mã quyết gì -> dựng thế nào
   const owner = {}, R = {};
   (pl.ops || []).forEach(o => (o.marks || o.slots || []).forEach(m => owner[m] = o));
-  (pl.render || []).forEach(r => R[r.id] = r);
+  (pl.render || []).forEach(r => { const u = r.unit || r.id; if (!R[u]) R[u] = r; });
   const L = (pl.slots.L || []).filter(m => (m.typo || []).length);
   if (!L.length) return `<h3>Chữ khó (typography)</h3><p class="muted">Không có dòng cong, dọc, nghiêng, OCR sót, cụm nét lạ hay chấm đầu dòng.</p>`;
   const rows = L.map(m => { const o = owner[m.id] || {}, r = R[o.id] || {};
@@ -461,15 +461,20 @@ function renderDebug(P, pl) {
   (pl.ops || []).forEach(o => (o.marks || o.slots || []).forEach(m => owner[m] = o));
   const rows = (pl.slots.L || []).map(m => { const o = owner[m.id] || {};
     return `<tr><td class="role">${m.id}</td><td>${esc(m.ocr)}</td><td>${Math.round(m.size || 0)}px</td><td class="role">${esc(o.id || "")} ${esc(o.kind || "—")}</td><td>${esc(plainHtml(o.html))}</td></tr>`; }).join("");
+  const R = {};
+  (pl.render || []).forEach(r => { const u = r.unit || r.id; (R[u] = R[u] || []).push(r); });
+  const fit = o => (R[o.id] || []).map(r => `${Math.round(r.fs)}px` + (r.shrink < 0.97 ? ` co ${r.shrink}` : "") + (r.sx && r.sx < 0.995 ? ` nén ${r.sx}` : "")).join(" · ");
   const ops = (pl.ops || []).map(o => `<tr><td class="role">${esc(o.id)}</td><td class="role">${esc(o.kind)}</td><td class="role">${esc((o.marks || o.slots || []).join(","))}</td>
-    <td>${esc(plainHtml(o.html))}</td><td class="mono">${esc(o.box_style || "")}</td><td class="muted">${esc(o.why || "")}</td></tr>`).join("");
+    <td>${esc((o.client || []).join(", ") || (o.kind === "text" ? "lấp" : ""))}</td><td>${esc(plainHtml(o.html))}</td>
+    <td class="role">${esc([o.role, o.set ? "tập " + o.set : "", o.mode, o.align, o.font, o.weight].filter(Boolean).join(" · "))}<br><span class="muted">${esc(fit(o))}</span></td>
+    <td class="muted">${esc(o.why || "")}</td></tr>`).join("");
   const errs = (pl.errors || []).map(e => `<li>${esc(e.type)} ${esc((e.ops || []).join(","))} ${esc(JSON.stringify(Object.fromEntries(Object.entries(e).filter(([k]) => !["type", "ops"].includes(k)))))}</li>`).join("");
   const errs1 = (pl.errors_first || []).length;
   el.innerHTML = `<h3>OCR nháp → ô → lệnh</h3><table><tr><th>ô</th><th>OCR đọc</th><th>cỡ</th><th>lệnh</th><th>viết</th></tr>${rows}</table>
     ${typoDebug(pl)}
     ${eraseDebug(P, pl)}
-    <h3>Lệnh designer (${(pl.ops || []).length}) · phong cách</h3><p class="mono">${esc(JSON.stringify(pl.style || {}))}</p>
-    <table><tr><th>id</th><th>loại</th><th>ô</th><th>chữ</th><th>box_style</th><th>vì sao</th></tr>${ops}</table>
+    <h3>Đơn vị chữ (${(pl.ops || []).length}): VLM ghép câu ↔ dòng, code chép nguyên văn · kiểu theo vai</h3><p class="mono">${esc(JSON.stringify(pl.style || {}))}</p>
+    <table><tr><th>id</th><th>loại</th><th>dòng</th><th>câu</th><th>chữ đặt</th><th>vai · tập · cách dựng · lề · font</th><th>vì sao</th></tr>${ops}</table>
     <h3>Lỗi đo được: lượt đầu ${errs1} → cuối ${(pl.errors || []).length}</h3><ul>${errs || "<li>không</li>"}</ul>
     <h3>Nhật ký</h3><pre class="pe">${esc((pl.log || []).join("\n"))}</pre>`;
 }

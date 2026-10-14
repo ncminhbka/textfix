@@ -17,7 +17,6 @@ Hai trạm dùng riêng được (máy chủ chạy dây chuyền nhiều phiên
 
 from __future__ import annotations
 
-import json
 import time
 
 import numpy as np
@@ -103,10 +102,12 @@ def draw(flux, B: dict, W: int, H: int, seed: int, product: np.ndarray | None = 
 
 
 def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -> dict:
-    """TRẠM THIẾT KẾ: dòng (OCR + nét chữ) -> gỡ mọi dòng (LaMa, MỘT lần) -> VLM điền chữ -> rà lệnh -> trả điểm ảnh nháp cho dòng
-    giữ -> dựng -> kiểm -> sửa bằng code. d = draw(...)."""
-    from . import lonly, render, slots
+    """TRẠM THIẾT KẾ (chặng B, 14/10): dòng (OCR + nét chữ) -> gỡ mọi dòng (LaMa, MỘT lần) -> VLM GHÉP câu khách <-> dòng + kiểu
+    theo vai -> code chép nguyên văn, cỡ / lề / tập theo nháp (fill) -> trả điểm ảnh nháp cho dòng giữ -> dựng -> kiểm -> sửa
+    bằng code. d = draw(...)."""
+    from . import fill, lonly, render, slots
     draft, ink, T = d["draft"], d["ink"], dict(d["timing"])
+    texts = B["texts"]
     t0 = time.time()
     progress("đo dòng (OCR + nét chữ)")
     M0 = slots.build(draft, ink, product=product)
@@ -122,84 +123,78 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     clean, mask_all = lonly.erase(draft, ink, M, log=elog)
     T["go_chu"] = time.time() - t0
 
-    def base_of(p_, log_=None):
-        return lonly.settle(draft, clean, ink, M, p_, log_)
+    def base_of(U_, log_=None):
+        return lonly.settle(draft, clean, ink, M, {"ops": U_}, log_)
 
     def ask():
-        return lonly.plan(draft, M, B["prompt_en"], B["texts"], vlm, product=product, base=clean)
+        return fill.parse(lonly.plan(draft, M, B["prompt_en"], texts, vlm, product=product, base=clean))
     t0 = time.time()
-    progress("VLM thiết kế")
-    raw = ask()
-    # KẾ HOẠCH RỖNG (13/10 accept1 f03: VLM trả về không một lệnh nào -> mọi dòng bị bỏ, poster ra không chữ, 0 lỗi): có dòng chữ, có
-    # câu khách mà không lệnh nào viết chữ -> gọi lại VLM một lần; vẫn rỗng thì ghi lỗi nặng "empty_plan"
-    wrote = lambda p_: any(o.get("kind") == "text" and o.get("html") for o in p_.get("ops") or [])   # noqa: E731
-    empty = bool(M["L"] and B["texts"]) and not wrote(raw)
+    progress("VLM ghép câu")
+    A = ask()
+    # GHÉP RỖNG (13/10 accept1 f03: VLM trả về không một lệnh nào -> poster không chữ): có dòng, có câu khách mà không đơn vị nào
+    # viết -> gọi lại một lần; vẫn rỗng thì lỗi nặng "empty_plan"
+    wrote = lambda a: any(u["kind"] == "text" and (u["clients"] or u["text_vlm"]) for u in a.get("assign") or [])   # noqa: E731
+    empty = bool(M["L"] and texts) and not wrote(A)
     if empty:
-        progress("VLM trả kế hoạch rỗng, gọi lại")
-        raw = ask()
+        progress("VLM trả ghép rỗng, gọi lại")
+        A = ask()
     llog = []
-    # CÂU TRẢ LỜI CỤT (mix1 p02: 1 lệnh cho 10 dòng -> 9 dòng trống): gọi lại một lần, lấy bản phủ nhiều dòng hơn
-    n0 = len(lonly.covered(raw, M))
-    if empty:   # đã gọi lại một lần ở trên; ghi câu trả lời thô để truy vì sao rỗng
-        llog.append("VLM trả rỗng, câu trả lời thô: " + json.dumps(raw, ensure_ascii=False)[:300])
+    # CÂU TRẢ LỜI CỤT (mix1 p02: 1 lệnh cho 10 dòng): gọi lại một lần, lấy bản phủ nhiều dòng hơn
+    n0 = len(fill.covered(A, M))
+    if empty:
+        llog.append("VLM trả ghép rỗng -> gọi lại: " + ("được" if wrote(A) else "VẪN RỖNG"))
     elif M["L"] and n0 < lonly.COVER_MIN * len(M["L"]):
         progress("VLM bỏ sót nhiều dòng, gọi lại")
         again = ask()
-        n1 = len(lonly.covered(again, M))
-        llog.append(f"VLM chỉ viết {n0} / {len(M['L'])} dòng -> gọi lại: {n1} dòng")
+        n1 = len(fill.covered(again, M))
+        llog.append(f"VLM chỉ ghép {n0} / {len(M['L'])} dòng -> gọi lại: {n1} dòng")
         if n1 > n0:
-            raw = again
-    raw, flog = lonly.fix_ops(raw, M)
-    raw, slog = lonly.split_far(raw, M)
-    P, log = slots.validate(raw, M, B["texts"], product=product)
-    P, glog = lonly.fill_gaps(P, M, B["texts"], product=product)
-    P, mlog = lonly.marks_rule(P, M)
-    log = llog + flog + slog + log + glog + mlog
-    if empty:
-        log.insert(0, "VLM trả kế hoạch không có lệnh chữ nào -> gọi lại: " + ("được" if wrote(raw) else "VẪN RỖNG"))
-    log[:0] = geo_log   # vùng chữ của bộ dò, ô chữ cong, dòng OCR sót, cụm nét chưa dòng nào nhận, chấm đầu dòng
+            A = again
+    if A.get("dropped"):
+        llog.append(f"bỏ mục ghép sai khuôn: {A['dropped']}")
+    U, rlog0, miss_i = fill.resolve(A, M, texts, product=product)
+    U, llay = fill.layout(U, M, ink, A["styles"], A["accent"], texts)
+    log = geo_log + llog + rlog0 + llay
     if product:
         log.insert(0, f"ảnh sản phẩm khách tải: chữ đọc được {d.get('product_ocr') or []} -> dòng nháp là chữ in trên sản phẩm {printed}")
     T["vlm"] = time.time() - t0
     t0 = time.time()
     progress("dựng + kiểm")
-    base, mask = base_of(P, log)
-    poster, res, rlog = render.render(page, base, P, M)
-    errs = render.check(P, M, res)
-    if empty and not wrote(raw):
+    base, mask = base_of(U, log)
+    poster, res, rlog = render.render_units(page, base, U, M)
+    errs = render.check_units(U, res)
+    if empty and not wrote(A):
         errs.append({"type": "empty_plan", "ops": []})
     log += rlog + [f"LỖI: {e}" for e in errs]
     poster_first, errs_first = poster, errs   # bản lượt đầu (debug: so trước / sau khi mã sửa lỗi)
-    sev = lambda E: sum(e["type"] in slots.SEVERE for e in E)   # noqa: E731
+    sev = lambda E: sum(e["type"] in render.SEVERE for e in E)   # noqa: E731
     for k in range(render.FIX_ROUNDS if sev(errs) else 0):   # SỬA BẰNG CODE: lỗi nặng đo được -> sửa, dựng lại, giữ khi bớt lỗi
-        P2, flog2 = render.autofix(P, M, errs, res)
+        U2, flog2 = render.autofix_units(U, errs, res)
         if not flog2:
             break
-        poster2, res2, rlog2 = render.render(page, base_of(P2)[0], P2, M)
-        errs2 = render.check(P2, M, res2)
+        poster2, res2, rlog2 = render.render_units(page, base, U2, M)
+        errs2 = render.check_units(U2, res2)
         ok = (sev(errs2), len(errs2)) < (sev(errs), len(errs))
         log += [f"-- sửa bằng code {k + 1} --"] + flog2 + [f"LỖI CÒN: {e}" for e in errs2] + \
             ["-> giữ bản sửa" if ok else "-> bản sửa không bớt lỗi, giữ bản trước"]
         if not ok:
             break
-        poster, P, errs, res = poster2, P2, errs2, res2
+        poster, U, errs, res = poster2, U2, errs2, res2
         if not sev(errs):
             break
     T["dung"] = time.time() - t0
-    tid = lambda m: int(m[1:]) if isinstance(m, str) and m[1:].isdigit() else m   # noqa: E731  "T5" -> 5
-    miss_i = [i for i in map(tid, P.get("missing") or []) if isinstance(i, int) and 0 <= i < len(B["texts"])]
-    code_miss = [i for i in slots.uncovered(P, B["texts"]) if i not in miss_i]   # VLM bỏ câu mà không khai
-    code_miss = [i for i in code_miss if B["texts"][i].get("source") != "ai"]    # chữ phụ trợ (không phải lời khách) được phép bỏ
-    if code_miss:
-        log.append(f"câu khách không có trên poster (đo bằng mã): {[B['texts'][i]['text'] for i in code_miss]}")
-    missing = [B["texts"][i]["text"] for i in sorted(set(miss_i) | set(code_miss))]
-    base, mask = base_of(P)   # nền của kế hoạch cuối (vòng sửa / duyệt có thể đã đổi dòng giữ)
-    kept = lonly.kept_of(P)
-    # DỰNG THẾ NÀO, từng lệnh (debug "chữ khó"): cỡ, co, nén ngang, xoay, theo đường cong
-    rinfo = [{"id": r["id"], "fs": round(float(r.get("fs") or r.get("size") or 0), 1), "shrink": round(float(r.get("shrink") or 1), 2),
-              "sx": r.get("sx", 1), "angle": round(float(r.get("angle") or 0), 1), "path": bool(r.get("path"))} for r in res or []]
-    plan = {"style": P.get("style"), "ops": P["ops"], "render": rinfo, "missing": missing, "notes": P.get("notes"), "errors": errs, "log": log,
-            "slots": slots.public(M), "slots_mode": "L", "errors_first": errs_first,
+    vlm_miss = [k for k in A.get("missing") or [] if 0 <= k < len(texts)]
+    if sorted(vlm_miss) != sorted(miss_i):
+        log.append(f"câu khách không có trên poster: VLM khai {['T%d' % k for k in vlm_miss]}, đo bằng mã {['T%d' % k for k in miss_i]}")
+    missing = [texts[i]["text"] for i in miss_i]
+    kept = lonly.kept_of({"ops": U})
+    # DỰNG THẾ NÀO, từng phần tử (debug "chữ khó"): cỡ, co, nén ngang, xoay, theo đường cong
+    rinfo = [{"id": r["id"], "unit": r.get("unit"), "fs": round(float(r.get("fs") or r.get("size") or 0), 1),
+              "shrink": round(float(r.get("shrink") or 1), 2), "sx": r.get("sx", 1), "angle": round(float(r.get("angle") or 0), 1),
+              "path": bool(r.get("path"))} for r in res or []]
+    plan = {"style": A["styles"], "assign": A["assign"], "accent": A["accent"], "ops": fill.public(U), "render": rinfo,
+            "missing": missing, "notes": A.get("notes"), "errors": errs, "log": log, "slots": slots.public(M), "slots_mode": "L",
+            "errors_first": errs_first,
             "erase": {"mask_pct": round(100 * float(mask.mean()), 2), "ink_pct": round(100 * float(ink.mean()), 2),
                       "kept": sorted(kept), "orphans": [l["id"] for l in M["L"] if l.get("orphan")], "log": elog}}
     ink_img = lonly.ink_image(draft, ink, mask, M, kept)

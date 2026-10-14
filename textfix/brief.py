@@ -114,6 +114,7 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
     n_variants: số hướng thiết kế KHÁC (người dùng chọn nhiều ảnh: ảnh 1 = prompt_en, ảnh 2.. = các hướng này; cùng chữ khách).
     Mỗi prompt (chính và từng hướng) qua cùng các bước giữ cam kết: bỏ tỉ lệ / độ phân giải, chữ khách thiếu ngoặc kép thì nối."""
     form = {k: v for k, v in (form or {}).items() if k not in TECH_KEYS and v not in (None, "", [], False)}
+    steps = form.get("category") == "guide" or bool(form.get("guide_steps"))   # poster hướng dẫn: các mục là BƯỚC (có thứ tự)
     if form.get("category") in CATEGORIES:
         form["category"] = CATEGORIES[form["category"]]
     user = []
@@ -260,6 +261,9 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
         if t.get("role") == "list_item" and c != t["text"]:
             t["text"] = c
             log.setdefault("list_capitalized", []).append(c)
+        # CÁC BƯỚC luôn theo thứ tự khách (người dùng chốt 14/10, kể cả khi FLUX vẽ hình minh hoạ lệch thứ tự): fill.order đọc cờ này
+        if steps and t.get("role") == "list_item":
+            t["ordered"] = True
     raw = {**raw, "prompt_en": _requote(raw.get("prompt_en", ""), out),
            "variants": [{**v, "prompt_en": _requote(str(v.get("prompt_en") or ""), out)} for v in (raw.get("variants") or [])
                         if isinstance(v, dict)]}

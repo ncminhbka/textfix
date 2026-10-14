@@ -8,15 +8,14 @@ nét chữ của nháp), dưới chữ là gì do LaMa vẽ lại:
 
   ink = hisam.strokes(draft)                  # nét chữ (trạm vẽ)
   M   = view(slots.build(draft, ink))         # chỉ còn L: dòng OCR + cụm nét chưa dòng nào nhận ("orphan": VLM quyết giữ / xoá)
-  P   = fix_ops(plan(...), M)                 # lệnh của VLM: chỉ ô L, không nền / viền riêng
   clean, mask = erase(draft, ink, M)         # LaMa MỘT lần: gỡ mọi dòng (nền VLM nhìn)
-  base, mask = settle(draft, clean, ink, M, P)   # dòng VLM "keep" trả về điểm ảnh nháp
+  A   = fill.parse(plan(...))                 # VLM GHÉP câu khách <-> dòng + kiểu theo vai (chặng B: không viết html)
+  base, mask = settle(draft, clean, ink, M, {"ops": U})   # dòng "keep" trả về điểm ảnh nháp
 """
 
 from __future__ import annotations
 
 import os
-import re
 
 import numpy as np
 
@@ -31,280 +30,66 @@ def view(M: dict) -> dict:
     return {"L": L, "size": M["size"], "by": {l["id"]: l for l in L}, "geo_log": M.get("geo_log") or []}
 
 
-LOOSE = 0.4       # ghép dòng bị bỏ với câu khách còn thừa: chữ nháp giống >= 0.4
-COVER_MIN = 0.6   # VLM trả lệnh cho < 60% số dòng = câu trả lời bị cụt (mix1 p02: 1 lệnh / 10 dòng) -> gọi lại một lần
-
-
-def covered(P: dict, M: dict) -> set:
-    """Các dòng đã có lệnh VIẾT (có chữ) hoặc GIỮ."""
-    return {m for op in (P or {}).get("ops") or [] if op.get("kind") == "keep" or (op.get("kind") == "text" and op.get("html"))
-            for m in op.get("marks") or op.get("slots") or [] if m in M["by"]}
-
-
-ICON_LEAD = re.compile(r"^(\s*(?:<(?!i-icon|svg)[^>]+>\s*)*)(?:<i-icon\b[^>]*>(?:\s*</i-icon>)?|<svg\b.*?</svg>)\s*", re.I | re.S)
-DOT_LEAD = re.compile(r"^(\s*(?:<(?!i-icon|svg)[^>]+>\s*)*)[•●○▪■◆✓✔☑★→·]\s*")
-BR = re.compile(r"<br\s*/?>", re.I)
-
-
-def marks_rule(P: dict, M: dict) -> tuple[dict, list[str]]:
-    """TEXTFIX CHỈ SỬA CHỮ (người dùng chốt 14/10): icon / tick / hình nhỏ trước mỗi dòng là điểm ảnh của nháp, không gỡ, không vẽ
-    lại -> lệnh chữ không được mở đầu bằng icon (gỡ, nếu không sẽ có hai dấu cạnh nhau). CHẤM TRÒN đầu dòng thì khác: OCR gộp nó
-    vào khung dòng và Hi-SAM coi nó là nét chữ (đo accept2 r04: 3 / 3), tức nó bị gỡ cùng chữ -- nó là một KÝ TỰ của dòng.
-    Người dùng chốt 14/10: chấm không phải icon -- Hi-SAM đã gỡ chấm (l["dot"]) thì VLM ĐƯỢC viết "• " (nó quyết, mã không tự
-    thêm); dòng mà chấm của nháp còn trên nền thì chấm VLM viết bị gỡ, không thì thành hai chấm.
-    Lệnh nhiều dòng: xét từng dòng khi số dòng html khớp số ô, không thì chỉ dòng đầu."""
-    log, ops = [], []
-    for op in P.get("ops") or []:
-        mk = [m for m in op.get("marks") or [] if m in M["by"]]
-        if op.get("kind") != "text" or not op.get("html") or not mk:
-            ops.append(op)
-            continue
-        Ls = sorted((M["by"][m] for m in mk), key=lambda l: (l["box"][1], l["box"][0]))
-        parts = BR.split(op["html"])
-        rows = list(zip(parts, Ls)) if len(parts) == len(Ls) else [(parts[0], Ls[0])]
-        out, did = [], []
-        for h, l in rows:
-            h2 = ICON_LEAD.sub(lambda m: m.group(1), h)
-            if h2 != h:
-                did.append(f"{l['id']} bỏ icon đầu dòng")
-            had = bool(DOT_LEAD.match(h2))
-            if had and not l.get("dot"):
-                h2 = DOT_LEAD.sub(lambda m: m.group(1), h2)
-                did.append(f"{l['id']} bỏ chấm đầu dòng (nháp không có)")
-            out.append(h2)
-        if did:
-            log.append(f"{op.get('id')}: " + "; ".join(did))
-            op = {**op, "html": "<br>".join(out + parts[len(out):])}
-        ops.append(op)
-    return {**P, "ops": ops}, log
-
-
-STACK_GAP = 1.0   # hai dòng xếp chồng: khe dọc <= 1 cao chữ và có phần chồng ngang
-ROW_GAP = 2.0     # hai mẩu của một dòng: cùng hàng (chồng dọc >= nửa cao), khe ngang <= 2 cao chữ
-
-
-def split_far(P: dict, M: dict) -> tuple[dict, list[str]]:
-    """LỆNH GỘP CÁC DÒNG KHÔNG XẾP CHỒNG (ca người dùng gửi 14/10: VLM gộp năm dòng của bốn thẻ vào một lệnh -> khung dựng là
-    hình bao cả bốn thẻ, chữ trôi khỏi thẻ). Các ô của một lệnh chia thành cụm liền nhau (xếp chồng sát / cùng hàng); hơn một
-    cụm thì tách thành mỗi cụm một lệnh, chữ chia theo <br>: số dòng html = số ô -> mỗi ô một dòng; = số cụm -> mỗi cụm một
-    dòng; không khớp -> phát lần lượt, cụm hết chữ thành dòng bị bỏ (fill_gaps lo). 63 lệnh gộp của accept2 + mix1 (đo 14/10)
-    đều là dòng xếp chồng khe <= 0,6: luật này không đụng lệnh nào ở đó."""
-    log, ops = [], []
-    for op in P.get("ops") or []:
-        mk = [m for m in op.get("marks") or [] if m in M["by"]]
-        if op.get("kind") != "text" or not op.get("html") or len(mk) < 2 or any(M["by"][m].get("path") for m in mk):
-            ops.append(op)
-            continue
-        Ls = sorted((M["by"][m] for m in mk), key=lambda l: (l["box"][1], l["box"][0]))
-        par = list(range(len(Ls)))
-
-        def root(i):
-            while par[i] != i:
-                i = par[i]
-            return i
-        for i, a in enumerate(Ls):
-            for j in range(i + 1, len(Ls)):
-                b = Ls[j]
-                A, B = a["box"], b["box"]
-                sz = max(float(a.get("size") or A[3] - A[1]), float(b.get("size") or B[3] - B[1]))
-                vgap, hov = max(B[1] - A[3], A[1] - B[3]), min(A[2], B[2]) - max(A[0], B[0])
-                vov, hgap = min(A[3], B[3]) - max(A[1], B[1]), max(B[0] - A[2], A[0] - B[2])
-                if (vgap <= STACK_GAP * sz and hov > 0) or (vov >= 0.5 * min(A[3] - A[1], B[3] - B[1]) and hgap <= ROW_GAP * sz):
-                    par[root(i)] = root(j)
-        groups: dict = {}
-        for i, l in enumerate(Ls):
-            groups.setdefault(root(i), []).append(l)
-        G = sorted(groups.values(), key=lambda g: (min(l["box"][1] for l in g), min(l["box"][0] for l in g)))
-        if len(G) < 2:
-            ops.append(op)
-            continue
-        parts = [x for x in BR.split(op["html"])]
-        take = [len(g) for g in G] if len(parts) == len(Ls) else [1] * len(G) if len(parts) == len(G) else None
-        k, made = 0, []
-        for n, g in enumerate(G):
-            cnt = take[n] if take else min(len(g), max(0, len(parts) - k))
-            html = "<br>".join(parts[k:k + cnt])
-            k += cnt
-            if not re.sub(r"<[^>]+>", "", html).strip():
-                continue
-            ids = [l["id"] for l in g]
-            # không tự khai nhóm cho các lệnh vừa tách: nhóm "list" kéo theo luật dồn hàng / xếp lại thứ tự của validate
-            made.append({**op, "id": f"{op.get('id')}_{n + 1}", "marks": ids, "slots": ids, "html": html})
-        ops += made
-        log.append(f"{op.get('id')}: lệnh gộp {len(Ls)} dòng không xếp chồng ({[[l['id'] for l in g] for g in G]}) -> tách {len(made)} lệnh")
-    return {**P, "ops": ops}, log
-
-
-def fill_gaps(P: dict, M: dict, texts: list[dict], product: bool = False) -> tuple[dict, list[str]]:
-    """KHÔNG ĐỂ TRỐNG DÒNG NÀO nháp đã vẽ (13/10, người dùng: "cố gắng bịa vào, đừng bỏ trống" -- mix1: mỗi dòng bị bỏ là một
-    nút / huy hiệu trống). Dòng chưa có lệnh viết / giữ (VLM bỏ sót, VLM ghi skip, luật chặn đổi thành skip):
-      - chữ in trên sản phẩm khách tải -> GIỮ (mix1 p02: VLM bỏ sót, nhãn trên gói bị xoá);
-      - chữ nháp ở đó gần trùng một câu khách -> viết câu khách đó;
-      - không thì GIỮ nguyên chữ nháp của dòng (có thể sai chính tả, nhưng vỏ không trống)."""
-    import html as _html
-    from . import slots
-    have, log, ops = covered(P, M), [], []
-    # CỤM NÉT CHƯA DÒNG NÀO NHẬN ("orphan"): VLM quyết (người dùng chốt 14/10) -- nó ghi skip thì xoá, không nhắc tới thì GIỮ
-    wiped = {m for op in P.get("ops") or [] if op.get("kind") == "skip" for m in op.get("marks") or op.get("slots") or []}
-    gaps = [l for l in M["L"] if l["id"] not in have and not (l.get("orphan") and l["id"] in wiped)]
-    if not gaps:
-        return P, log
-    gone = {l["id"] for l in gaps}
-    # câu khách CHƯA lệnh nào viết: ghép một - một với các dòng bị bỏ theo độ giống chữ nháp, ngưỡng thấp (LOOSE) -- chữ nháp méo
-    # nặng ("Tio shard" = "Tiêu chuẩn") không qua được ngưỡng chung, nhưng trong số câu còn thừa thì nó vẫn là câu giống nhất
-    from difflib import SequenceMatcher
-    used = {slots._tid(op.get("client")) for op in P.get("ops") or [] if op.get("kind") == "text" and op.get("html")}
-    wrote = " ".join(slots._flat(re.sub(r"<[^>]+>", " ", op.get("html") or "")) for op in P.get("ops") or [] if op.get("kind") == "text")
-    free = [k for k, t in enumerate(texts) if k not in used and slots._flat(t["text"]) not in wrote]
-    pairs = sorted(((SequenceMatcher(None, slots._flat(l.get("ocr") or ""), slots._flat(texts[k]["text"])).ratio(), l["id"], k)
-                    for l in gaps if not l.get("printed") and not l.get("orphan") and len(slots._flat(l.get("ocr") or "")) >= 3 for k in free), reverse=True)
-    loose = {}
-    for sim, lid, k in pairs:
-        if sim >= LOOSE and lid not in loose and k not in loose.values():
-            loose[lid] = k
-    for op in P.get("ops") or []:   # gỡ các dòng này khỏi lệnh skip cũ
-        mk = [m for m in op.get("marks") or op.get("slots") or [] if m not in gone]
-        if op.get("kind") == "skip" and not mk:
-            continue
-        ops.append({**op, "marks": mk, "slots": mk} if op.get("kind") == "skip" else op)
-    for l in gaps:
-        if l.get("orphan"):
-            ops.append({"id": f"fill_{l['id']}", "kind": "keep", "marks": [l["id"]], "slots": [l["id"]], "why": "fill: nét OCR không đọc, VLM không nhắc"})
-            log.append(f"{l['id']}: cụm nét OCR không đọc ({l.get('ocr')!r}), VLM không nhắc tới -> giữ nguyên")
-            continue
-        k = None if l.get("printed") else loose.get(l["id"], slots._client_like(l.get("ocr") or "", texts))
-        if k is not None:
-            ops.append({"id": f"fill_{l['id']}", "kind": "text", "marks": [l["id"]], "slots": [l["id"]], "client": f"T{k}",
-                        "html": _html.escape(texts[k]["text"]), "box_style": "", "why": "fill: dòng bị bỏ, chữ nháp giống câu khách"})
-            log.append(f"{l['id']}: dòng bị bỏ ({l.get('ocr')!r}) -> viết câu khách T{k} {texts[k]['text']!r}")
-        elif l.get("printed"):
-            ops.append({"id": f"fill_{l['id']}", "kind": "keep", "marks": [l["id"]], "slots": [l["id"]], "why": "fill: chữ in trên sản phẩm"})
-            log.append(f"{l['id']}: dòng bị bỏ ({l.get('ocr')!r}) -> giữ nguyên (chữ in trên sản phẩm)")
-        elif product:
-            # KHÁCH TẢI ẢNH SẢN PHẨM (accept2 q03, 14/10: logo Coca-Cola trên lon bị OCR đọc thành dòng "eo.mg", VLM không nhắc tới,
-            # bộ đọc ảnh sản phẩm không khớp được -> dòng bị xoá trống = mất logo). Chữ trên sản phẩm PHẢI GIỮ: ở poster có ảnh
-            # sản phẩm, dòng không ai viết gì thì giữ nguyên điểm ảnh nháp -- sai về phía này chỉ còn lại một mẩu chữ giun
-            ops.append({"id": f"fill_{l['id']}", "kind": "keep", "marks": [l["id"]], "slots": [l["id"]], "why": "fill: poster có ảnh sản phẩm, không ai viết dòng này"})
-            log.append(f"{l['id']}: dòng bị bỏ ({l.get('ocr')!r}) -> giữ nguyên (poster có ảnh sản phẩm: có thể là chữ trên sản phẩm)")
-        else:   # không còn câu nào để viết (dòng nối của một câu đã viết ở dòng trên): XOÁ TRỐNG -- người dùng chốt 14/10, chữ
-            # nháp giữ lại là chữ giun (mix1 "SoundBean Air 3")
-            ops.append({"id": f"fill_{l['id']}", "kind": "skip", "marks": [l["id"]], "slots": [l["id"]], "html": "",
-                        "why": "fill: không còn câu nào để viết"})
-            log.append(f"{l['id']}: dòng bị bỏ ({l.get('ocr')!r}) -> xoá trống (không còn câu nào để viết)")
-    return {**P, "ops": ops}, log
+COVER_MIN = 0.6   # VLM ghép < 60% số dòng = câu trả lời bị cụt (mix1 p02: 1 lệnh / 10 dòng) -> gọi lại một lần
 
 
 def describe_l(M: dict) -> str:
     from . import slots
     note = lambda m: (slots._curve_note(m) if m.get("path") else f", drawn at {m['angle']:.0f} degrees" if abs(m.get("angle") or 0) >= 2   # noqa: E731
-                      else "") + (", OCR missed this line: the letters read here are a guess" if m.get("missed") and not m.get("orphan") else "") \
-        + (", its bullet dot was wiped with the letters: you may start it with \"• \"" if m.get("dot") else "") \
-        + (", STRAY LETTERING the reader could not read" if m.get("orphan") else "") \
+                      else "") + (", found by the stroke detector (big decorated lettering)" if m.get("missed") and not m.get("orphan") else "") \
+        + (", its bullet dot was wiped with the letters (\"bullet\": true puts it back)" if m.get("dot") else "") \
+        + (", STRAY LETTERING (letter shapes that may be junk, a logo or decoration)" if m.get("orphan") else "") \
         + (", PRINTED ON THE CLIENT'S PRODUCT: kind \"keep\"" if m.get("printed") else "")
-    li = "\n".join(f"{m['id']}: \"{m['ocr']}\" (text ~{m['size']:.0f}px, ~{len(m['ocr'])} characters, color {m['color']}"
-                   f"{note(m)}{slots._look(m)})" for m in M["L"]) or "(none)"
+    # CHỮ OCR KHÔNG GỬI (người dùng 14/10: VLM tự đọc nháp, không cần gợi ý chữ giun): mỗi dòng chỉ còn số đo
+    li = "\n".join(f"{m['id']}: text ~{m['size']:.0f}px, color {m['color']}{note(m)}{slots._look(m)}" for m in M["L"]) or "(none)"
     return f"Text lines:\n{li}"
 
 
 SYSTEM_L = """You are a senior graphic designer finishing a poster. An image model drew the DRAFT from the PROMPT below. Everything in it \
-is good except its lettering, which is garbled and misspelt. The renderer keeps the draft exactly as it is -- pictures, cards, \
-pills, badges, symbols, ornaments -- and only replaces the lettering: code measured every TEXT LINE of the draft as a slot \
-L#, wiped the old letters (the BASE image shows the result) and now draws what you write exactly inside each slot. The final \
-poster is the draft with clean, correct text.
+is good except its lettering, which is garbled and misspelt. Code measured every TEXT LINE of the draft (red L# on SLOTS), \
+wiped the old letters (BASE) and will set the CLIENT TEXTS there itself, word for word, at the size, place and alignment the \
+draft shows. YOUR JOB IS TO READ, NOT TO WRITE: say which client text each drawn line was meant to be, and how each kind of \
+text looks in the draft.
 
-THE RULES THAT MATTER MOST
-1. The LOOK comes from the draft, the WORDS come from the client texts. Never take spelling from the image or the OCR \
-(the model draws TRƯỞNG for TRƯƠNG); copy client words character for character with every Vietnamese diacritic, and never \
-swap a word for a synonym (nghìn stays "nghìn").
-2. EVERY LINE THE MODEL DREW IS WRITTEN. Never leave an L# out and never skip one (only "STRAY LETTERING" may be skipped): an empty spot on its row or inside \
-its card looks broken. When the draft has more lines than the client has texts (the model repeated a row, or drew an extra \
-one), fill the extra lines in this order: (a) a client text that has no line yet; (b) a short phrase taken from another \
-client text (from the description: "Cơm chín đều"); (c) a short natural phrase of your own that fits that spot and that \
-business, carrying no fact and no promise. Steps of a guide, name / price rows, dates and contacts are never invented: there \
-an extra line repeats nothing and gets (a) or (b) only.
-3. FIT. The room is what the model drew, never what the client wrote. Each line lists how many characters the model wrote \
-there: that is the most the line holds (real letters are wider than the model's thin ones); fewer is fine. A client text \
-longer than its room is REWRITTEN SHORT in the client's own words until it fits at the drawn size: keep the key words, drop \
-the rest. Example: "Hỗ trợ nấu cơm chín đều, giữ độ mềm dẻo và giúp việc chuẩn bị bữa ăn hằng ngày trở nên thuận tiện" drawn \
-as 2 lines of about 22 characters -> "Cơm chín đều, mềm dẻo<br>mỗi bữa ăn". Never the full sentence at a smaller size, never \
-more lines than the model drew.
-4. FACTS -- names, prices, numbers, dates, phones, addresses, emails, links -- are never changed, abbreviated or invented: \
-exact, with their unit (35.000đ, 30 phút, 50%, 15-25 triệu; "Quận 3", never "Q.3"), or left out.
-5. Each client text is written ONCE, in the line that fits it best (the biggest one for a headline). Where the model repeated \
-it, the copy gets other words by rule 2.
-6. The rows of one list look exactly alike and keep the client's order. Client items the model drew no row for are listed \
-in "missing", never crammed into another row.
+1. ASSIGN EVERY LINE. Look at the DRAFT and SLOTS and read what each marked line was meant to say (the drawn letters are \
+garbled: "Hỏ mây ầm" is "Hồ nước ấm"). Every L# goes in exactly \
+one "assign" entry. A client text the model broke over several stacked lines is ONE entry with all those lines (["L3","L4","L5"]). \
+One drawn line holding two client texts (a dish name and its price) is one entry with both ("client": ["T5","T6"]), in \
+reading order. Never assign a client text twice.
+2. ONE TEXT, LINES OF CLEARLY DIFFERENT SIZE OR IN SEPARATE PLACES (a small "THANH TOÁN" over a huge "NHANH CHÓNG"; "NGÀY" and \
+"HỘI" in two boxes): one entry with all those lines and "split": the client text cut into one piece per line, in line order \
+-- the pieces joined must give the client text exactly.
+3. EXTRA LINES (the model drew more lines than the client has texts, or repeated one): fill them in this order: (a) a client \
+text that has no line yet; (b) "client": null with "text": a short phrase taken from another client text; (c) "client": null \
+with "text": a short natural phrase that fits that spot and that business, no fact, no number, no promise. A repeated row of a \
+list gets a list item that has no row yet. Steps, name / price rows, dates and contacts are never invented. Give a filled line \
+the "role" it plays (the role of the row it repeats).
+4. KEEP / SKIP: kind "keep" ONLY for text printed on a product, package, screen or object in the photo (its pixels stay as \
+drawn). "STRAY LETTERING": "keep" when it is a logo, seal, sign or product text, or decoration that \
+looks fine; "skip" (wiped) only when it is garbled junk; when unsure "keep". Poster lettering, however decorated, is never kept.
+5. Client texts the model drew no line for go in "missing". Never cram them into another line.
+6. A line whose "bullet dot was wiped with the letters": set "bullet": true on its entry when the dot belongs to the design \
+(the same on every row of that list). Ticks, icons, numbers and pictures before a line stay on the BASE: never mention them.
 
-IMAGES: the message names each one. DRAFT = what the model drew. SLOTS = the draft with every text line marked (red L#). \
-BASE = the draft with the old letters wiped: what will really be behind each line. Cards, pills, buttons and every picture \
-are already there: never draw a background, border, box or shadow box of your own. You write letters only.
+STYLES -- one entry per client-text ROLE (the role is written after each T#): how that kind of text looks in the DRAFT. Every \
+text of the role is set exactly alike, so describe what the role looks like, not one line: "font" (a key from the catalog \
+whose family matches the draft's letterforms -- condensed, rounded, geometric, serif, script, display -- and whose letter width \
+is within about 0.05em of the measured width), "weight" (100-900, as heavy as the draft: a heavy headline stays 800-900), \
+"italic", "case" ("upper" when the draft shows capitals, else "none"), "tracking" (em, only when clearly spaced) and "effect" \
+(CSS only for outlines, shadows, glows or gradient / metallic letters, as strong as the draft: text-shadow, -webkit-text-stroke, \
+background-clip:text with a linear-gradient) and "color" (#hex fill of the letters as drawn -- white letters with a black \
+outline are "#ffffff" with the outline in "effect"; a role drawn in different colors on different backgrounds: the most common one).
+ACCENT (optional): a word or number the draft draws bigger or in another color inside one client text ("50%" in "Giảm 50% hôm \
+nay"): {"client": "T#", "text": "<exact substring>", "scale": 1.6, "color": "#hex"}.
 
-TEXT LINES, as listed after the images: the garbled OCR letters, the drawn text size in px, the number of characters drawn \
-(its room), the color. L# numbers follow the reading order block by block: a column is numbered top to bottom before the \
-column beside it starts.
-
-ONE OP PER LINE (or per group of stacked lines)
-- kind "text", slots ["L5"], html = the text. One op may take several CONSECUTIVE lines of ONE block stacked one under the \
-other (["L5","L6"], <br> between the lines), never lines standing side by side (only two pieces of one drawn line that OCR \
-cut apart go together). Every slot id appears in exactly ONE op.
-- kind "keep" ONLY for text printed on a product, package, screen, dial or object in the photo: its pixels stay as drawn. \
-Poster lettering, however decorated (on a ribbon, 3D, metallic, in a badge), is always rewritten as text.
-- CURVED LINE (the list says so; SLOTS shows its curve): ONE text op with that single slot, one line, no <br>: the renderer \
-lays your letters along the measured curve.
-- A line "drawn at N degrees" is tilted and the renderer rotates it itself: never write transform rotate / skew. Tilted \
-lines stacked in one sticker / ribbon are ONE op.
-- "OCR missed this line": real lettering of the draft (usually a big decorated headline). Look at the DRAFT to see which \
-client text it is and write it there.
-- LETTERS ONLY. Whatever stands in front of a line -- a check mark, tick, leaf, arrow or little picture -- stays on the BASE \
-exactly as the model drew it: never put a picture or a symbol in your html. A plain BULLET DOT counts as a letter: \
-when the list says a line's "bullet dot was wiped with the letters", you may start that line with "• " (the same on every \
-row of that list). On any other line a dot the draft drew is still on the BASE: never add one there.
-- "STRAY LETTERING the reader could not read": letter shapes the stroke detector found where OCR read nothing (the listed \
-letters may be empty). Look at the DRAFT and decide: kind "keep" when it is lettering on a product, logo, seal, sign or \
-object in the picture, or decoration that looks fine; kind "text" when it is clearly one of the client texts drawn there; \
-kind "skip" (it is wiped, the spot stays empty) only when it is garbled junk that would look wrong on the poster. When \
-unsure: "keep".
-- Step numbers and pictures beside a line are still on the BASE: never repeat them in the text ("1.", "Bước 2").
-
-TEXT
-- Write each line at the size measured for its slot, with the model's line breaks; fine print and footers too. Set \
-"client": "T<i>" on every op writing (part of) a client text, and null on a line you filled by rule 2 (b) or (c).
-- One client text drawn over several stacked lines (MENU / TRÀ SỮA) is one op with all those slots. Read the garbled OCR to \
-find them: a short line under a line that ends its sentence is that text's second line.
-- Client texts marked OURS are filler we wrote (headline, tagline, button, section label): shorten or reword them freely.
-- Star ratings are pictures and stay on the BASE: never write "5 sao" / "5.0" or star characters.
-- html: inline spans only (color / weight / italic / size for emphasis), inline CSS, no <img>, URLs or scripts; sizes in poster \
-px. The slot is a flex box centered both ways; left-aligned text needs box_style "justify-content:flex-start; text-align:left".
-
-GROUPS -- you declare, the renderer obeys. Ops that belong together carry the same "group" name ("benefits", "menu-names", \
-"menu-prices", "badges", "headline"), the same "group_kind" and "align":
-  "list" = separate items, one per row: drawn on ONE margin at ONE size, font, weight and color.
-  "flow" = ONE sentence the draft broke over several lines that you did not merge into one op: all lines drawn alike.
-  "align" = "left" | "center" | "right", as the draft aligned them.
-  Write the ops of a group identically yourself (same font key, weight, size, color, case, letter-spacing; only the words \
-change). Every list and every multi-line sentence that is not one merged op MUST be a group. Lines the draft drew at clearly \
-different sizes (a small "GIẢM" beside a huge "50%", a big headline over a small tagline) are NOT a group: "group": null.
-
-STYLE -- the poster should look like the draft with clean text, not like another design
-- One type system: style.display_font for headlines, style.text_font for the rest (keys from the catalog); <i-font key="..." \
-weight="700">...</i-font> only where a line needs another font. Pick fonts whose family matches the draft's letterforms \
-(condensed, rounded, geometric, serif, script, display) and whose letter width is within about 0.05em of the width listed for \
-the line (caps width for all-caps lines): a wider font gets shrunk, a narrower one looks lost.
-- Match each line's weight, case, italic and tracking: a heavy headline stays heavy (800-900), a script stays a script, \
-slanted stays italic, a wide headline is never set condensed. The measured weight / strokes / shadow are hints; the image \
-wins. Effects with inline CSS, as strong as the draft: -webkit-text-stroke or text-shadow for outlines, text-shadow for \
-shadows and glows, background-clip:text with a linear-gradient for gradient or metallic letters.
-- Colors: put the draft's 3-5 main colors in style.palette and take every text color from it or from the measured colors; \
-no new hues. Same role, same color and font. Every text must read clearly on what is behind it on the BASE; on a busy \
-background add a subtle text-shadow.
-- Hierarchy and alignment as the draft shows them; a centered block stays centered, a left column stays left.
+IMAGES: DRAFT = what the model drew. SLOTS = the draft with every text line marked (red L#). BASE = the draft with the old \
+letters wiped. The list after the images gives each line's measured size, color and look.
 
 OUTPUT: one JSON object
-{"style": {"display_font": "<key>", "text_font": "<key>", "palette": ["#hex"], "notes": "..."},
- "ops": [{"id": "o1", "slots": ["L1"], "kind": "text|keep|skip", "client": "T0" | null, "html": "...", "box_style": "...",
-          "group": "name" | null, "group_kind": "list" | "flow" | null, "align": "left" | "center" | "right" | null,
-          "why": "a few words"}],
- "missing": ["T5"], "notes": "..."}
+{"assign": [{"lines": ["L1"], "client": "T0" | ["T5","T6"] | null, "split": ["..."] | null, "text": "..." | null,
+             "role": "<role, for a filled line>" | null, "kind": "text" | "keep" | "skip", "bullet": false, "why": "a few words"}],
+ "styles": {"<role>": {"font": "<key>", "weight": 700, "italic": false, "case": "none", "tracking": null, "color": "#hex", "effect": ""}},
+ "accent": [], "missing": ["T5"], "notes": "..."}
 
 FONT CATALOG (key: family, class): {fonts}"""
 
@@ -313,34 +98,6 @@ def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, produ
          meta: dict | None = None) -> dict:
     from . import slots
     return slots.plan(draft, M, prompt, texts, call, slots._system(SYSTEM_L), describe_l(M), base, product=product, meta=meta)
-
-
-BOX = re.compile(r"(?:^|;)\s*(?:background(?:-color|-image)?|border(?:-(?:top|right|bottom|left|radius|width|color|style))?|"
-                 r"box-shadow|padding(?:-(?:top|right|bottom|left))?|outline)\s*:[^;]*", re.I)
-
-
-def fix_ops(P: dict, M: dict) -> tuple[dict, list[str]]:
-    """Lệnh của VLM trong chế độ chỉ dòng chữ: bỏ ô không phải L; lệnh chữ không có nền / viền / đệm riêng (vỏ đã nằm trên nền,
-    vẽ thêm là vỏ lồng vỏ) -- trừ dải màu tô CHỮ (background-clip:text)."""
-    log, ops = [], []
-    for op in P.get("ops") or []:
-        mk = [m for m in op.get("marks") or [] if m in M["by"]]
-        if not mk:
-            continue
-        op = {**op, "marks": mk, "slots": mk}
-        bs = op.get("box_style") or ""
-        if op.get("kind") == "text" and bs and not re.search(r"background-clip\s*:\s*text", bs, re.I):
-            bs2 = BOX.sub("", bs).strip("; ")
-            if bs2 != bs.strip("; "):
-                log.append(f"{op.get('id')}: bỏ nền / viền riêng của lệnh chữ (vỏ là điểm ảnh nháp)")
-                op["box_style"] = bs2
-        if op.get("kind") not in ("text", "keep", "skip"):
-            log.append(f"{op.get('id')}: kind {op.get('kind')!r} trên ô dòng chữ -> skip")
-            op = {**op, "kind": "skip", "html": ""}
-        if op.get("kind") == "skip":
-            log.append(f"{op.get('id')}: VLM bỏ dòng {mk} -- chữ cũ được xoá, chỗ đó để trống")
-        ops.append(op)
-    return {**P, "ops": ops}, log
 
 
 def _region(l: dict, H: int, W: int, grow: float) -> np.ndarray:

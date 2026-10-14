@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 
-SEVERE = ("empty_plan", "unassigned", "content_overlap", "boxes_overlap", "overflow", "low_contrast", "mark_twice")
+SEVERE = ("empty_plan", "content_overlap", "overflow", "low_contrast")   # = render.SEVERE (chặng B)
 SHRINK = 0.6   # lệnh chữ co dưới 0.6 cỡ nháp
 
 
@@ -24,21 +24,25 @@ def flags(plan: dict) -> list[str]:
     shr = [float(x) for l in log for x in re.findall(r"co còn ([0-9.]+)", l)]
     if any(x < SHRINK for x in shr):
         out.append(f"chữ co còn {min(shr):.2f}")
-    miss = [l.split(":", 1)[1].strip() for l in log if l.startswith("câu khách không có trên poster")]
+    miss = plan.get("missing") or []
     if miss:
-        out.append("mất câu khách: " + miss[0][:120])
-    guard = [l for l in log if any(w in l for w in ("chữ chệch", "bỏ chữ không có", "số không có trong câu khách", "lặp chữ", "chữ không có trong câu khách"))]
+        out.append("mất câu khách: " + " · ".join(miss)[:120])
+    # chặng B: chữ là nguyên văn câu khách; mã chỉ còn chặn chữ LẤP có số bịa và split không nối lại đúng câu
+    guard = [l for l in log if "có số không có trong câu khách" in l or "không nối lại đúng câu khách" in l]
     if guard:
-        out.append(f"bộ chặn chữ can thiệp {len(guard)} lệnh")
+        out.append(f"mã chặn {len(guard)} chữ lấp / chỗ cắt câu sai của VLM")
     if any("VẪN RỖNG" in l for l in log):
         out.append("VLM trả kế hoạch rỗng")
     # ---- đường chỉ dòng chữ (lonly): những lần MÃ phải làm thay VLM, và bước gỡ chữ rơi về đường dự phòng
     blank = sum("xoá trống" in l for l in log)
     if blank:
         out.append(f"{blank} dòng nháp xoá trống (không còn câu nào để viết)")
-    fill = sum("dòng bị bỏ" in l and "viết câu khách" in l for l in log)
+    fill = sum("chưa ai ghép" in l and "-> câu khách" in l for l in log)
     if fill >= 2:
-        out.append(f"mã tự lấp {fill} dòng VLM bỏ")
+        out.append(f"mã tự ghép {fill} dòng VLM bỏ sót")
+    own = sum("-> dòng lấp" in l for l in log)
+    if own:
+        out.append(f"{own} dòng ghép trùng câu đã có -> thành dòng lấp")
     if any("gọi lại" in l and "dòng" in l for l in log):
         out.append("VLM viết thiếu dòng, đã gọi lại")
     er = plan.get("erase") or {}
@@ -47,6 +51,4 @@ def flags(plan: dict) -> list[str]:
     core = sum(int(x) for l in (er.get("log") or []) + log for x in re.findall(r"lõi dòng (\d+)", l)[:1])
     if core:
         out.append(f"{core} dòng Hi-SAM không thấy nét (gỡ theo lõi khung)")
-    if sum("lệnh gộp" in l and "không xếp chồng" in l for l in log):
-        out.append("VLM gộp dòng của nhiều khối (mã đã tách)")
     return out

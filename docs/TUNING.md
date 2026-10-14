@@ -753,6 +753,26 @@ icon; cụm nét lạ: VLM giữ cả 6 (chữ vòng trên huy hiệu trà, dấ
 - Không do chặng A: l04 VLM trả rỗng hai lần (mã lấp 8 dòng, poster hỏng như lượt trước); e05 VLM lặp "Gội dưỡng", thiếu "Đính đá";
   r01 "15%" quá nhỏ; k02 câu "HÁI TAY 100%" không có chỗ (chữ vòng trên huy hiệu, VLM giữ nguyên).
 
+**14/10 tối: CHẶNG B -- VLM GHÉP CÂU, CODE CHÉP CHỮ VÀ DỰNG THEO NHÁP** (plan duyệt; đường VLM viết html: nhánh `legacy-ops-html`).
+Người dùng chốt: nhóm lấy từ VAI câu khách (brief), không đoán từ ảnh; không cắt chữ, co; nháp thiếu câu thì chịu; các bước theo
+thứ tự khách; VLM không cần chữ OCR làm gợi ý.
+- [mã] `textfix/fill.py`: `parse` (khuôn `assign` / `styles` / `accent` / `missing`), `resolve` (một dòng một đơn vị; chữ in trên sản
+  phẩm luôn giữ; `split` phải nối lại đúng câu; một câu ở nhiều chỗ -> chỗ giống nhất nhận, chỗ khác nhận câu cùng vai còn thiếu
+  hoặc thành dòng lấp; dòng lấp có số bịa -> bỏ chữ; VLM chỉ được xoá cụm nét lạ; dòng chưa ai ghép như luật lấp cũ), `order`
+  (bước), `layout` (khung nét Hi-SAM, cỡ trung vị, lề theo mép nét, ngắt dòng theo tỉ lệ ký tự OCR, dòng khác cỡ / mẩu cùng hàng,
+  một dòng nhiều câu cắt tại khe nét gần chỗ dự kiến theo tỉ lệ chữ, tập cùng vai, kiểu theo vai, màu theo vai trừ khi các dòng
+  cùng vai đo ra màu khác hẳn, số bước theo thứ tự khách, ngoặc cho câu trích). `render.render_units` / `check_units` /
+  `autofix_units`. Lời dặn VLM 15.400 -> 6.900 ký tự (kể cả danh mục font). Bỏ `_guard`, `validate`, `marks_rule`, `split_far`,
+  `fix_ops`, nhóm / cân cỡ / căn lề của render, `_pack_lists`, `_list_order`.
+- [đo tại máy, lệnh VLM cũ qua `fill.from_ops`, nền LaMa CPU] mix1c 35 poster: 24 tập ở 19 poster, 0 tập lệch cỡ, 0 chữ lệch câu
+  khách, 8 phần tử co < 0,6 (câu dài trong chỗ FLUX vẽ ngắn), 14 câu thiếu -- cả 14 đã thiếu trong lệnh cũ. accept2 (bộ thi, chỉ
+  ghi): 17 tập ở 12 poster, 0 lệch, 0 chữ lệch câu, 10 phần tử co < 0,6.
+- LƯU Ý: nhiều chi tiết chặng B được phát hiện trên ca accept2 (tên + giá gộp dòng, huy chương, màu chữ viền, ngoặc ruy băng) --
+  accept2 không còn là bài thi sạch cho chặng B; chấm chặng B trên `bench/final1.json`.
+- CÒN (nguồn lỗi đã dồn về bước ĐO DÒNG): OCR gộp hai cột / một khung hai hàng / đọc tick thành chữ cái (tick sát chữ bị gỡ cùng
+  chữ: mix1 m01, có từ khi dùng Hi-SAM; thử luật theo ký tự OCR đầu dòng: bắt 0 / 538 dòng, đã gỡ) / góc nghiêng. Ứng viên: Hi-SAM
+  phân cấp (từ / dòng) chia dòng thay OCR. VLM ghép theo khuôn mới chưa đo (cần máy chủ).
+
 **Bộ thi `bench/accept2.json` (30 ca, seed 9001-9030):** e nút / thẻ / huy hiệu (6), h nền khó (5), k chữ khó (5), l danh sách /
 bảng / các bước (5), q ảnh sản phẩm (3), r form thường gặp (6). CHỈ chạy và chấm, không sửa mã theo từng ca của bộ này; lỗi
 thấy ở đây chỉ sửa khi nó hiện thành một con số trên tập luyện (mix1, accept1, dev2, dev3, form1).

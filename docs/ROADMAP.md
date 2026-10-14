@@ -72,14 +72,21 @@ Máy chủ
 - [x] ~~Một lượt accept2 nữa với bản vá~~ -- người dùng bỏ (14/10); bản vá kiểm tại máy trên đúng các ca lỗi.
 - [ ] VRAM đỉnh khi Hi-SAM + LaMa + FLUX chung card (lượt này không lỗi, chưa có số).
 
-## Chặng B -- Khối, bậc cỡ, chỗ trống thật (chưa bắt đầu)
+## Chặng B -- VLM ghép câu, code chép chữ và dựng theo nháp (đang làm)
 
-Cơ sở: `output/fit_probe/`. 61 bậc cỡ thì 26 bậc dựng ra lệch trên 15%; chỗ trống thật rộng 1,23 lần khung OCR.
-- [ ] Mã chia khối dòng trước khi hỏi VLM; VLM điền chữ theo khối, không gộp qua khối.
-- [ ] Bậc cỡ: các dòng nháp vẽ cùng cỡ dựng một cỡ; không dòng nào tự co riêng.
-- [ ] Chỗ của dòng = phần nền trống thật quanh dòng, không phải khung chữ giun.
-- [ ] Lời dặn và khuôn trả lời của VLM theo khối.
-- [ ] UI debug: khung khối, bậc cỡ, chỗ trống đo được.
+Chốt 14/10 (thay hướng "khối, bậc cỡ, chỗ trống thật"): nhóm lấy từ VAI câu khách trong brief, không đoán từ ảnh, không để VLM
+khai; không cắt câu khách, chữ dài thì co; nháp thiếu câu thì chịu; các bước luôn theo thứ tự khách. Cơ sở: probe 30 poster
+(`output/probe_role/`): chữ đúng câu khách 30/30, 19 tập cùng vai dựng đều. Đường cũ (VLM viết html, group): nhánh `legacy-ops-html`.
+- [x] VLM chỉ trả `assign` (câu <-> dòng, `split`, dòng lấp, keep / skip, `bullet`), `styles` theo vai, `accent`, `missing` (`lonly.SYSTEM_L`, `fill.parse`).
+- [x] `textfix/fill.py`: chép nguyên văn, một câu nhiều chỗ, dòng chưa ai ghép, chặn số bịa ở dòng lấp, thứ tự các bước (cờ `ordered` của brief).
+- [x] Hình theo nháp: khung = nét Hi-SAM, cỡ = trung vị cỡ đo, màu theo dòng, lề theo mép nét, ngắt dòng theo tỉ lệ ký tự OCR; dòng khác cỡ / mẩu cùng hàng.
+- [x] Tập cùng vai (cỡ nháp đôi một lệch <= 1,25): một cỡ, một màu, một lề, một mức nén theo mục chật nhất (`render.render_units`).
+- [x] Bỏ: html VLM, `_guard`, `validate`, `marks_rule`, `split_far`, `fix_ops`, nhóm / cân cỡ / căn lề của render, `_pack_lists`, `_list_order`.
+- [x] UI debug: đơn vị chữ (màu = tập), bảng câu ↔ dòng, cỡ / co từng phần tử; `scripts/lonly_replay.py` dựng lại plan cũ qua `fill.from_ops`.
+- [x] Dựng lại tại máy 30 accept2 + 35 mix1c (lệnh VLM cũ qua `fill.from_ops`): 0 tập lệch cỡ, chữ đúng nguyên văn; câu thiếu đều đã thiếu trong lệnh cũ.
+- [x] VLM không nhận chữ OCR (người dùng 14/10); số bước đặt lại theo thứ tự khách; `engine.design` chạy trơn với VLM giả.
+- [ ] Hi-SAM phân cấp (từ / dòng) chia dòng thay OCR: tick sát chữ, hai cột gộp, một khung hai hàng.
+- [ ] Máy chủ: một lượt accept2 với lời dặn mới, xem 100% ảnh, so lượt 1014_040431.
 
 ## Chặng C -- Thi
 
