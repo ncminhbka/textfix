@@ -1,0 +1,83 @@
+# Lộ trình: TextFix chỉ sửa chữ, Hi-SAM + LaMa thay bản xoá FLUX
+
+Bắt đầu 14/10/2026. Tệp này là nguồn duy nhất cho câu hỏi "đang ở đâu, còn gì". Mỗi việc xong thì tick, kèm một dòng số đo
+nếu có. Đường cũ (bản xoá FLUX) nằm ở nhánh git `legacy-flux-erase`, không so sánh, không phát triển.
+
+## Đã chốt (người dùng, 14/10)
+
+- TextFix **chỉ sửa chữ**. Vỏ, nút, icon to, **icon và dấu đầu dòng**, hoạ tiết là điểm ảnh của nháp. Nháp vẽ xấu thì chịu.
+- Không bỏ dòng nào của nháp. Nháp vẽ thừa hay lặp thì VLM viết cho đủ.
+- Bỏ hẳn bản xoá FLUX trên `main`. Hi-SAM cho biết chữ ở đâu, LaMa vẽ lại nền dưới chữ.
+- Cụm nét Hi-SAM thấy mà OCR không trả dòng: thành dòng, **VLM quyết** giữ / viết lại / xoá. VLM không nhắc tới thì giữ.
+- Chữ neon quầng rộng và chữ rất nhỏ: cho chạy đã, xấu thì sửa sau.
+- Thiếu tệp Hi-SAM hoặc LaMa: báo lỗi rõ và dừng.
+- LaMa chạy **một lần** mỗi poster (gỡ mọi dòng). Dòng VLM chọn giữ được trả lại điểm ảnh nháp bằng mặt nạ, không gỡ lại.
+
+## Dây chuyền đích
+
+| # | Bước | Trạm | Ghi chú |
+|---|---|---|---|
+| 1 | LLM viết đề | điều phối | không đổi |
+| 2 | FLUX vẽ nháp | vẽ (GPU) | không đổi |
+| 3 | Hi-SAM tìm nét chữ | vẽ (GPU) | thay "FLUX xoá + dọn chữ sót" (6,5 s -> ~0,2 s) |
+| 4 | Đo dòng: OCR + dòng cong + cụm nét chưa ai nhận | thiết kế | không còn ô vỏ, ô chi tiết, dấu đầu dòng |
+| 5 | Gỡ mọi dòng: mặt nạ nét + quầng, LaMa lấp | thiết kế | một lần LaMa |
+| 6 | VLM điền chữ theo dòng: viết / giữ / xoá | thiết kế | |
+| 7 | Mã rà lệnh: chặn chữ, lấp dòng bị bỏ, tách lệnh gộp sai | thiết kế | |
+| 8 | Trả điểm ảnh nháp cho dòng được giữ | thiết kế | chỉ tính lại mặt nạ |
+| 9 | Dựng chữ, kiểm, tự sửa lỗi nặng | thiết kế | |
+
+## Chặng A -- Hi-SAM + LaMa thay bản xoá (đang làm)
+
+Mã
+- [x] Nhánh `legacy-flux-erase` giữ đường cũ (đã push).
+- [x] `textfix/hisam.py`: nạp một lần mỗi thiết bị, fp16, đọc / ghi mặt nạ. *(chạy CPU tại máy; chưa chạy trong máy chủ)*
+- [x] `lonly.erase_mask` + `lonly.erase`: nét Hi-SAM theo dòng, quầng (dải sát nét, lan đuôi nhạt trên nền phẳng), LaMa. Bỏ đường luật dự phòng. *(tại máy)*
+- [x] `slots.build(draft, ink)`: không cần bản xoá; cụm nét chưa ai nhận thành dòng `orphan`. *(tại máy)*
+- [x] Gỡ dấu đầu dòng khỏi `main`. Icon trước dòng để nguyên, mã gỡ icon khỏi lệnh VLM (`lonly.marks_rule`). Riêng chấm tròn "•" là ký tự: Hi-SAM gỡ nó cùng chữ nên dòng mới viết lại "• " (`slots._lead_dots`).
+- [x] `lonly.erase` (LaMa một lần, gỡ mọi dòng) + `lonly.settle` (trả điểm ảnh nháp cho dòng giữ, chỉ tính lại mặt nạ).
+- [x] `lonly.fill_gaps`: dòng `orphan` VLM không nhắc -> giữ; VLM ghi xoá -> xoá.
+- [x] Rào tách lệnh VLM gộp các dòng không xếp chồng (`lonly.split_far`; thử trên ca bốn thẻ: tách đúng 4 lệnh).
+- [x] Lời dặn VLM (`SYSTEM_L`): icon không phải việc của VLM, chấm tròn, dòng `orphan` (keep / text / skip). *(chưa chạy VLM thật)*
+- [x] `engine.draw` / `engine.design`: bỏ xoá FLUX và dọn chữ sót, truyền mặt nạ nét. *(chạy trọn trạm thiết kế tại máy với VLM giả)*
+- [x] `server/app.py`: nạp Hi-SAM theo card, kiểm tệp lúc khởi động, lưu `ink.png` / `ink.jpg` / `base.jpg`, bỏ `plate*`. **(CHƯA CHẠY LẦN NÀO)**
+- [x] `server/ui.html`: bỏ hai ô bản xoá; thêm "Nét chữ + mặt nạ gỡ" và "Nền đã gỡ chữ". **(chưa mở trên trình duyệt)**
+- [x] `steps.jpg` năm cột (nháp, dòng, nét chữ, nền, poster); zip báo cáo mang `ink.png` thay bản xoá. **(batch_report chưa chạy)**
+- [ ] Tờ ảnh ghép và trang HTML của `batch_report`: thêm cột nét chữ / nền.
+- [x] `audit.flags`: cờ cho dòng `orphan`, dòng gỡ theo lõi khung, lệnh gộp bị tách.
+- [x] `scripts/erase_bench.py` theo đường mới. *(tuỳ chọn `--recheck` cho số vô lý > 100%: chưa dùng được)*
+- [x] `scripts/lonly_replay.py` theo đường mới (dựng lại tại máy với lệnh VLM đã lưu).
+- [x] Xoá khỏi `main`: `cleanup.py`, `overlay.py`, `textmask.py`, `flux.erase`, 12 script chỉ đường cũ dùng.
+- [ ] Cắt nốt trong `slots.py` lời dặn và bộ mô tả của đường ô vỏ / ô chi tiết (`SYSTEM`, `describe`, phần S / I của `validate`).
+- [x] `docs/SERVER.md`, `README.md`, mục 14/10 trong `docs/TUNING.md`, `scripts/check_server.py` kiểm tệp Hi-SAM / LaMa.
+- [ ] `docs/DESIGN.md`, `PLAN_BLOCKS.md`, `SLOTS_GT.md` còn tả đường cũ: viết lại hoặc xoá.
+
+Đo tại máy (trước khi xin chạy máy chủ)
+- [x] Bước 4 trên 30 nháp accept2: 241 / 242 dòng cũ còn, 3 dòng cong còn đủ, thêm 4 cụm nét (chữ vòng trên huy hiệu trà).
+- [x] Bước 4 trên cả 65 nháp (accept2 + mix1): 531 / 532 dòng cũ còn, 7 / 7 dòng cong, 11 cụm nét ở 4 poster, 4 dòng có chấm.
+- [ ] Bước 5: mới xem mắt 10 nháp khó với luật quầng cuối (OCR đọc lại nền: 0 ký tự sót ở cả 10); chưa chạy đủ hai tập.
+- [ ] Dựng lại với lệnh VLM đã lưu: 30 poster accept2 với luật quầng đầu (xem 8, không vỡ); chưa dựng đủ 65 với luật cuối -- người dùng chọn chạy thẳng máy chủ.
+
+Máy chủ
+- [ ] Một lượt `accept2` trên `main` mới, một zip. Chấm đẹp / dùng được / hỏng, so với mốc 21 / 7 / 2.
+- [ ] VRAM khi Hi-SAM chạy chung card với FLUX và LaMa.
+
+## Chặng B -- Khối, bậc cỡ, chỗ trống thật (chưa bắt đầu)
+
+Cơ sở: `output/fit_probe/`. 61 bậc cỡ thì 26 bậc dựng ra lệch trên 15%; chỗ trống thật rộng 1,23 lần khung OCR.
+- [ ] Mã chia khối dòng trước khi hỏi VLM; VLM điền chữ theo khối, không gộp qua khối.
+- [ ] Bậc cỡ: các dòng nháp vẽ cùng cỡ dựng một cỡ; không dòng nào tự co riêng.
+- [ ] Chỗ của dòng = phần nền trống thật quanh dòng, không phải khung chữ giun.
+- [ ] Lời dặn và khuôn trả lời của VLM theo khối.
+- [ ] UI debug: khung khối, bậc cỡ, chỗ trống đo được.
+
+## Chặng C -- Thi
+
+- [ ] `bench/final1.json`, một lượt, chấm. Ngưỡng: hỏng <= 10%, không mất chữ sản phẩm, không số / giá / liên hệ bịa.
+
+## Giới hạn đã biết, chưa xử lý
+
+- Chữ neon quầng rộng: còn bóng mờ sau khi gỡ.
+- Chữ rất nhỏ: Hi-SAM thấy ít nét (chân trang accept2 e02); chế độ cắt mảnh chưa đo trên GPU.
+- Chữ chạy vòng trên con dấu / huy hiệu: OCR đọc từng mẩu, phần còn lại thành các cụm nét rời.
+- Logo kiểu thư pháp (Coca-Cola, Dove) Hi-SAM phần lớn không đánh dấu: không dùng Hi-SAM để nhận chữ sản phẩm.

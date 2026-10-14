@@ -215,7 +215,8 @@ def evaluate(only: str = "") -> dict:
         gt = json.loads((OUT / f"{k}.json").read_text(encoding="utf-8"))["items"]
         D = np.asarray(Image.open(OUT / f"{k}_draft.png").convert("RGB"))
         P = np.asarray(Image.open(OUT / f"{k}_plate.png").convert("RGB"))
-        M = slots.build(D, P)
+        ink = np.abs(D.astype(np.int16) - P.astype(np.int16)).max(2) > 40   # nét chữ = chỗ nháp giả khác nền (đáp án tuyệt đối)
+        M = slots.build(D, ink)
         for it in gt:
             gb = it["box"]
             hit = [l for l in M["L"] if _iou(l["box"], gb) > 0 and slots._cov(gb, l["box"]) >= 0.5]

@@ -41,6 +41,12 @@ def flags(plan: dict) -> list[str]:
         out.append(f"mã tự lấp {fill} dòng VLM bỏ")
     if any("gọi lại" in l and "dòng" in l for l in log):
         out.append("VLM viết thiếu dòng, đã gọi lại")
-    if any("LaMa lỗi" in l for l in log) or (plan.get("slots_mode") == "L" and not any("(LaMa)" in l for l in log)):
-        out.append("gỡ chữ không dùng LaMa (đường luật dự phòng)")
+    er = plan.get("erase") or {}
+    if er.get("orphans"):
+        out.append(f"{len(er['orphans'])} cụm nét OCR không đọc (VLM quyết giữ / xoá)")
+    core = sum(int(x) for l in (er.get("log") or []) + log for x in re.findall(r"lõi dòng (\d+)", l)[:1])
+    if core:
+        out.append(f"{core} dòng Hi-SAM không thấy nét (gỡ theo lõi khung)")
+    if sum("lệnh gộp" in l and "không xếp chồng" in l for l in log):
+        out.append("VLM gộp dòng của nhiều khối (mã đã tách)")
     return out

@@ -340,9 +340,9 @@ try { debug = localStorage.getItem("tf_debug") === "1"; } catch {}
 const PLANS = {}, LAYERS = { L: true, S: true, I: true };
 function setDebug(on) { debug = on; try { localStorage.setItem("tf_debug", on ? "1" : "0"); } catch {} if (!on && !["poster"].includes(view)) view = "poster"; show(); }
 const VIEWS = [["poster", "Poster", false], ["poster_first", "Lượt đầu (trước sửa)", true], ["draft", "Nháp FLUX", true],
-               ["plate_raw", "Bản xoá FLUX", true], ["plate", "Bản xoá đã dọn", true], ["ocr", "Ô + OCR", true],
+               ["ink", "Nét chữ + mặt nạ gỡ", true], ["base", "Nền đã gỡ chữ", true], ["ocr", "Dòng + OCR", true],
                ["ops", "Lệnh designer", true], ["steps", "Các bước", true]];
-const TN = { llm: "LLM", ve_nhap: "vẽ nháp", xoa: "xoá lớp phủ", don: "dọn chữ sót", o: "đo ô", vlm: "VLM thiết kế", dung: "dựng", duyet: "VLM sửa" };
+const TN = { llm: "LLM", ve_nhap: "vẽ nháp", net_chu: "nét chữ (Hi-SAM)", dong: "đo dòng", go_chu: "gỡ chữ (LaMa)", vlm: "VLM thiết kế", dung: "dựng", duyet: "VLM sửa" };
 function thumb(p, i) {
   const on = i === picked ? " on" : "", lab = `<div class="vlab">${i + 1}. ${esc(p.direction || "")}</div>`;
   if (p.status === "done") return `<div class="vcard${on}" onclick="picked=${i};show()"><img src="${p.poster_url}">${lab}</div>`;
@@ -357,7 +357,7 @@ function show() {
   const P = R.posters[picked];
   let h = `<div class="bar"><div class="thumbs">${R.posters.map(thumb).join("")}</div>
            <span class="dbgbox"><label class="dbg"><input type="checkbox" ${debug ? "checked" : ""} onchange="setDebug(this.checked)"> Debug</label>
-           ${R.run_id && R.status !== "running" ? `<a class="dl" href="api/runs/${R.run_id}/zip" download title="Mọi tệp debug của lượt này: yêu cầu, brief, nháp, bản xoá, ô, lệnh, poster, plan.json">Tải debug (zip)</a>` : ""}</span></div>`;
+           ${R.run_id && R.status !== "running" ? `<a class="dl" href="api/runs/${R.run_id}/zip" download title="Mọi tệp debug của lượt này: yêu cầu, brief, nháp, nét chữ, nền đã gỡ, dòng, lệnh, poster, plan.json">Tải debug (zip)</a>` : ""}</span></div>`;
   const avail = VIEWS.filter(([k, , d]) => (!d || debug) && (k === "ocr" ? P.plan_url : P[k + "_url"]));
   if (!avail.find(([k]) => k === view)) view = avail.length ? avail[0][0] : "poster";
   if (P.status === "error") h += `<p class="err">Ảnh ${picked + 1} lỗi: ${esc(P.error)}</p>`;
@@ -401,7 +401,7 @@ async function drawOcr() {
     if (!LAYERS[k]) continue;
     for (const m of pl.slots[k] || []) {
       const [x0, y0, x1, y1] = m.box, o = owner[m.id];
-      const tip = `${m.id}` + (m.ocr !== undefined ? ` · OCR: "${m.ocr}"` : "") + (m.size ? ` · ~${Math.round(m.size)}px` : "") + (m.path ? " · CHỮ CONG" : "") + (m.missed ? " · dòng OCR sót" : "") +
+      const tip = `${m.id}` + (m.ocr !== undefined ? ` · OCR: "${m.ocr}"` : "") + (m.size ? ` · ~${Math.round(m.size)}px` : "") + (m.path ? " · CHỮ CONG" : "") + (m.orphan ? " · NÉT OCR KHÔNG ĐỌC (VLM quyết)" : m.missed ? " · dòng OCR sót" : "") + (m.dot ? " · có chấm đầu dòng" : "") +
         (o ? ` → ${o.id} ${o.kind}${o.html ? `: ${plainHtml(o.html)}` : ""}` : " → (chưa có lệnh)");
       g += `<g><title>${esc(tip)}</title><rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="${KCOL[k]}22" stroke="${KCOL[k]}"
             stroke-width="${Math.max(2, W / 400)}"${o && o.kind === "skip" ? ' stroke-dasharray="8 6"' : ""}/>
@@ -429,7 +429,8 @@ function renderDebug(P, pl) {
   const errs = (pl.errors || []).map(e => `<li>${esc(e.type)} ${esc((e.ops || []).join(","))} ${esc(JSON.stringify(Object.fromEntries(Object.entries(e).filter(([k]) => !["type", "ops"].includes(k)))))}</li>`).join("");
   const errs1 = (pl.errors_first || []).length;
   el.innerHTML = `<h3>OCR nháp → ô → lệnh</h3><table><tr><th>ô</th><th>OCR đọc</th><th>cỡ</th><th>lệnh</th><th>viết</th></tr>${rows}</table>
-    <h3>Ô vỏ / chi tiết</h3><p class="muted">${(pl.slots.S || []).length} vỏ S, ${(pl.slots.I || []).length} chi tiết I · dọn chữ sót: ${esc(JSON.stringify(pl.cleanup || {}))}</p>
+    <h3>Gỡ chữ (Hi-SAM + LaMa)</h3><p class="muted">xanh lá = nét bị gỡ · vàng = phần nới / quầng · xanh dương = nét của dòng giữ · hồng = nét không thuộc dòng nào (để nguyên)</p>
+    <p class="mono">${esc(JSON.stringify(pl.erase || {}))}</p>
     <h3>Lệnh designer (${(pl.ops || []).length}) · phong cách</h3><p class="mono">${esc(JSON.stringify(pl.style || {}))}</p>
     <table><tr><th>id</th><th>loại</th><th>ô</th><th>chữ</th><th>box_style</th><th>vì sao</th></tr>${ops}</table>
     <h3>Lỗi đo được: lượt đầu ${errs1} → cuối ${(pl.errors || []).length}</h3><ul>${errs || "<li>không</li>"}</ul>

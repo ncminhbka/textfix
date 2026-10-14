@@ -33,7 +33,7 @@ for _s in (sys.stdout, sys.stderr):
 SEVERE = ("unassigned", "content_overlap", "boxes_overlap", "overflow", "low_contrast", "mark_twice")
 
 
-JPG = ("poster.png", "poster_first.png", "plate_raw.png")   # --jpg: ảnh để xem; nháp + bản xoá đã dọn giữ PNG (đo ô / gán nhãn lại)
+JPG = ("poster.png", "poster_first.png")   # --jpg: ảnh để xem; nháp + mặt nạ nét chữ giữ PNG (đo lại được)
 
 
 def _jpg(src: Path, out: Path) -> Path:
@@ -126,7 +126,7 @@ def main(argv: list[str] | None = None) -> int:
                   f" -> sửa code {'CÓ' if cf else 'không'}, vòng duyệt VLM {'CÓ' if ran else 'không'};"
                   f" lỗi nặng cuối {[(e['type'], e.get('ops')) for e in P.get('errors') or [] if e['type'] in SEVERE]}")
             for f in (["plan.json", "poster.png"] if a.light else
-                      ["plan.json", "poster.png", "poster_first.png", "draft.png", "plate_raw.png", "plate.png"]):
+                      ["plan.json", "poster.png", "poster_first.png", "draft.png", "ink.png", "base.jpg"]):
                 if (vd / f).exists():
                     src, arc = vd / f, f"{rd.name}/{vd.name}/{f}"
                     if a.jpg and f in JPG:

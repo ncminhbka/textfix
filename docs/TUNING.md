@@ -8,7 +8,7 @@
    theo loại, sửa bằng code chạy / giữ, câu thiếu (VLM khai + đo bằng mã), thời gian -> mục "Mốc" của tập.
 3. **Chấm lượt tune trước.** Tập mới là phép thử của các sửa "chờ server" / "thử": từng dòng đó đổi thành **đạt** /
    **không đạt** kèm số. Sửa không đạt thì xem lại trước khi thêm sửa mới.
-4. **Xem bằng mắt 100% ảnh** (nháp | bản xoá | poster, kèm plan khi cần). Ghi mỗi lỗi vào **bước gây ra nó**, không phải bước
+4. **Xem bằng mắt 100% ảnh** (nháp | nét chữ | nền | poster, kèm plan khi cần). Ghi mỗi lỗi vào **bước gây ra nó**, không phải bước
    nó lộ ra (chữ co nhỏ ở B4 có thể do B2.5 đo sai cỡ; chữ rác ở poster có thể do B2 xoá sót) -- truy tới số đo / lệnh cụ thể.
    Bảng "Lỗi theo bước" ghi số ảnh dính.
 5. **Xếp ưu tiên** theo số ảnh dính × độ nặng: sai / mất / bịa chữ khách > chữ rác, chữ chồng > vỡ bố cục (vỏ mất, khung sai) >
@@ -39,9 +39,9 @@ scripts/geo_synth.py (chữ cong / nghiêng / nhiều cỡ tổng hợp, đáp �
 |---|---|---|---|---|---|
 | B0 Brief | intent (poster / ảnh thường), câu khách nguyên văn, prompt FLUX, các hướng thiết kế; code giữ cam kết | `textfix/brief.py` | LLM | `SYSTEM`, `FIELD_ROLE`, `ORIENT`, luật nguyên văn / ngoặc kép / trường form / `overridden` | brief.json: câu khách đủ / thừa / sai, `log` |
 | B1 Nháp | FLUX.2-klein vẽ cả poster có chữ | `textfix/flux.py` | FLUX | prompt (B0), seed, số bước | mắt: bố cục, số hàng danh sách |
-| B2 Xoá | FLUX xoá lớp phủ + dọn chữ sót (OCR bản xoá, inpaint / FLUX vùng cắt, 2 lượt) | `flux.py`, `textfix/cleanup.py` | FLUX + OCR | `ERASE_PROMPT`, `MATCH`, `CONFIRM`, `TEXTURE` | OCR bản xoá đã dọn: chữ còn sót; mắt: vết loang |
-| B2.5 Ô | nháp − bản xoá = lớp phủ -> L dòng chữ / S vỏ / I chi tiết (+ hình học chữ, đang tắt) | `textfix/overlay.py`, `slots.py` (lines, build), `glyph.py`, `geo.py` | OCR | `DIFF`, `SHELL_*`, `SOFT_*`, `_ring`, `SNAP_MIN_W`, `TALL_MIN` | `scripts/slots_gt.py eval --vs base`, `scripts/geo_synth.py eval` |
-| B3 Designer | VLM điền ô: text / shape / icon / keep / skip; code chặn chữ | `slots.py` (plan, validate, _guard, uncovered) | VLM | `SYSTEM` designer, `PRINTED`, luật `_guard` | plan.json: `missing`, log chặn chữ |
+| B2 Nét chữ + gỡ chữ | Hi-SAM tìm nét chữ của nháp (trạm vẽ); mặt nạ nét + quầng theo dòng, LaMa lấp MỘT lần, dòng "keep" được trả điểm ảnh nháp | `textfix/hisam.py`, `lonly.py` (erase_mask, erase, settle) | Hi-SAM + LaMa | `MASK_GROW`, `WEAK`, `HALO_*` | `scripts/erase_bench.py` (ký tự OCR còn đọc được trên nền, % đổi), xem mắt `ink.jpg` / `base.jpg` |
+| B2.5 Dòng | dòng OCR + chữ cong + cụm nét OCR không đọc (`orphan`) + chấm tròn đầu dòng; không còn ô vỏ / chi tiết / dấu đầu dòng | `slots.py` (lines, build, _orphans, _lead_dots), `glyph.py`, `geo.py` | OCR | `ORPHAN_*`, `DOT_*`, ngưỡng `geo.py` | số dòng, dòng cong, cụm nét trên các nháp đã lưu |
+| B3 Designer | VLM điền chữ theo dòng: text / keep / skip (chỉ cụm nét lạ); code tách lệnh gộp sai, chặn chữ, lấp dòng bị bỏ, luật icon / chấm đầu dòng | `lonly.py` (SYSTEM_L, fix_ops, split_far, fill_gaps, marks_rule), `slots.py` (plan, validate, _guard) | VLM | `SYSTEM_L`, `STACK_GAP`, luật `_guard` | plan.json: `missing`, log chặn chữ, cờ `audit.flags` |
 | B4 Dựng + kiểm | Chromium dựng, đo lỗi, sửa bằng code (vòng duyệt VLM tắt) | `textfix/render.py`, `engine.py` | — | `CONDENSE`, `FIX_ROUNDS`, `LH_ACCENT`, `PARA_WORDS`, `CONTRAST_*` | `scripts/runs_report.py`: lỗi lượt đầu / cuối |
 
 ## Mốc dev2 (09/10, mã 3fe4022 trên server, đủ 62 ảnh)
@@ -711,6 +711,33 @@ không số / giá / liên hệ bịa. Người dùng quyết KHÔNG khoá nhi�
 - Giới hạn đã biết, KHÔNG sửa trước nghiệm thu (đã thử, hoặc cần phép đo bóng chữ): chữ chạy vòng trên con dấu, vòng tròn mảnh
   cùng màu quanh chữ bị gỡ, nút rất nhỏ, cầu vồng / hình nằm dưới tiêu đề nhoè; VLM đặt câu dài vào ô ngắn (lời dặn đã có, VLM
   không theo); VLM chồng chữ / lẫn cột trong bảng.
+
+**14/10: BỎ BẢN XOÁ FLUX -- Hi-SAM tìm nét chữ + LaMa (chặng A của docs/ROADMAP.md).** Người dùng chốt: TextFix CHỈ sửa chữ; main
+chuyển hẳn, không so hai đường (đường cũ: nhánh `legacy-flux-erase`); icon / dấu đầu dòng là của nháp; cụm nét OCR không đọc
+để VLM quyết; LaMa một lần mỗi poster.
+- [đo trước] bản xoá chỉ còn là bằng chứng cho mặt nạ: dựng mặt nạ có / không bản xoá trên 141 nháp, 1.126 dòng -- 74% dòng như
+  nhau, 21% bản xoá làm mặt nạ TO hơn (quầng, nhưng cũng loang trên nền gỗ / ảnh bị vẽ lại), 6% làm NHỎ hơn (chặn luật màu nền).
+- [đo máy chủ, 2x A30, 30 nháp accept2] Hi-SAM (SAM ViT-L + `sam_tss_l_textseg.pth`): fp16 0,17 s / ảnh, mặt nạ trùng fp32 >= 0,997,
+  đỉnh VRAM 4,4 GB (card trống). 232 dòng cần viết: không dòng nào sót hẳn; yếu nhất chân trang rất nhỏ (e02, phủ 6% ô).
+- [mã] `textfix/hisam.py`; `engine.draw` = nháp -> nét chữ (bỏ FLUX xoá + dọn chữ sót, ~6,5 s); `slots.build(draft, ink)`: dòng OCR
+  + chữ cong (nét mực = nét Hi-SAM) + `_orphans` (cụm nét chưa dòng nào nhận -> ô L `orphan`) + `_lead_dots`; `lonly.erase_mask` /
+  `erase` / `settle`; `lonly.split_far`, `marks_rule`; `fill_gaps` giữ dòng `orphan` VLM không nhắc. Xoá: `cleanup.py`, `overlay.py`,
+  `textmask.py`, `flux.erase`, đường luật `_base_rules`, bộ dò dấu đầu dòng, 12 script chỉ đường cũ dùng.
+- [đo tại máy] đo dòng mới so với ô đã lưu, 65 nháp (accept2 + mix1): 531 / 532 dòng cũ còn, 7 / 7 dòng cong, thêm 11 cụm nét ở 4
+  poster (chữ vòng trên huy hiệu trà, chữ trên ba ảnh sản phẩm), 4 dòng có chấm đầu dòng.
+- [mặt nạ, xem mắt 10 nháp khó mỗi vòng] (1) quầng trong dải sát nét so với nền của dòng: nút / thẻ nguyên, con dấu giữ vòng ngoài
+  và hạt cà phê (mix1 c01), cầu vồng nguyên (x04), nút đỏ nhỏ nguyên (f02) -- ba giới hạn cũ đã hết; (2) nền phẳng thì lan theo
+  đuôi NHẠT của quầng: chữ 3D đỏ có bóng (accept2 e04) hết bóng chữ mờ; (3) gạch nối / dấu câu trong lõi dòng cũng gỡ (e01
+  "300 Mbps - 245.000đ"); (4) quầng không lấn vùng dòng khác. ĐÃ THỬ VÀ BỎ: nền ước từ vành ngoài vùng dòng + lan mọi thứ khác
+  nền liền với nét (lòng nút, vòng con dấu thành "quầng": mặt nạ 15 -> 30% ảnh); lan cả điểm đậm (nút đỏ, hạt cà phê, đầu cầu vồng).
+- [dấu đầu dòng] icon trước dòng: Hi-SAM không coi là chữ, khung OCR không ôm -> để nguyên, mã gỡ icon khỏi lệnh VLM. Chấm tròn
+  "•": OCR gộp vào khung dòng và Hi-SAM coi là nét (accept2 r04: 3 / 3) -> gỡ cùng chữ, dòng mới mở đầu "• " (`l["dot"]`).
+- [ca người dùng gửi] VLM gộp năm dòng của bốn thẻ vào một lệnh: `split_far` tách theo cụm xếp chồng; 63 lệnh gộp của 65 poster
+  đều khe <= 0,6 nên không lệnh nào bị đụng.
+- CÒN: chữ neon quầng rộng vẫn để bóng mờ (accept2 h03); mẩu vụn nhỏ sót quanh tiêu đề cong (mix1 f02); phép đo "còn nét" bằng
+  Hi-SAM chạy lại cho số > 100%, chưa dùng được. Dựng lại tại máy mới xem 30 poster accept2 với luật quầng đầu, chưa xem đủ 65 với
+  luật cuối (người dùng chọn chạy thẳng máy chủ). CHỜ MÁY CHỦ: một lượt accept2, so mốc 21 đẹp / 7 dùng được / 2 hỏng; VRAM khi
+  Hi-SAM + LaMa chung card với FLUX.
 
 **Bộ thi `bench/accept2.json` (30 ca, seed 9001-9030):** e nút / thẻ / huy hiệu (6), h nền khó (5), k chữ khó (5), l danh sách /
 bảng / các bước (5), q ảnh sản phẩm (3), r form thường gặp (6). CHỈ chạy và chấm, không sửa mã theo từng ca của bộ này; lỗi

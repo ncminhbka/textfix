@@ -1,7 +1,7 @@
 # TextFix
 
-Poster tiếng Việt từ FLUX.2-klein. Model vẽ tốt bố cục và hình ảnh, nhưng vẽ sai chi tiết nhỏ: chữ thành "giun", icon, avatar, sao
-méo. TextFix giữ nguyên bố cục và hình của model, rồi vẽ lại sạch toàn bộ lớp chi tiết đó.
+Poster tiếng Việt từ FLUX.2-klein. Model vẽ tốt bố cục, hình ảnh, vỏ và icon, nhưng chữ thành "giun". TextFix **chỉ sửa chữ**:
+giữ nguyên mọi điểm ảnh khác của nháp, gỡ chữ giun và viết lại đúng câu của khách vào đúng chỗ model đã vẽ.
 
 ## Luồng
 
@@ -9,15 +9,15 @@ méo. TextFix giữ nguyên bố cục và hình của model, rồi vẽ lại s
 form / prompt
   -> LLM: prompt FLUX.2 (theo hướng dẫn nâng prompt của BFL) + câu của khách          textfix/brief.py
   -> FLUX.2-klein vẽ nháp                                                            textfix/flux.py
-  -> FLUX.2-klein xoá lớp phủ (lời dặn ngắn: "Remove all text from this image...")    textfix/flux.py
-  -> dọn chữ sót: OCR bản xoá, xoá nét (inpaint / FLUX vùng cắt)                       textfix/cleanup.py
-  -> nháp - bản xoá = lớp phủ -> các Ô: S# vỏ, I# chi tiết nhỏ, L# dòng chữ           textfix/overlay.py, slots.py
-  -> VLM designer: quyết mỗi ô là gì, điền nội dung + CSS (không đưa toạ độ)          textfix/slots.py
-  -> dựng HTML đúng khung từng ô trên bản xoá (Chromium), kiểm lỗi, một vòng sửa      textfix/render.py
+  -> Hi-SAM tìm nét chữ của nháp (mặt nạ từng điểm ảnh)                             textfix/hisam.py
+  -> đo DÒNG chữ: OCR + chữ cong + cụm nét OCR không đọc                              textfix/slots.py, geo.py
+  -> gỡ chữ: mặt nạ nét + quầng, LaMa lấp một lần                                     textfix/lonly.py
+  -> VLM designer điền chữ theo dòng: viết / giữ (chữ in trên sản phẩm) / xoá         textfix/lonly.py, slots.py
+  -> rà lệnh, dựng chữ đúng khung dòng trên nền (Chromium), kiểm lỗi, sửa bằng code   textfix/render.py
   -> poster
 ```
 
-Chi tiết cách làm và giới hạn đã biết: [docs/DESIGN.md](docs/DESIGN.md).
+Lộ trình và tình trạng hiện tại: [docs/ROADMAP.md](docs/ROADMAP.md). [docs/DESIGN.md](docs/DESIGN.md) tả thiết kế trước 14/10 (ô vỏ / ô chi tiết, bản xoá FLUX): chỉ còn giá trị tham khảo.
 
 ## Chạy
 
@@ -32,7 +32,6 @@ python scripts/probe.py                     # thử engine trên bench/prompts_C
 ```
 
 Chạy trên máy chủ bằng ô notebook (`%run scripts/...`): kết quả tự gói thành zip < 24 MB và tự tải về ([docs/SERVER.md](docs/SERVER.md)).
-Đo bộ tách ô bằng bộ đáp án: [docs/SLOTS_GT.md](docs/SLOTS_GT.md).
 
 ## Cấu trúc
 
@@ -40,16 +39,17 @@ Chạy trên máy chủ bằng ô notebook (`%run scripts/...`): kết quả t�
 |---|---|
 | `textfix/engine.py` | Nối toàn bộ luồng: `Engine.brief`, `make` (vẽ + sửa), `fix` (sửa nháp có sẵn) |
 | `textfix/brief.py` | LLM đầu luồng: prompt FLUX + câu khách, code giữ cam kết không bịa chữ |
-| `textfix/flux.py` | FLUX.2-klein: vẽ nháp, xoá lớp phủ, căn bản xoá theo nháp |
-| `textfix/cleanup.py` | Dọn chữ bản xoá còn sót (OCR bản xoá, xoá nét: inpaint / FLUX vùng cắt) |
-| `textfix/overlay.py` | Bản đồ lớp phủ: tách vỏ (S#) và chi tiết nhỏ (I#), đo màu, bo góc |
-| `textfix/slots.py` | Ô (dòng chữ nắn theo lớp phủ), lời dặn designer, gọi VLM, vòng sửa, nền |
+| `textfix/flux.py` | FLUX.2-klein: vẽ nháp |
+| `textfix/hisam.py` | Hi-SAM: mặt nạ nét chữ của nháp |
+| `textfix/lonly.py` | Đường chỉ dòng chữ: gỡ chữ (mặt nạ + LaMa), lời dặn VLM, rà lệnh |
+| `textfix/slots.py` | Đo dòng chữ, gọi VLM, chặn chữ sai, vòng duyệt |
 | `textfix/render.py` | Dựng HTML đúng khung ô (thẻ tiện ích icon / sao / font), kiểm lỗi |
-| `textfix/ocr.py`, `glyph.py`, `textmask.py` | OCR dòng, đo nét (cỡ, màu), mặt nạ nét chữ |
+| `textfix/ocr.py`, `glyph.py`, `geo.py` | OCR dòng, đo nét (cỡ, màu), chữ cong |
 | `textfix/fonts.py`, `icons.py` | Bộ font OFL đủ dấu tiếng Việt, bộ icon Lucide |
 | `textfix/ship.py` | Gói kết quả máy chủ thành zip < 24 MB, tự tải về trình duyệt (JupyterLab) |
 | `server/` | Máy chủ FastAPI + giao diện form |
-| `scripts/make_pairs.py`, `slots_gt.py` | Cặp nháp / bản xoá (máy chủ); bộ đáp án ô: điền sẵn, chấm (máy cá nhân) |
+| `scripts/dev_batch.py`, `batch_report.py` | Chạy một tập qua máy chủ, báo cáo + một zip |
+| `scripts/lonly_replay.py`, `erase_bench.py` | Máy cá nhân: dựng lại poster / đo bước gỡ chữ trên nháp đã lưu |
 | `tools/annotate.html` | Công cụ gán nhãn ô S / I / L / P (Chrome / Edge, ghi thẳng vào repo) |
 | `flux2/` | Mã suy luận FLUX.2 của Black Forest Labs (Apache-2.0), nguyên trạng |
 | `assets/` | Font (OFL) và icon Lucide (ISC) |

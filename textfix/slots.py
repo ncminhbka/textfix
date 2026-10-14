@@ -1,13 +1,12 @@
-"""DESIGNER "ĐIỀN Ô": nháp - bản xoá = lớp phủ model đã vẽ -> các Ô đúng toạ độ; VLM chỉ quyết mỗi ô là gì và điền cho đẹp; code
-dựng đúng khung từng ô (render.py), theo lớp vỏ -> chi tiết -> chữ.
+"""DÒNG CHỮ của nháp và việc của VLM: code đo mỗi dòng chữ thành một Ô L# đúng toạ độ; VLM chỉ quyết viết gì vào từng ô; code dựng
+đúng khung từng ô (render.py). Đường đang chạy là "chỉ dòng chữ" (lonly.py); tệp này còn giữ lời dặn và bộ mô tả của đường ô
+vỏ / ô chi tiết cũ (SYSTEM, describe, review) -- chưa cắt, xem docs/ROADMAP.md.
 
-  M = build(draft, plate)                         # S# vỏ, I# chi tiết nhỏ, L# dòng chữ (OCR nguyên khung, số đo nét)
+  M = build(draft, ink)                           # L# dòng chữ: OCR nguyên khung + số đo nét + chữ cong + cụm nét "orphan"
   P = plan(draft, M, prompt, texts, call)         # VLM: {style, ops: [{slots, kind, html, box_style, client}], missing}
   P, log = validate(P, M, texts)                 # + chặn chữ: dấu theo câu khách, chữ bịa, dòng lặp
-  base = base_image(draft, plate, M, P)           # bản xoá + dán lại pixel nháp ở dòng "keep" (chữ in trên sản phẩm / màn hình)
-  P2 = repair(draft, poster, M, P, errs, prompt, texts, call)   # có lỗi (render.check): một vòng, chỉ các lệnh / ô lỗi
 
-VLM không đưa toạ độ: chỉ trỏ id ô. Mỗi ô thuộc đúng một lệnh (lệnh chữ được gộp nhiều dòng liền nhau thành một khối).
+VLM không đưa toạ độ: chỉ trỏ id ô. Mỗi ô thuộc đúng một lệnh (lệnh chữ được gộp nhiều dòng xếp chồng thành một khối).
 """
 
 from __future__ import annotations
@@ -275,192 +274,38 @@ def _anchor(l: dict) -> tuple[float, float]:
     return ((b[0] + b[2]) / 2, (b[1] + b[3]) / 2)
 
 
-def _layers(draft: np.ndarray, plate: np.ndarray, A: np.ndarray, L: list, masks: dict) -> tuple[dict, list, list, dict, list]:
-    """Vỏ (S) và chi tiết (I) của nháp, đo theo danh sách dòng L. masks {id dòng: vùng chữ}: dòng cong / dòng OCR sót do phần hình
-    học tạo ra -- vùng chữ của chúng là CHỮ với mọi luật ở đây như dòng thường (không thành vỏ, không thành chi tiết), nhờ vậy luật
-    nào viết cho dòng thẳng cũng đúng cho dòng cong mà không cần nhánh riêng. Gắn l["shell"]. -> (O, S, I, shells, vỏ giả)."""
-    from .overlay import overlay
-    O = overlay(draft, plate, [{"box": l["box"], "poly": l["poly"],
-                                **({"mask": masks[l["id"]], "anchor": _anchor(l)} if l["id"] in masks else {})} for l in L])
-    for j, l in enumerate(L):
-        sh = next((s for s in O["S"] if j in s["lines"]), None)
-        l["shell"] = sh["id"] if sh else None
-    # VỎ GIẢ (12/10 dev3 2871 "Pool Party": một mảng chữ tiêu đề to, đặc, bị coi là vỏ -> VLM vẽ mảng trắng sau chữ): màu lòng
-    # gần trùng màu mực của dòng nằm trong nó -> đó là chữ, bỏ ô vỏ
-    fake = [s for s in O["S"] if s.get("fill") not in (None, "none") and any(
-        L[j].get("color") and float(np.linalg.norm(_hex_lab(L[j]["color"]) - s["_fill_lab"])) < SHELL_INK_DE for j in s["lines"])]
-    for s in fake:
-        for j in s["lines"]:
-            L[j]["shell"] = None
-    O["S"] = [s for s in O["S"] if not any(s is f for f in fake)]
-    for c in O["I"]:
-        if any(c.get("shell") == f["id"] for f in fake):
-            c["shell"] = None
-    S =[{k: v for k, v in s.items() if not k.startswith("_")} for s in O["S"]]
-    for s in S:
-        s["lines"] = [L[j]["id"] for j in s["lines"]]
-    shells = {s["id"]: {"mask": s["_mask"], "fill_lab": s["_fill_lab"]} for s in O["S"]}   # cho "keep" vỏ (không ghi JSON)
-    # chi tiết không bao giờ ĐÈ lên chữ; bỏ chi tiết nằm trong khung dòng (gạch đầu dòng OCR gộp vào dòng) và lồng trong chi tiết khác
-    # (dòng có vùng chữ riêng: overlay đã trừ vùng đó, không so theo khung thẳng)
-    plain = [l for l in L if l["id"] not in masks]
-    I = [c for c in O["I"] if all(_cov(c["box"], l["box"]) < 0.3 and _cov(l["box"], c["box"]) < 0.5 for l in plain)]
-    H, W = A.shape[:2]
-
-    def on(c, mk):   # mẩu vụn chạm vùng chữ của một dòng cong (cùng ngưỡng geo.apply_arcs gộp mẩu vào cung) = nét / dấu của chữ đó
-        x0, y0, x1, y1 = (int(max(0, v)) for v in c["box"])
-        sub = mk[y0:min(H, y1), x0:min(W, x1)]
-        cy, cx = int(min(H - 1, (c["box"][1] + c["box"][3]) / 2)), int(min(W - 1, (c["box"][0] + c["box"][2]) / 2))
-        return bool(mk[cy, cx]) or (sub.size > 0 and sub.mean() >= 0.08)
-    I = [c for c in I if not any(on(c, mk) for mk in masks.values())]
-    area = lambda b: (b[2] - b[0]) * (b[3] - b[1])   # noqa: E731
-    I = [c for c in I if not any(o is not c and _cov(o["box"], c["box"]) >= 0.8 and area(o["box"]) > area(c["box"]) for o in I)]
-    I = _rows(I)
-    if plain:   # vụn nhỏ hơn nửa chữ thân không phải chi tiết
-        lh = float(np.median([l["box"][3] - l["box"][1] for l in plain]))
-        I = [c for c in I if max(c["box"][2] - c["box"][0], c["box"][3] - c["box"][1]) >= DETAIL_MIN * lh]
-    for k, c in enumerate(I, 1):
-        c["id"] = f"I{k}"
-    return O, S, I, shells, fake
+DOT_MAX = 0.5    # chấm tròn đầu dòng: mảng nét đầu tiên của dòng, cạnh <= 0,5 cao dòng, gần vuông (cạnh ngắn >= 0,5 cạnh dài) ...
+DOT_GAP = 0.2    # ... cách mảng nét kế tiếp >= 0,2 cao dòng theo chiều ngang ...
+DOT_MID = (0.2, 0.8)   # ... tâm nằm ở khoảng giữa chiều cao dòng (dấu nháy ở trên, dấu chấm câu ở dưới thì không)
 
 
-ROWMARK = os.environ.get("TEXTFIX_ROWMARK", "1") != "0"   # dấu đầu dòng nhập vào ô của dòng (13/10); 0 = để thành ô I như trước
-MARK_MAX = 1.6    # dấu đầu dòng: cạnh dài <= 1.6 cao dòng (icon to hơn là hình minh hoạ / avatar: vẫn là ô I riêng)
-MARK_SQUARE = 0.4   # ... và gọn: cạnh ngắn >= 0.4 cạnh dài (chấm, tick, icon đều gần vuông)
-MARK_GAP = 1.2    # ... cách mép trái dòng <= 1.2 cao dòng, tâm nằm trong chiều cao dòng (nới 0.25 cao)
-
-
-MARK_REACH = 2.4   # dò dấu trên NHÁP: cửa sổ bên trái dòng rộng 2,4 cao dòng
-MARK_SEP = 0.12    # ... cách mép trái dòng >= 0,12 cao dòng (sát hơn là mẩu của chữ cái đầu dòng)
-MARK_ALONE = 0.3   # dấu nhỏ hơn 0,3 cao dòng (chấm tròn) chỉ nhận khi >= 2 dòng có dấu thẳng cột (danh sách); to hơn thì nhận lẻ
-MARK_MIN = 0.12    # ... dấu có cạnh dài >= 0,12 cao dòng (nhỏ hơn là hạt nhiễu)
-MARK_FLAT = 6.0    # ... nền cửa sổ phẳng: trung vị cách màu nền <= 6 ΔE (trên ảnh chụp không dò)
-MARK_DE = 25.0     # ... dấu khác màu nền >= 25 ΔE
-
-
-def _draft_marks(L: list, I: list, A: np.ndarray, img: np.ndarray, only: set | None = None) -> tuple[list, list[str]]:
-    """DẤU ĐẦU DÒNG DÒ NGAY TRÊN NHÁP, không qua danh sách chi tiết của lớp phủ. 14/10: 507 dòng của accept2 + mix1 chỉ 8 dòng
-    được gắn dấu trong khi VLM viết dấu ở 27 dòng; đo 9 dòng có dấu: bản xoá gỡ dấu 6 / 9 mà mã không gắn dòng nào (dấu rơi ở
-    bộ lọc chi tiết, hoặc dòng bị coi là nghiêng). Chế độ chỉ dòng chữ: dấu không thuộc dòng thì không được gỡ, VLM lại viết
-    thêm một dấu -> "● • Quét mã QR". Luật: mảng nhỏ, gọn, khác màu nền, nằm TRỌN trong dải cao của dòng ngay bên trái dòng,
-    trên nền phẳng, không đụng ô dòng khác. Mảng chạm mép trên / dưới / trái cửa sổ là hình to hơn dòng (icon to, ảnh): bỏ.
-    only: chỉ xét các dòng này và NỚI luật (bỏ điều kiện thẳng cột / đọc ra số) -- dùng khi đã có bằng chứng thứ hai là VLM
-    viết dấu đầu dòng cho đúng dòng đó (lonly.lead_marks). -> (I đã bỏ chi tiết trùng dấu, log)."""
+def _lead_dots(L: list, ink: np.ndarray) -> list[str]:
+    """CHẤM TRÒN ĐẦU DÒNG LÀ KÝ TỰ CỦA DÒNG (14/10): OCR gộp "•" vào khung dòng và Hi-SAM coi nó là nét chữ, nên nó bị gỡ cùng
+    chữ. Ghi l["dot"] = True để dòng chữ mới mở đầu bằng "• " (lonly.marks_rule). Icon, tick, hình nhỏ trước dòng KHÔNG phải nét
+    chữ: không dò, không gỡ, không vẽ lại -- TextFix chỉ sửa chữ (người dùng chốt 14/10)."""
     import cv2
-    H, W = A.shape[:2]
-    taken = np.zeros((H, W), bool)
+    H, W = ink.shape
+    log = []
     for l in L:
-        x0, y0, x1, y1 = (int(v) for v in l["box"])
-        taken[max(0, y0):y1, max(0, x0):x1] = True
-    log, found = [], []
-    for l in L:
-        if l.get("mark") or l.get("path") or l.get("vertical") or abs(l.get("angle") or 0) >= 2:
-            continue
-        if only is not None and l["id"] not in only:
+        if l.get("path") or l.get("orphan") or l.get("vertical") or abs(l.get("angle") or 0) >= 2:
             continue
         x0, y0, x1, y1 = (int(round(v)) for v in l["box"])
         h = y1 - y0
-        wx0, wy0, wy1 = max(0, x0 - int(MARK_REACH * h)), max(0, y0 - int(0.1 * h)), min(H, y1 + int(0.1 * h))
-        if h < 8 or x0 - 2 - wx0 < 6:
+        if h < 8 or x1 - x0 < 2 * h:
             continue
-        a, tk = A[wy0:wy1, wx0:x0 - 2], taken[wy0:wy1, wx0:x0 - 2]
-        free = a[~tk]
-        if len(free) < 30:
+        sub = ink[max(0, y0):min(H, y1), max(0, x0):min(W, x1)].astype(np.uint8)
+        n, _cc, st, _c = cv2.connectedComponentsWithStats(sub, 8)
+        comps = sorted((st[i] for i in range(1, n) if st[i][4] >= 6), key=lambda t: t[0])
+        if len(comps) < 3:
             continue
-        d = np.linalg.norm(a - np.median(free, axis=0), axis=2)
-        if float(np.median(d[~tk])) > MARK_FLAT:
-            continue
-        n, cc, st, _c = cv2.connectedComponentsWithStats(((d > MARK_DE) & ~tk).astype(np.uint8), 8)
-        best, cands = None, 0
-        for i in range(1, n):
-            bx, by, bw, bh = (int(v) for v in st[i][:4])
-            side = max(bw, bh)
-            if not (MARK_MIN * h <= side <= MARK_MAX * h) or min(bw, bh) < MARK_SQUARE * side:
-                continue
-            gap = a.shape[1] - (bx + bw)
-            # sát mép phải cửa sổ = mẩu của chữ cái đầu dòng (khung OCR cắt vào chữ); chạm mép trên / dưới / trái = hình to hơn dòng
-            if bx == 0 or by == 0 or by + bh >= a.shape[0] or gap > MARK_GAP * h or gap < MARK_SEP * h:
-                continue
-            if tk[by:by + bh, bx:bx + bw].any():
-                continue
-            cands += 1
-            if best is None or bx > best[0]:
-                best = (bx, by, bw, bh)
-        if best is None or cands >= 3:   # ba mảng trở lên trong một dải: hàng chấm nối / hoạ tiết lặp, không phải dấu của dòng
-            continue
-        bx, by, bw, bh = best
-        tiny = max(bw, bh) < MARK_ALONE * h
-        # chấm nhỏ mà trong dải còn >= 3 chấm li ti khác: hàng chấm nối tên - giá của thực đơn (accept1 c03)
-        if tiny and sum(1 for i in range(1, n) if max(st[i][2], st[i][3]) < MARK_ALONE * h and st[i][4] >= 2) >= 3:
-            continue
-        # nằm lọt trong khung của một mảng khác (ký tự / hình trong vòng tròn): dấu là cả VÒNG; vòng quá cỡ thì không phải dấu
-        outer = [st[i] for i in range(1, n) if st[i][0] <= bx and st[i][1] <= by and st[i][0] + st[i][2] >= bx + bw
-                 and st[i][1] + st[i][3] >= by + bh and (st[i][2], st[i][3]) != (bw, bh)]
-        if outer:
-            ox, oy, ow, oh = (int(v) for v in max(outer, key=lambda t: t[2] * t[3])[:4])
-            if max(ow, oh) > MARK_MAX * h or ox == 0 or oy == 0 or oy + oh >= a.shape[0]:
-                continue
-            bx, by, bw, bh = ox, oy, ow, oh
-            best, tiny = (bx, by, bw, bh), False
-        # dấu to mà đọc ra chữ / số: SỐ BƯỚC trong vòng tròn ("①"), chữ cái trang trí -- là nội dung, không phải dấu để vẽ lại
-        if not tiny and only is None:
-            from .ocr import read_rect
-            t, sc = read_rect(img, (wx0 + bx + bw / 2, wy0 + by + bh / 2), bw * 1.2, bh * 1.2, 0.0)
-            if sc >= 0.5 and any(ch.isalnum() for ch in t):
-                continue
-        bx, by, bw, bh = best
-        found.append((l, [wx0 + bx, wy0 + by, wx0 + bx + bw, wy0 + by + bh]))
-    # chấm nhỏ đứng lẻ là hạt trang trí / nhiễu; chấm của danh sách thì thẳng cột với chấm của dòng khác
-    col = lambda mb: (mb[0] + mb[2]) / 2   # noqa: E731
-    tall = lambda l: l["box"][3] - l["box"][1]   # noqa: E731
-    found = [(l, mb) for l, mb in found if only is not None or max(mb[2] - mb[0], mb[3] - mb[1]) >= MARK_ALONE * tall(l)
-             or any(o is not l and abs(col(mb) - col(ob)) <= 0.5 * tall(l) for o, ob in found)]
-    for l, mb in found:
-        b = l["box"]
-        l["mark"] = {"box": [float(v) for v in mb], "color": None, "from": "draft"}
-        l["box"] = [float(min(b[0], mb[0])), b[1], b[2], b[3]]
-        l["ocr_box"] = list(l["box"])
-        l["poly"] = [[l["box"][0], b[1]], [b[2], b[1]], [b[2], b[3]], [l["box"][0], b[3]]]
-        log.append(f"dấu đầu dòng trên nháp {[round(v) for v in mb]} -> nhập vào {l['id']}")
-    inside = lambda c, mb: min(c[2], mb[2]) > max(c[0], mb[0]) and min(c[3], mb[3]) > max(c[1], mb[1])   # noqa: E731
-    return [c for c in I if not any(inside(c["box"], mb) for _l, mb in found)], log
-
-
-def _row_marks(L: list, I: list) -> tuple[list, list[str]]:
-    """DẤU ĐẦU DÒNG (chấm, tick, icon nhỏ ngay bên trái một dòng, cùng hàng) nhập vào Ô CỦA DÒNG ĐÓ: khung dòng nới sang trái ôm
-    cả dấu, l["mark"] ghi lại; chi tiết đó không còn là ô I. Lý do (13/10 run 1f85, 93f1): dấu và chữ là hai lệnh rời thì lệch
-    cỡ, lệch hàng, dấu còn chữ mất hoặc ngược lại; OCR vốn đã gộp chấm "•" vào dòng ở nhiều poster nên cùng một danh sách có
-    hàng ôm dấu, hàng không -> lề thò thụt. Icon to / đứng xa / không nằm bên trái dòng nào giữ nguyên là ô I. -> (I còn lại, log)."""
-    log, rest = [], []
-    for c in I:
-        x0, y0, x1, y1 = c["box"]
-        cy, side = (y0 + y1) / 2, max(x1 - x0, y1 - y0)
-        best = None
-        if min(x1 - x0, y1 - y0) < MARK_SQUARE * side:   # mảnh dẹt / dài: nét viền khung quanh dòng (dev2 99a1), gạch kẻ -- không phải dấu
-            rest.append(c)
-            continue
-        for l in L:
-            if l.get("path") or abs(l.get("angle") or 0) >= 2 or l.get("shell") != c.get("shell"):
-                continue
-            lx0, ly0, lx1, ly1 = l["box"]
-            h = ly1 - ly0
-            gap = lx0 - x1
-            if ly0 - 0.25 * h <= cy <= ly1 + 0.25 * h and -0.3 * h <= gap <= MARK_GAP * h and side <= MARK_MAX * h and x0 < lx0 \
-                    and (best is None or gap < best[0]):
-                best = (gap, l)
-        if best is None:
-            rest.append(c)
-            continue
-        l = best[1]
-        b = l["box"]
-        mb = (l.get("mark") or {}).get("box") or c["box"]
-        l["mark"] = {"box": [min(mb[0], x0), min(mb[1], y0), max(mb[2], x1), max(mb[3], y1)], "color": c.get("color")}
-        l["box"] = [min(b[0], x0), b[1], b[2], b[3]]
-        l["ocr_box"] = list(l["box"])
-        l["poly"] = [[l["box"][0], b[1]], [b[2], b[1]], [b[2], b[3]], [l["box"][0], b[3]]]
-        log.append(f"dấu đầu dòng {c['id']} {[round(v) for v in c['box']]} -> nhập vào {l['id']}")
-    for k, c in enumerate(rest, 1):
-        c["id"] = f"I{k}"
-    return rest, log
+        bx, by, bw, bh = (int(v) for v in comps[0][:4])
+        nxt = min(int(c[0]) for c in comps[1:])
+        mid = (by + bh / 2) / max(1, sub.shape[0])
+        if max(bw, bh) <= DOT_MAX * h and min(bw, bh) >= 0.5 * max(bw, bh) and nxt - (bx + bw) >= DOT_GAP * h \
+                and DOT_MID[0] <= mid <= DOT_MID[1]:
+            l["dot"] = True
+            log.append(f"{l['id']}: chấm tròn đầu dòng (ký tự của dòng, gỡ cùng chữ)")
+    return log
 
 
 def _xy_order(boxes: list, texts: list | None = None) -> list[int]:
@@ -539,69 +384,93 @@ def _renumber(L: list, S: list, I: list, logs: list[str]) -> tuple[list, list[st
     return out, [sub(t) for t in logs]
 
 
-def build(draft: np.ndarray, plate: np.ndarray, product: bool = False) -> dict:
-    """Ô của nháp: L# (dòng OCR nguyên khung + số đo nét, vỏ chứa nó), S# vỏ, I# chi tiết nhỏ (overlay.overlay)."""
+ORPHAN_MIN = 0.012   # cụm nét chưa dòng nào nhận: cao >= 1,2% cạnh ngắn ảnh ...
+ORPHAN_PX = 80       # ... và >= 80 điểm nét (nhỏ hơn là hạt nhiễu, để nguyên)
+ORPHAN_MAX = 8       # nhiều nhất 8 cụm to nhất mỗi poster thành dòng (chữ li ti trên bao bì, biển hiệu trong ảnh nền: để nguyên)
+
+
+def build(draft: np.ndarray, ink: np.ndarray, product: bool = False) -> dict:
+    """Ô của nháp: L# = dòng chữ. ink = nét chữ của Hi-SAM (hisam.strokes), nguồn duy nhất cho biết chữ ở đâu ở mức điểm ảnh
+    (14/10: không còn bản xoá FLUX, không còn ô vỏ S / ô chi tiết I -- vỏ và icon là điểm ảnh của nháp).
+      1. dòng OCR nguyên khung + số đo nét;
+      2. hình học (geo.py): chữ chạy theo cung -> một ô L có đường chân; vùng chữ của bộ dò mà OCR không trả dòng nào -> ô L mới;
+      3. CỤM NÉT CHƯA DÒNG NÀO NHẬN (Hi-SAM thấy chữ, OCR không): thành ô L "orphan" để VLM quyết giữ / viết lại / xoá
+         (người dùng chốt 14/10). VLM không nhắc tới thì GIỮ nguyên điểm ảnh nháp (lonly.fill_gaps)."""
     H, W = draft.shape[:2]
+    ink = np.asarray(ink, bool)
     L = lines(draft)
     A = _lab(draft)
     for l in L:
         # KHUNG DÒNG = KHUNG OCR, nguyên bản (12/10: bỏ hẳn bước nắn khung theo nét mực -- trên nền ảnh chụp nét mực đo thiếu,
-        # khung bị cắt hẹp / đẩy mép trái vào mỗi dòng một kiểu: 11-25% dòng, danh sách thò thụt, chữ co). Bản xoá là xoá cả
-        # ảnh nên dấu thanh nhô khỏi khung không đè vào đâu; vòng co của render chỉ kiểm tràn NGANG với dòng đơn.
+        # khung bị cắt hẹp / đẩy mép trái vào mỗi dòng một kiểu: 11-25% dòng, danh sách thò thụt, chữ co).
         l["ocr_box"] = list(l["box"])
-    O, S, I, shells, fake = _layers(draft, plate, A, L, {})
-    # HÌNH HỌC CHỮ (geo.py): chữ chạy theo cung (OCR cắt mẩu / bỏ hai đầu cung) -> một ô L cung; một dòng nhiều cỡ OCR tách mẩu
-    # -> một ô L có runs. Nét chữ dò cung: lớp phủ ngoài vỏ + trong vỏ điểm khác màu lòng vỏ.
+        l["shell"] = None
+    I: list = []
     from . import geo
-    glog, glog2 = [], []
+    glog, glog2, masks = [], [], {}
     if geo.ENABLED:
-        L, I, glog, masks = _geo_lines(L, I, draft, A, _lab(plate), list(shells.values()), missed=not product)
-        if masks:
-            # DÒNG MỚI VÀO ĐẦU NGUỒN (13/10): phần hình học vừa tạo dòng (cong / OCR sót) -> đo lại vỏ và chi tiết với danh sách
-            # dòng CUỐI. Trước đó vỏ / chi tiết đo khi chưa biết các dòng này: chữ "KHÓ" đậm của một dòng cong thành "vỏ" nâu,
-            # luật vỏ giả không có dòng nào để so, rồi luật "vỏ chứa chữ thì vẽ lại" tô nâu đè lên chữ (run 1077).
-            O, S, I, shells, fake = _layers(draft, plate, A, L, masks)
+        L, I, glog, masks = _geo_lines(L, I, draft, A, ink, [])
         if geo.RUNS:
             L, glog2 = geo.runs(L)
-    mlog = []
-    if ROWMARK:
-        I, mlog = _row_marks(L, I)
-        I, dlog = _draft_marks(L, I, A, draft)
-        mlog += dlog
-    for s in S:   # dòng trong vỏ: tính lại theo điểm trên dòng (ô đã gộp; dòng cong: điểm giữa chữ, không phải tâm khung thẳng)
-        x0, y0, x1, y1 = s["box"]
-        s["lines"] = [l["id"] for l in L if x0 <= _anchor(l)[0] <= x1 and y0 <= _anchor(l)[1] <= y1]
-    for s in S:
-        s["icons"] = [c["id"] for c in I if c["shell"] == s["id"]]
-    for s in S:   # vỏ này GIỮ được điểm ảnh nháp không (lấp được nét chữ cũ bằng màu lòng)
-        s["keepable"] = _keepable(A, shells[s["id"]], [l["box"] for l in L if l["id"] in s["lines"]])
-    for c in I:   # quan hệ với dòng gần nhất (gợi ý cho VLM: avatar cạnh tên, sao dưới tên, icon đầu dòng)
-        cx, cy = (c["box"][0] + c["box"][2]) / 2, (c["box"][1] + c["box"][3]) / 2
-        best = None
-        # dòng CÙNG HÀNG trước (13/10 run 1f85: ba icon ngay bên trái ba dòng tính năng đều bị ghi "below L5" vì dòng mô tả dài
-        # phía trên gần hơn theo khoảng cách -> VLM đặt icon lệch hàng), rồi mới tới dòng gần nhất
-        row = [l for l in L if l["box"][1] <= cy <= l["box"][3]]
-        for l in row or L:
-            x0, y0, x1, y1 = l["box"]
-            dx, dy = max(x0 - cx, 0, cx - x1), max(y0 - cy, 0, cy - y1)
-            d = float(np.hypot(dx, dy))
-            if best is None or d < best[0]:
-                side = "left of" if cx < x0 and dx >= dy else "right of" if cx > x1 and dx >= dy else "above" if cy < y0 else \
-                    "below" if cy > y1 else "on"
-                best = (d, l["id"], side)
-        c["near"] = f"{best[2]} {best[1]}" if best and best[0] <= 3 * max(8.0, c["box"][3] - c["box"][1]) else None
-    L, glog = _renumber(L, S, I, glog + glog2 + mlog)
-    # mask: lớp phủ (nháp - bản xoá đã dọn), cho "keep" dán lại trọn mảng bị xoá (không ghi JSON)
-    return {"L": L, "S": S, "I": I, "size": [W, H], "by": {m["id"]: m for m in L + S + I}, "mask": O["mask"], "shells": shells,
-            "geo_log": glog + [f"vỏ giả (màu lòng = màu chữ) {[round(v) for v in f['box']]} -> bỏ ô vỏ" for f in fake]}
+    L, olog = _orphans(L, draft, ink, masks)
+    mlog = _lead_dots(L, ink)
+    L, glog = _renumber(L, [], [], glog + glog2 + olog + mlog)
+    return {"L": L, "S": [], "I": [], "size": [W, H], "by": {m["id"]: m for m in L}, "mask": ink, "shells": {}, "geo_log": glog}
 
 
-def _geo_lines(L: list, I: list, draft: np.ndarray, A: np.ndarray, Bp: np.ndarray, shells: list,
+def _orphans(L: list, draft: np.ndarray, ink: np.ndarray, masks: dict) -> tuple[list, list[str]]:
+    """Mảng nét Hi-SAM không chạm vùng của dòng nào -> gom các mảng gần nhau (đóng hình thái 0,8 cao nét) -> ô L "orphan". Chữ đọc bằng bộ đọc
+    của OCR (đọc không ra: để rỗng -- vẫn là ô, VLM nhìn ảnh mà quyết)."""
+    import cv2
+    from . import lonly, ocr
+    H, W = ink.shape
+    zone = np.zeros((H, W), bool)
+    for l in L:
+        zone |= masks[l["id"]] if l["id"] in masks else lonly._region(l, H, W, 0.3)
+    n, cc, st, _c = cv2.connectedComponentsWithStats(ink.astype(np.uint8), 8)
+    taken = np.unique(cc[zone & ink])
+    rest = ink & ~np.isin(cc, taken[taken > 0])
+    hs = [int(st[i, cv2.CC_STAT_HEIGHT]) for i in np.unique(cc[rest]) if i > 0 and st[i, cv2.CC_STAT_HEIGHT] >= 4]
+    if not hs:
+        return L, []
+    hm = float(np.median(hs))
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * int(round(0.8 * hm)) + 1, 2 * int(round(0.8 * hm)) + 1))   # mọi hướng: chữ chạy vòng
+    nb, bc, bst, _c = cv2.connectedComponentsWithStats(cv2.morphologyEx(rest.astype(np.uint8), cv2.MORPH_CLOSE, k), 8)
+    found = []
+    for i in range(1, nb):
+        sel = rest & (bc == i)
+        px = int(sel.sum())
+        ys, xs = np.nonzero(sel)
+        if px < ORPHAN_PX or (ys.max() + 1 - ys.min()) < ORPHAN_MIN * min(W, H):
+            continue
+        found.append((px, sel, [float(xs.min()), float(ys.min()), float(xs.max() + 1), float(ys.max() + 1)]))
+    found.sort(key=lambda t: -t[0])
+    log = []
+    if len(found) > ORPHAN_MAX:
+        log.append(f"cụm nét chưa dòng nào nhận: {len(found)} cụm, chỉ {ORPHAN_MAX} cụm to nhất thành ô, còn lại để nguyên")
+    for px, sel, box in found[:ORPHAN_MAX]:
+        x0, y0, x1, y1 = box
+        text = ocr.read_region(draft, (((x0 + x1) / 2, (y0 + y1) / 2), (x1 - x0, y1 - y0), 0.0))
+        ch = [int(st[j, cv2.CC_STAT_HEIGHT]) for j in np.unique(cc[sel]) if j > 0 and st[j, cv2.CC_STAT_HEIGHT] >= 4]
+        gh = float(np.median(ch)) if ch else (y1 - y0)
+        caps = bool(text) and sum(c.isupper() or c.isdigit() for c in text if c.isalnum()) >= 0.8 * max(1, sum(c.isalnum() for c in text))
+        col = np.median(draft[sel], axis=0)
+        new = {"id": f"L{1 + max([int(l['id'][1:]) for l in L] or [0])}", "box": box, "ocr_box": list(box),
+               "poly": [[x0, y0], [x1, y0], [x1, y1], [x0, y1]], "ocr": text, "base": None,
+               "size": float(min(gh, y1 - y0) / (CAP_EM if caps or not text else 0.62)), "color": "#%02x%02x%02x" % tuple(int(v) for v in col),
+               "angle": 0.0, "caps": caps, "stroke": None, "stroke_contrast": None, "effect": None, "shell": None,
+               "missed": True, "orphan": True}
+        L = L + [new]
+        log.append(f"cụm nét chưa dòng nào nhận: {[round(v) for v in box]} ({px} điểm nét) đọc {text!r} -> {new['id']} (VLM quyết giữ / viết / xoá)")
+    return L, log
+
+
+def _geo_lines(L: list, I: list, draft: np.ndarray, A: np.ndarray, ink0: np.ndarray, shells: list,
                missed: bool = True) -> tuple[list, list, list[str], dict]:
     """CHỮ HÌNH DẠNG KHÓ từ VÙNG CHỮ của bộ dò (ocr.regions: bản đồ của chính RapidOCR trước khi bị ép khung 4 điểm). Đo trên 1307
     vùng của 162 nháp (12/10): mọi vùng hiển thị võng >= 0.3 cao dòng đều là chữ cong thật (dòng thẳng <= 0.24).
       (a) vùng CONG -> MỘT ô L có đường chân, gộp các mẩu OCR và chi tiết nằm trên nó;
-      (b) vùng KHÔNG có dòng OCR nào, bị bước xoá gỡ (là lớp phủ, không phải chữ in trên vật) và bộ đọc đọc ra chữ -> ô L mới
+      (b) vùng KHÔNG có dòng OCR nào, có nét chữ Hi-SAM (>= 10% vùng) và bộ đọc đọc ra chữ -> ô L mới
           (dòng to bị OCR bỏ ở khâu ép khung: "FLASH SALE", dòng giữa của nhãn dán), thay các ô chi tiết vụn nằm trong nó.
           KHÔNG làm khi khách tải ảnh sản phẩm (missed=False): chữ in trên sản phẩm cũng bị bước xoá gỡ và cũng "không có dòng
           OCR" (12/10: con dấu bánh pía "DAU", chữ dọc trên lon) -- các ô chi tiết + "keep" đang lo đúng phần đó.
@@ -609,11 +478,8 @@ def _geo_lines(L: list, I: list, draft: np.ndarray, A: np.ndarray, Bp: np.ndarra
     lại vỏ / chi tiết với các vùng này là CHỮ (xem _layers)."""
     import cv2
     from . import geo, ocr
-    from .overlay import DIFF
     H, W = A.shape[:2]
-    ink = cv2.GaussianBlur(np.linalg.norm(A - Bp, axis=2), (0, 0), 1.0) > DIFF   # nét mực = chỗ bước xoá đã gỡ
-    for sh in shells:
-        ink[sh["mask"]] = (np.linalg.norm(A - sh["fill_lab"], axis=2) > INK_IN_SHELL)[sh["mask"]]
+    ink = np.asarray(ink0, bool)   # nét mực = nét chữ của Hi-SAM (14/10; trước: chỗ bước xoá FLUX đã gỡ)
     found, log, masks = [], [], {}
     cen_in = lambda b, m: bool(m[int(min(H - 1, max(0, (b[1] + b[3]) / 2))), int(min(W - 1, max(0, (b[0] + b[2]) / 2)))])   # noqa: E731
     regs = ocr.regions(draft)
@@ -678,7 +544,6 @@ def _geo_lines(L: list, I: list, draft: np.ndarray, A: np.ndarray, Bp: np.ndarra
             masks[new["id"]] = part
             log.append(f"dòng OCR sót: vùng chữ {[round(x) for x in pbox]} đọc {text!r} + {[c['id'] for c in gone]} -> {new['id']}")
     L, I, lg = geo.apply_arcs(L, I, found, CAP_EM)
-    edge = np.linalg.norm(A - Bp, axis=2)
     for l in L:
         mk = l.pop("_mask", None)
         if mk is None:
@@ -697,7 +562,8 @@ def _geo_lines(L: list, I: list, draft: np.ndarray, A: np.ndarray, Bp: np.ndarra
         # được thì không có màu): các điểm bị gỡ đổi màu mạnh nhất = lõi nét, không lẫn quầng
         sel = ink & mk
         if int(sel.sum()) >= 50:
-            core = sel & (edge >= np.percentile(edge[sel], 60))
+            core = sel & (cv2.erode(ink.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0)   # lõi nét, không lẫn viền khử răng cưa
+            core = core if int(core.sum()) >= 30 else sel
             l["color"] = "#%02x%02x%02x" % tuple(int(v) for v in np.median(draft[core], axis=0))
     return L, I, log + lg, masks
 
@@ -743,27 +609,14 @@ def _stacked(near: np.ndarray, ink: np.ndarray, tilt: float, ext: float) -> list
     return out
 
 
-def attach_geo(M: dict, draft: np.ndarray, plate: np.ndarray, product: bool = False) -> list[str]:
-    """M đọc từ plan.json: chạy phần đo chữ theo cung trên các ô ĐÃ LƯU (không OCR lại) -> đổi M["L"], M["I"], M["by"] tại chỗ,
-    trả log. Dùng cho đo / dựng lại tại máy (scripts/geo_measure.py)."""
-    if "shells" not in M:
-        attach_shells(M, draft, plate)
+def attach_geo(M: dict, draft: np.ndarray, ink: np.ndarray, product: bool = False) -> list[str]:
+    """M đọc từ plan.json: chạy phần đo chữ theo cung trên các ô ĐÃ LƯU (không OCR lại) -> đổi M["L"], M["by"] tại chỗ, trả log.
+    Dùng cho đo / dựng lại tại máy."""
     for l in M["L"]:
         l.setdefault("poly", [[l["box"][0], l["box"][1]], [l["box"][2], l["box"][1]], [l["box"][2], l["box"][3]], [l["box"][0], l["box"][3]]])
-    A = _lab(draft)
-    L, I, log, masks = _geo_lines(M["L"], M["I"], draft, A, _lab(plate), list(M["shells"].values()), missed=not product)
-    if masks:   # như build: có dòng mới thì đo lại vỏ / chi tiết với danh sách dòng cuối
-        O, S, I, shells, fake = _layers(draft, plate, A, L, masks)
-        for s_ in S:
-            x0, y0, x1, y1 = s_["box"]
-            s_["lines"] = [l["id"] for l in L if x0 <= _anchor(l)[0] <= x1 and y0 <= _anchor(l)[1] <= y1]
-            s_["icons"] = [c["id"] for c in I if c["shell"] == s_["id"]]
-            s_["keepable"] = _keepable(A, shells[s_["id"]], [l["box"] for l in L if l["id"] in s_["lines"]])
-        log += [f"đo lại vỏ / chi tiết theo dòng mới: S {[[round(v) for v in x['box']] for x in M['S']]} -> "
-                f"{[[round(v) for v in x['box']] for x in S]}, I {len(M['I'])} -> {len(I)}"]
-        M["S"], M["shells"], M["mask"] = S, shells, O["mask"]
-    M["L"], M["I"] = L, I
-    M["by"] = {m["id"]: m for m in L + M["S"] + I}
+    L, I, log, masks = _geo_lines(M["L"], [], draft, _lab(draft), ink, [])
+    M["L"], M["I"] = L, []
+    M["by"] = {m["id"]: m for m in L}
     return log
 
 
@@ -784,56 +637,9 @@ def _hex_lab(hx: str) -> np.ndarray:
     return _lab(np.uint8([[[int(hx[i:i + 2], 16) for i in (1, 3, 5)]]]))[0, 0]
 
 
-def _line_zone(shape, box) -> tuple[slice, slice]:
-    """Vùng nét của một dòng: khung OCR nới 0.3 cao mỗi bên, 0.6 cao phía trên (dấu thanh nhô khỏi khung)."""
-    H, W = shape[:2]
-    x0, y0, x1, y1 = box
-    h = y1 - y0
-    return (slice(int(max(0, y0 - 0.6 * h)), int(min(H, y1 + 0.3 * h))), slice(int(max(0, x0 - 0.3 * h)), int(min(W, x1 + 0.3 * h))))
-
-
-def _shell_ink(A: np.ndarray, sh: dict, boxes: list) -> np.ndarray:
-    """Mặt nạ NÉT CHỮ CŨ trong một vỏ: điểm trong vỏ, trong vùng nét của các dòng, khác màu lòng vỏ >= INK_IN_SHELL."""
-    ink = np.zeros(A.shape[:2], bool)
-    for b in boxes:
-        ys, xs = _line_zone(A.shape, b)
-        ink[ys, xs] = (np.linalg.norm(A[ys, xs] - sh["fill_lab"], axis=2) >= INK_IN_SHELL) & sh["mask"][ys, xs]
-    return ink
-
-
-def _keepable(A: np.ndarray, sh: dict, boxes: list) -> bool:
-    if not boxes:
-        return True
-    zone = np.zeros(A.shape[:2], bool)
-    for b in boxes:
-        zone[_line_zone(A.shape, b)] = True
-    zone &= sh["mask"]
-    return bool(zone.sum() >= 20 and _shell_ink(A, sh, boxes)[zone].mean() <= KEEP_INK_MAX)
-
-
-def attach_shells(M: dict, draft: np.ndarray, plate: np.ndarray) -> dict:
-    """M đọc từ plan.json (không có mặt nạ): tính lại lớp phủ từ nháp + bản xoá + khung dòng đã lưu, gắn mặt nạ / màu lòng cho
-    từng ô vỏ đã lưu (khớp theo khung) -> M["shells"], S["keepable"]. Dùng cho dựng lại tại máy (replay, probe)."""
-    from .overlay import overlay
-    box = lambda l: l.get("ocr_box") or l["box"]   # noqa: E731
-    poly = lambda b: [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]]   # noqa: E731
-    O = overlay(draft, plate, [{"box": box(l), "poly": l.get("poly") or poly(box(l))} for l in M["L"]])
-    A = _lab(draft)
-    M["shells"] = {}
-    M.setdefault("mask", O["mask"])
-    for s in M["S"]:
-        best = max(O["S"], key=lambda o: min(_cov(o["box"], s["box"]), _cov(s["box"], o["box"])), default=None)
-        if best is None or min(_cov(best["box"], s["box"]), _cov(s["box"], best["box"])) < 0.6:
-            s["keepable"] = False
-            continue
-        M["shells"][s["id"]] = {"mask": best["_mask"], "fill_lab": best["_fill_lab"]}
-        s["keepable"] = _keepable(A, M["shells"][s["id"]], [M["by"][i]["box"] for i in s.get("lines", []) if i in M["by"]])
-    return M
-
-
 def public(M: dict) -> dict:
     """Ô để ghi JSON."""
-    return {"L": [{k: m[k] for k in ("id", "box", "ocr_box", "ocr", "size", "color", "angle", "shell", "curve", "runs", "geo", "path", "scale", "missed", "mark", "poly") if k in m}
+    return {"L": [{k: m[k] for k in ("id", "box", "ocr_box", "ocr", "size", "color", "angle", "shell", "curve", "runs", "geo", "path", "scale", "missed", "orphan", "printed", "dot", "poly") if k in m}
                   for m in M["L"]],
             "S": M["S"], "I": M["I"]}
 
@@ -2131,58 +1937,3 @@ def accept(P: dict, errs: list[dict], P2: dict, errs2: list[dict]) -> bool:
 
 
 # ---------------------------------------------------------------------------------------------------- nền
-def base_image(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict) -> np.ndarray:
-    """Bản xoá + DÁN LẠI pixel nháp ở các ô "keep" (chữ / logo / hình in trên sản phẩm, màn hình: bản xoá đã xoá cả chúng).
-    Vùng dán = khung ô nới 0.25 cao + TRỌN các mảng lớp phủ chạm khung (vòng con dấu, phần logo ngoài khung dòng), trong giới
-    hạn khung nới 1 cao ô mỗi phía (mảng lớp phủ to chạy xa -- dải, thẻ -- không bị kéo theo)."""
-    import cv2
-    H, W = draft.shape[:2]
-    m = np.zeros((H, W), np.uint8)
-    ov = M.get("mask")
-    cc = None
-    if ov is not None:
-        _, cc = cv2.connectedComponents(cv2.morphologyEx(ov.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8)), connectivity=8)
-    for op in P.get("ops", []):
-        if op.get("kind") != "keep":
-            continue
-        for i in op.get("marks") or []:
-            if i not in M["by"] or i in (M.get("shells") or {}):   # vỏ có mặt nạ: dán theo mặt nạ ở dưới, không dán cả khung
-                continue
-            x0, y0, x1, y1 = M["by"][i]["box"]
-            h = y1 - y0
-            p = 0.25 * h
-            m[int(max(0, y0 - p)):int(min(H, y1 + p)), int(max(0, x0 - p)):int(min(W, x1 + p))] = 1
-            if cc is not None:
-                X0, Y0, X1, Y1 = int(max(0, x0 - h)), int(max(0, y0 - h)), int(min(W, x1 + h)), int(min(H, y1 + h))
-                ids = np.unique(cc[int(max(0, y0)):int(min(H, y1)), int(max(0, x0)):int(min(W, x1))])
-                ids = ids[ids > 0]
-                if len(ids):
-                    sel = np.isin(cc[Y0:Y1, X0:X1], ids)
-                    m[Y0:Y1, X0:X1] |= cv2.dilate(sel.astype(np.uint8), np.ones((5, 5), np.uint8))
-    # VỎ GIỮ (12/10): vỏ S "keep" -> dán điểm ảnh nháp theo MẶT NẠ vỏ (dáng, viền, bóng, chuyển màu đúng như nháp), rồi lấp nét
-    # chữ cũ trong vùng các dòng của nó bằng nền quanh nét (inpaint) -- chữ mới do lệnh chữ viết lên. Dòng "keep" (chữ in trên
-    # vật) không lấp.
-    kept = {i for op in P.get("ops", []) if op.get("kind") == "keep" for i in op.get("marks") or []}
-    # chi tiết "keep" (đường viền, hoạ tiết, mảng ảnh) kéo theo mảng lớp phủ chạm khung: không được kéo theo chữ nháp của dòng
-    # không giữ (chữ méo dán lại lên poster)
-    if m.any():
-        for l in M["L"]:
-            if l["id"] not in kept:
-                ys, xs = _line_zone((H, W), l["box"])
-                m[ys, xs] = 0
-    wipe = np.zeros((H, W), bool)
-    for sid in sorted(i for i in kept if i in (M.get("shells") or {})):
-        sh = M["shells"][sid]
-        m |= cv2.dilate(sh["mask"].astype(np.uint8), np.ones((7, 7), np.uint8))
-        boxes = [M["by"][i]["box"] for i in M["by"][sid].get("lines", []) if i in M["by"] and i not in kept]
-        if boxes:   # không lấp sát mép vỏ: nét viền của vỏ (vỏ chỉ có viền, vỏ có viền màu) khác màu lòng nhưng không phải chữ
-            e = 2 * int(3 + (M["by"][sid].get("border_px") or 0)) + 1
-            wipe |= _shell_ink(_lab(draft), sh, boxes) & cv2.erode(sh["mask"].astype(np.uint8), np.ones((e, e), np.uint8)).astype(bool)
-    if not m.any():
-        return plate.copy()
-    a = cv2.GaussianBlur(m.astype(np.float32), (0, 0), 2.0)[..., None]
-    out = (draft * a + plate * (1 - a)).round().clip(0, 255).astype(np.uint8)
-    if wipe.any():
-        k = 2 * KEEP_HALO + 1
-        out = cv2.inpaint(out, cv2.dilate(wipe.astype(np.uint8), np.ones((k, k), np.uint8)), 3, cv2.INPAINT_TELEA)
-    return out

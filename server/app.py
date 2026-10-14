@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """MÁY CHỦ TEXTFIX: form / prompt -> LLM (prompt FLUX + câu khách + các hướng thiết kế) -> mỗi phiên bản: FLUX.2-klein vẽ nháp ->
-FLUX.2-klein xoá lớp phủ -> dọn chữ sót -> ô (OCR + lớp phủ) -> VLM designer điền ô -> dựng (Chromium) -> kiểm -> vòng sửa -> poster.
+Hi-SAM tìm nét chữ -> dòng (OCR + nét chữ) -> gỡ chữ (LaMa) -> VLM điền chữ -> dựng (Chromium) -> kiểm -> vòng sửa -> poster.
 
   python server/app.py --port 8088                  # bản distill (4 bước)
   python server/app.py --port 8088 --model base     # bản base (50 bước, CFG 4)
@@ -10,7 +10,7 @@ API (giao diện server/ui.html dùng job + hỏi tiến độ; script dùng /ap
   GET  /api/jobs/{id}    {status: queued|running|done|error, progress, result, error}
   POST /api/generate     GenerateRequest -> kết quả (chờ xong)
   GET  /api/health       model đã nạp, LLM / VLM đang dùng, hàng đợi
-Ảnh từng lần chạy: output/runs/<run_id>/ (request.json, brief.json, v<i>/draft.png, plate_raw.png (bản xoá FLUX), plate.png (đã dọn),
+Ảnh từng lần chạy: output/runs/<run_id>/ (request.json, brief.json, v<i>/draft.png, ink.png (mặt nạ nét chữ Hi-SAM), ink.jpg (nét + mặt nạ gỡ chữ), base.jpg (nền đã gỡ chữ),
 slots.jpg, poster.png, poster_first.png (lượt đầu, khi vòng sửa đổi), steps.jpg, ops.jpg, plan.json), phục vụ ở /outputs/<run_id>/...
 
 DÂY CHUYỀN: mỗi card GPU một FLUX + một luồng VẼ (chung hàng đợi, TEXTFIX_GPUS="0,1" mặc định mọi card), nhóm luồng THIẾT KẾ
@@ -158,7 +158,7 @@ def decode_image(b64: str | None) -> np.ndarray | None:
 
 # ---------------------------------------------------------------------------------------------------- dây chuyền
 # Mỗi phiên bản đi qua hai trạm, các phiên bản (và các yêu cầu) gối đầu nhau:
-#   VẼ (GPU)        mỗi card một FLUX + một luồng, chung một hàng đợi (vào trước ra trước)  nháp -> xoá -> dọn chữ sót  ~7 s
+#   VẼ (GPU)        mỗi card một FLUX + một Hi-SAM + một luồng, chung một hàng đợi          nháp -> nét chữ
 #   THIẾT KẾ        nhóm luồng, mỗi luồng một Chromium; VLM ở máy khác nên gọi song song    ô -> VLM -> dựng -> kiểm   ~15 s
 # LLM viết brief (một lời gọi / yêu cầu, kèm các hướng thiết kế) chạy ở luồng điều phối của yêu cầu.
 DRAW_Q: "queue.Queue" = queue.Queue()
@@ -190,6 +190,8 @@ def gpu_worker(k: int, args, ready: threading.Event) -> None:
             t0 = time.time()
             F = Flux(args.model, steps=args.steps, weights_dir=args.weights_dir, device=f"cuda:{k}").load()
             F.check_dtypes()
+            from textfix import hisam
+            hisam.load(f"cuda:{k}")   # nét chữ: cùng card, nạp sẵn để lỗi thiếu tệp lộ ra lúc khởi động
         STATE["flux"].append(F)
         log.info("FLUX cuda:%d sẵn sàng (%.0fs, %.1f GB)", k, time.time() - t0, torch.cuda.memory_allocated(k) / 2 ** 30)
     except BaseException as e:   # gồm SystemExit của flux2.util khi thiếu trọng số
@@ -219,6 +221,10 @@ def init_models(args) -> None:
     from textfix.ocr import _engine
     if not os.environ.get("TEXTFIX_LLM_URL") or not os.environ.get("TEXTFIX_MODEL"):
         raise RuntimeError("chưa đặt TEXTFIX_LLM_URL / TEXTFIX_MODEL (export trong terminal, docs/SERVER.md)")
+    from textfix import hisam, lonly
+    lost = hisam.missing() + ([] if lonly.lama_ready() else [lonly.LAMA_PATH])
+    if lost:   # người dùng chốt 14/10: thiếu tệp thì báo rõ và dừng, không lùi về cách nào khác
+        raise RuntimeError("thiếu tệp model gỡ chữ (docs/SERVER.md, mục Hi-SAM và LaMa): " + "; ".join(lost))
     m = config.models()
     STATE["models"] = m
     STATE["llm"] = json_call(m["llm"]["url"], m["llm"]["model"], m["llm"]["key_env"], tag="brief", schema=SCHEMA)
@@ -269,11 +275,14 @@ def design_one(job: dict, v: dict, d: dict, Bv: dict, product: bool, vd: Path, u
     from textfix.engine import design
     from textfix.render import ops_image
     try:
-        for k in ("draft", "plate_raw", "plate"):   # có ngay khi vẽ xong: UI xem được nháp / bản xoá trong lúc thiết kế
-            save(d[k], vd / f"{k}.png")
-        v.update(draft_url=f"{url}/draft.png", plate_raw_url=f"{url}/plate_raw.png", plate_url=f"{url}/plate.png")
+        from textfix import hisam
+        save(d["draft"], vd / "draft.png")   # có ngay khi vẽ xong: UI xem được nháp trong lúc thiết kế
+        hisam.to_png(d["ink"], vd / "ink.png")   # mặt nạ nét chữ: đủ để dựng lại tại máy cùng nháp + plan.json
+        v.update(draft_url=f"{url}/draft.png")
         r = design(d, Bv, STATE["vlm"], page(), product=product, progress=lambda m: v.update(stage=m))
         save(r["poster"], vd / "poster.png")
+        save(r["ink_image"], vd / "ink.jpg", 90)
+        save(r["base"], vd / "base.jpg", 92)
         save(r["steps"], vd / "steps.jpg", 88)
         P = r["plan"]
         M = {**P["slots"], "size": [d["draft"].shape[1], d["draft"].shape[0]],
@@ -287,7 +296,7 @@ def design_one(job: dict, v: dict, d: dict, Bv: dict, product: bool, vd: Path, u
         (vd / "plan.json").write_text(json.dumps(jsonable({"seed": v["seed"], "direction": v.get("direction"), "prompt_en": Bv["prompt_en"],
                                                            "timing": timing, **P}), ensure_ascii=False, indent=1), encoding="utf-8")
         v.update(status="done", stage="", poster_url=f"{url}/poster.png", steps_url=f"{url}/steps.jpg", ops_url=f"{url}/ops.jpg",
-                 slots_url=f"{url}/slots.jpg", plan_url=f"{url}/plan.json", timing=timing, missing=P["missing"],
+                 slots_url=f"{url}/slots.jpg", plan_url=f"{url}/plan.json", ink_url=f"{url}/ink.jpg", base_url=f"{url}/base.jpg", timing=timing, missing=P["missing"],
                  errors=len(P["errors"]), ops=sum(o.get("kind") not in ("skip", "keep") for o in P["ops"]),
                  **({"poster_first_url": f"{url}/poster_first.png"} if first else {}))
         log.info("%s v%d xong (gpu %s) %s", job["run_id"], v["index"], v.get("gpu"), timing)
@@ -297,7 +306,7 @@ def design_one(job: dict, v: dict, d: dict, Bv: dict, product: bool, vd: Path, u
 
 
 def image_one(job: dict, v: dict, d: dict, Bv: dict, vd: Path, url: str, t_llm: float) -> None:
-    """ẢNH THƯỜNG (B["mode"] == "image": không chữ khách): ảnh FLUX vẽ là kết quả, không xoá / ô / VLM / dựng."""
+    """ẢNH THƯỜNG (B["mode"] == "image": không chữ khách): ảnh FLUX vẽ là kết quả, không dò chữ / VLM / dựng."""
     try:
         save(d["draft"], vd / "poster.png")
         timing = {"llm": t_llm, **{k: round(x, 1) for k, x in d["timing"].items()}}
@@ -472,11 +481,11 @@ async def get_job(jid: str):
 
 
 ZIP_LIMIT = int(float(os.environ.get("TEXTFIX_ZIP_MB", "22")) * 1024 * 1024)   # < 24 MB (như textfix/ship.py)
-ZIP_JPG = ("poster.png", "poster_first.png", "plate_raw.png")   # ảnh để xem -> JPG; nháp + bản xoá đã dọn giữ PNG (đo lại được)
+ZIP_JPG = ("poster.png", "poster_first.png")   # ảnh để xem -> JPG; nháp + mặt nạ nét chữ giữ PNG (đo lại được)
 
 
 def run_zip(rd: Path, all_jpg: bool = False) -> bytes:
-    """Mọi tệp debug của một lượt chạy (request, brief, ảnh sản phẩm, mỗi phiên bản: nháp, bản xoá thô / đã dọn, ô, lệnh, các bước,
+    """Mọi tệp debug của một lượt chạy (request, brief, ảnh sản phẩm, mỗi phiên bản: nháp, nét chữ, nền đã gỡ, dòng, lệnh, các bước,
     poster, plan.json) trong MỘT zip, thư mục gốc <run_id>/ -- giải nén vào output/runs/ ở máy cá nhân. all_jpg: mọi PNG thành JPG
     95 (khi zip vượt giới hạn)."""
     import zipfile

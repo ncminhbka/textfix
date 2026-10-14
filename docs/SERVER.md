@@ -84,20 +84,22 @@ tail -f server.log
 curl -s localhost:8088/api/health          # phải thấy "ready": true
 ```
 
-Khởi động nạp **một FLUX trên mỗi card** (song song) và OCR: khoảng 1 phút; Chromium mở khi luồng thiết kế dùng lần đầu.
+Khởi động nạp **một FLUX và một Hi-SAM trên mỗi card** và OCR: khoảng 1 phút. Thiếu tệp Hi-SAM hoặc LaMa (hai mục cuối tệp này)
+thì máy chủ báo lỗi và dừng ngay lúc khởi động; Chromium mở khi luồng thiết kế dùng lần đầu.
 
-Dây chuyền: mỗi phiên bản qua trạm VẼ (GPU: nháp ~2 s, xoá ~4 s, dọn chữ sót ~1-4 s) rồi trạm THIẾT KẾ (đo ô ~2 s, VLM
-~11 s, dựng ~2 s, vòng sửa chỉ khi có lỗi nặng ~10 s). Các phiên bản và các yêu cầu gối đầu nhau: 2 card vẽ 2 phiên bản cùng lúc,
+Dây chuyền (docs/ROADMAP.md): mỗi phiên bản qua trạm VẼ (GPU: nháp ~2 s, Hi-SAM tìm nét chữ ~0,2 s) rồi trạm THIẾT KẾ (đo dòng
+~2 s, gỡ chữ bằng LaMa một lần, VLM ~11 s, dựng ~2 s, sửa bằng code chỉ khi có lỗi nặng). Các phiên bản và các yêu cầu gối đầu nhau: 2 card vẽ 2 phiên bản cùng lúc,
 VLM gọi song song. Chọn nhiều ảnh: LLM viết thêm các **hướng thiết kế khác nhau** (cùng chữ khách), mỗi ảnh một hướng; ảnh xong
 trước hiện trước trên UI. 4 ảnh ~35-45 s (một ảnh ~25-30 s).
 
-UI có ô **Debug** (góc trên kết quả): nháp FLUX, bản xoá FLUX, bản xoá đã dọn, **Ô + OCR** (khung L / S / I vẽ đè lên nháp, di
-chuột xem chữ OCR đọc và lệnh designer), lệnh designer, lượt đầu trước vòng sửa, bảng OCR -> ô -> lệnh, lỗi, nhật ký.
+UI có ô **Debug** (góc trên kết quả): nháp FLUX, **nét chữ + mặt nạ gỡ** (xanh lá = nét bị gỡ, vàng = phần nới / quầng, xanh
+dương = nét của dòng giữ, hồng = nét không thuộc dòng nào), **nền đã gỡ chữ**, **Dòng + OCR** (khung L vẽ đè lên nháp, di chuột xem
+chữ OCR đọc và lệnh designer), lệnh designer, lượt đầu trước vòng sửa, bảng OCR -> dòng -> lệnh, lỗi, nhật ký.
 
 Kết quả: `output/runs/<run_id>/` gồm `request.json`, `brief.json` (kèm các hướng thiết kế), và mỗi ảnh `v<i>/`: `draft.png`,
-`plate_raw.png` (bản xoá FLUX), `plate.png` (đã dọn), `slots.jpg`, `poster.png`, `poster_first.png` (khi vòng sửa đổi),
-`steps.jpg` (nháp | ô | bản xoá | poster), `ops.jpg` (lệnh designer), `plan.json` (ô, lệnh, lỗi còn lại, nhật ký, câu thiếu,
-thời gian).
+`ink.png` (mặt nạ nét chữ Hi-SAM, 1 bit), `ink.jpg` (nét + mặt nạ gỡ chữ, để xem), `base.jpg` (nền đã gỡ chữ), `slots.jpg`,
+`poster.png`, `poster_first.png` (khi vòng sửa đổi), `steps.jpg` (nháp | dòng | nét chữ | nền | poster), `ops.jpg` (lệnh
+designer), `plan.json` (dòng, lệnh, lỗi còn lại, nhật ký, câu thiếu, thời gian, mục `erase`).
 
 ## 6. Thử engine không qua giao diện
 
@@ -107,12 +109,11 @@ Lần đầu trình duyệt có thể hỏi "cho phép tải nhiều tệp": ch�
 
 ```python
 # ô notebook, thư mục làm việc = thư mục repo (%cd ~/work/<thư mục repo>)
-%run scripts/probe.py                          # 12 prompt bench/prompts_C.json: FLUX vẽ + xoá, VLM thật -> probe_NN.zip
+%run scripts/probe.py                          # 12 prompt bench/prompts_C.json: FLUX vẽ, Hi-SAM + LaMa, VLM thật -> probe_NN.zip
 %run scripts/probe.py --only p11_distill_s4    # một ca
-%run scripts/make_pairs.py                     # cặp nháp + bản xoá cho bộ đáp án ô (docs/SLOTS_GT.md) -> pairs_NN.zip
 # máy chủ (bash scripts/start_server.sh) phải đang chạy:
 %run scripts/dev_batch.py                      # tập dev bench/dev2.json (40 yêu cầu như người dùng điền UI, 73 ảnh) qua máy chủ
-                                               # -> dev2_<giờ>_NN.zip ĐẦY ĐỦ (nháp, bản xoá, lượt đầu, poster, plan); đứt giữa
+                                               # -> dev2_<giờ>_NN.zip ĐẦY ĐỦ (nháp, nét chữ, lượt đầu, poster, plan); đứt giữa
                                                # chừng: chạy lại lệnh này = chờ tiếp job cũ, không gửi lại
 %run scripts/dev_batch.py bench/dev3.json      # TẬP DEV 3 (40 yêu cầu, 62 ảnh): typography khó (cong / vòng con dấu / chéo /
                                                # lượn sóng / nhiều cỡ), 11 prompt dài thật (prompt_test), form đủ + prompt sơ sài,
@@ -122,11 +123,9 @@ Lần đầu trình duyệt có thể hỏi "cho phép tải nhiều tệp": ch�
 
 Biến môi trường trong notebook: `%env` từng biến, hoặc chạy `source ~/textfix_env.sh` trước khi mở JupyterLab.
 
-**Dùng cả 2 card:** `make_pairs.py`, `erase_probe.py` mặc định chạy mỗi A30 một tiến trình (mỗi tiến trình một bản FLUX ≈ 17 GB,
-chia đều việc, nhật ký có tiền tố `[gpu k]`), nhanh gần gấp đôi. Tiến trình con bỏ qua `TEXTFIX_DEVICE_*` và đặt mọi phần
-FLUX lên card của nó. `--gpus 1` để chạy một tiến trình như cũ (vd. khi card kia đang bận).
+**Dùng cả 2 card:** máy chủ nạp mỗi A30 một FLUX (≈ 17 GB) + một Hi-SAM (1,3 GB, đỉnh ~4 GB khi chạy); LaMa nằm trên card đầu.
 
-`probe.py` ra `output/probe/<key>.jpg` (nháp | ô | bản xoá | poster | lệnh), `<key>_plan.json`, `<key>_poster.png`.
+`probe.py` ra `output/probe/<key>.jpg` (nháp | dòng | nét chữ | nền | poster | lệnh), `<key>_plan.json`, `<key>_poster.png`.
 
 ## Chạy một tập dev từ terminal và xem kết quả tại chỗ
 
@@ -138,20 +137,20 @@ python scripts/dev_batch.py bench/accept1.json --fresh    # chạy lại cả t�
 Chạy xong, terminal in bảng từng ca và dòng tổng "so lượt trước: tốt lên / xấu đi / như cũ". Xem ảnh: mở
 `https://<địa-chỉ-jupyter>/user/<tên>/proxy/8088/outputs/_reports/accept1.html` (nháp cạnh poster, cờ nghi hỏng, poster lượt trước).
 Cần gửi kết quả về máy cá nhân: tải MỘT tệp `output/runs_zip/accept1_report_<giờ>.zip` (vài MB) từ cây thư mục JupyterLab.
-Thêm `--full` khi cần cả nháp / bản xoá cỡ gốc (các zip < 24 MB như trước). Lập lại báo cáo mà không chạy lại:
+Thêm `--full` khi cần nháp PNG cỡ gốc (các zip < 24 MB như trước). Lập lại báo cáo mà không chạy lại:
 `python scripts/batch_report.py bench/accept1.json`.
 
 ## Sự cố
 
 | Hiện tượng | Xử lý |
 |---|---|
-| `/api/health` có `error` | Đọc `server.log`: thường thiếu trọng số, chưa export biến LLM, hoặc hết VRAM |
+| `/api/health` có `error` | Đọc `server.log`: thường thiếu trọng số (FLUX, Hi-SAM, LaMa), chưa export biến LLM, hoặc hết VRAM |
 | `CUDA out of memory` | `nvidia-smi`: card có bị người khác chiếm không (bộ nhớ đầy mà không có tiến trình trong container = dịch vụ ngoài, báo quản trị). Đặt `TEXTFIX_DEVICE_TE=cuda:1` |
 | Lỗi 803 / `cuInit` | `start_server.sh` và `check_server.py` tự bỏ `.../compat` khỏi `LD_LIBRARY_PATH`; chạy tay thì làm tương tự |
 | VLM `400` / `too many images` / `maximum context length` | Tăng `--limit-mm-per-prompt` / `--max-model-len` phía máy chủ VLM |
 | Poster thiếu câu (giao diện báo "Không vẽ") | Model không chừa chỗ cho câu đó, hoặc designer rút gọn cho vừa: đổi seed, thêm ảnh |
 
-## Hi-SAM (thử nghiệm: mặt nạ nét chữ; chưa nối vào dây chuyền)
+## Hi-SAM (BẮT BUỘC từ 14/10: tìm nét chữ, thay bản xoá FLUX)
 
 Máy chủ không ra internet: tải ở máy khác rồi đưa lên `~/persistent-data/hisam/` (đổi chỗ: `export TEXTFIX_HISAM=<thư mục>`).
 - mã nguồn: https://github.com/ymy-k/Hi-SAM/archive/refs/heads/main.zip -> giải nén thành `hisam/Hi-SAM/`
@@ -161,15 +160,17 @@ Máy chủ không ra internet: tải ở máy khác rồi đưa lên `~/persiste
   TextSeg; bản sao: https://huggingface.co/creative-graphic-design/hi-sam-checkpoints) -> `hisam/sam_tss_l_textseg.pth`
 - thư viện: `torch` + `einops`. KHÔNG cài `requirements.txt` của Hi-SAM (ghim numpy / opencv bản cũ).
 
-Đo thời gian + VRAM trên mọi GPU: `python scripts/hisam_test.py --check` rồi `python scripts/hisam_test.py accept2 mix1`.
+Kiểm tệp + đo thời gian, VRAM riêng Hi-SAM: `python scripts/hisam_test.py --check` rồi `python scripts/hisam_test.py accept2`.
+Đo 14/10 trên 2x A30: fp16 0,17 s / ảnh, đỉnh VRAM 4,4 GB. Tắt fp16: `export TEXTFIX_HISAM_HALF=off`.
 
-## LaMa (gỡ chữ của chế độ chỉ dòng chữ)
+## LaMa (BẮT BUỘC: vẽ lại nền dưới chữ)
 
-Tệp `big-lama.pt` (196 MB): `wget -O ~/persistent-data/lama/big-lama.pt https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt`.
-Mã tự dùng khi tệp có ở `~/persistent-data/lama/big-lama.pt`; đổi chỗ thì `export TEXTFIX_LAMA=<đường dẫn>`, tắt thì
-`export TEXTFIX_LAMA=off` (về đường luật cũ). plan.json ghi dòng log "nền = nháp trừ chữ (LaMa): ..." khi LaMa chạy.
+Tệp `big-lama.pt` (196 MB, https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt) đặt ở
+`~/persistent-data/lama/big-lama.pt`; đổi chỗ thì `export TEXTFIX_LAMA=<đường dẫn>`. Thiếu tệp: lỗi, không còn đường dự phòng.
+plan.json ghi dòng log "nền = nháp trừ chữ (Hi-SAM + LaMa): ..." và mục `erase`.
 
-## Từ 14/10: một đường duy nhất
+## Từ 14/10: TextFix chỉ sửa chữ, không còn bản xoá FLUX
 
-Nhánh `main` chỉ còn chế độ "chỉ dòng chữ" (nền = nháp, gỡ chữ bằng LaMa, VLM chỉ viết dòng chữ). Không còn cờ `TEXTFIX_LONLY`;
-`TEXTFIX_GEO` mặc định bật. Đường cũ (ô vỏ / ô chi tiết) ở nhánh `legacy-slots-si`. Cần tệp `~/persistent-data/lama/big-lama.pt`.
+Nhánh `main`: nền = nháp; Hi-SAM tìm nét chữ, LaMa lấp nền dưới chữ một lần cho cả poster, VLM chỉ viết dòng chữ. Vỏ, nút, icon
+(kể cả icon đầu dòng) là điểm ảnh của nháp. Lộ trình và tình trạng: `docs/ROADMAP.md`.
+Đường cũ: nhánh `legacy-flux-erase` (bản xoá FLUX + dọn chữ sót), nhánh `legacy-slots-si` (ô vỏ / ô chi tiết).

@@ -11,7 +11,7 @@
    tải riêng tệp này về mở bằng trình duyệt là xem được (dưới 24 MB), bấm ảnh để phóng to.
    Mở bằng trình duyệt qua chính máy chủ TextFix đang chạy, không cần tải gì:
        https://<địa-chỉ-jupyter>/user/<tên>/proxy/8088/outputs/_reports/<tập>.html
-3. GÓI MỘT ZIP: output/runs_zip/<tập>_report_<giờ>.zip (dưới 24 MB): mỗi ca nháp + bản xoá + poster (JPG) + plan.json /
+3. GÓI MỘT ZIP: output/runs_zip/<tập>_report_<giờ>.zip (dưới 24 MB): mỗi ca nháp + poster (JPG) + ink.png (mặt nạ nét chữ Hi-SAM) + plan.json /
    brief.json / request.json + manifest -- đủ để Claude chấm bằng mắt VÀ dựng lại bước gỡ chữ tại máy cá nhân. Tải MỘT tệp này
    từ cây thư mục JupyterLab (chuột phải > Download). Ảnh PNG gốc từng điểm ảnh thì mới cần `dev_batch.py ... --full`.
 """
@@ -222,7 +222,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     # ---- MỘT zip đủ để chấm VÀ dựng lại tại máy cá nhân (13/10: người dùng muốn tải ít zip nhất): mỗi ca  nháp + bản xoá + poster
     # (JPG) + plan / brief / request. Trang HTML, tờ ảnh ghép, ảnh thu nhỏ KHÔNG gói -- xem trên máy chủ, và dựng lại được từ đây.
-    # Vượt 23 MB thì hạ dần chất lượng JPG (nháp / bản xoá để đo màu nên giữ cao nhất có thể).
+    # Vượt 23 MB thì hạ dần chất lượng JPG (nháp để đo màu nên giữ cao nhất có thể). Mặt nạ nét chữ: PNG 1 bit, vài chục KB.
     import io
     from PIL import Image
     zdir = ROOT / "output" / "runs_zip"
@@ -238,12 +238,16 @@ def main(argv: list[str] | None = None) -> int:
         items, total = [], 0
         for key, cid, s_, old, vd, th, run in rows:
             rd, v = a.runs / run, s_["dir"]
-            for kind in ("draft", "plate", "poster"):
+            for kind in ("draft", "poster"):
                 src = next((v / n for n in (f"{kind}.png", f"{kind}.jpg") if (v / n).exists()), None)
                 if src is not None:
                     data = jpg(src, q if kind != "poster" else min(q, 86))
                     items.append((f"runs/{run}/{v.name}/{kind}.jpg", data))
                     total += len(data)
+            if (v / "ink.png").exists():
+                data = (v / "ink.png").read_bytes()
+                items.append((f"runs/{run}/{v.name}/ink.png", data))
+                total += len(data)
             # poster + lệnh của LƯỢT TRƯỚC (so hai hướng trên cùng nháp): vẫn một zip
             if old and old.get("poster") is not None:
                 data = jpg(old["poster"], min(q, 86))
@@ -263,7 +267,7 @@ def main(argv: list[str] | None = None) -> int:
             for f in [rd / "brief.json", rd / "request.json", *sorted(rd.glob("v*/plan.json"))]:
                 if f.exists():
                     z.write(f, f"runs/{run}/{f.relative_to(rd).as_posix()}")
-    print(f"MỘT tệp để tải về cho Claude (nháp + bản xoá + poster + plan, JPG chất lượng {q}): {zp}  ({zp.stat().st_size / 2**20:.1f} MB)")
+    print(f"MỘT tệp để tải về cho Claude (nháp + poster + nét chữ + plan, JPG chất lượng {q}): {zp}  ({zp.stat().st_size / 2**20:.1f} MB)")
     return 0
 
 

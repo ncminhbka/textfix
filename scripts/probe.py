@@ -5,7 +5,7 @@
                                                         # cuối cùng gói output/probe thành zip < 24 MB và tự tải về
   python scripts/probe.py                               # terminal: như trên, zip ở output/probe_zip/ (tải tay)
   python scripts/probe.py --only p11_distill_s4,q21_distill_s0
-  python scripts/probe.py --data <thư mục>              # dùng nháp / bản xoá có sẵn: <key>_draft.png (+ <key>_plate.png)
+  python scripts/probe.py --data <thư mục>              # dùng nháp có sẵn: <key>_draft.png
   %run scripts/probe.py --pairs output/pairs --only r01_s0,r02_s0   # cặp của make_pairs.py (bộ đáp án), VLM thật
   python scripts/probe.py --data <thư mục> --dry        # không VLM (lệnh giả: vỏ tô màu đo, chi tiết = chấm, chữ = chữ OCR):
                                                         # kiểm phần đo / dựng ở máy không GPU, không mạng
@@ -55,8 +55,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", default="")
     ap.add_argument("--set", type=Path, default=ROOT / "bench" / "prompts_C.json")
-    ap.add_argument("--data", type=Path, default=None, help="thư mục nháp có sẵn (<key>_draft.png, tuỳ chọn <key>_plate.png)")
-    ap.add_argument("--plate-suffix", default="plate", help="bản xoá có sẵn: <key>_<hậu tố>.png")
+    ap.add_argument("--data", type=Path, default=None, help="thư mục nháp có sẵn (<key>_draft.png)")
     ap.add_argument("--dry", action="store_true", help="VLM giả (kiểm đo / dựng)")
     ap.add_argument("--pairs", type=Path, default=None, help="dùng cặp nháp / bản xoá của make_pairs.py (<thư mục>/pairs.json; "
                                                                 "key có seed, vd r02_s0): như --data, lấy prompt / câu khách / ảnh tham chiếu từ pairs.json")
@@ -72,7 +71,7 @@ def main() -> int:
     jobs = [j for j in jobs if not a.only or j["key"] in a.only.split(",")]
     a.out.mkdir(parents=True, exist_ok=True)
     F = None
-    if a.data is None or any(not (a.data / f"{j['key']}_{a.plate_suffix}.png").exists() for j in jobs):
+    if a.data is None:
         from textfix.flux import Flux
         t0 = time.time()
         F = Flux("distill").load()
@@ -92,9 +91,7 @@ def main() -> int:
             try:
                 if a.data is not None and (a.data / f"{k}_draft.png").exists():
                     draft = np.asarray(Image.open(a.data / f"{k}_draft.png").convert("RGB"))
-                    pf = a.data / f"{k}_{a.plate_suffix}.png"
-                    plate = np.asarray(Image.open(pf).convert("RGB").resize((draft.shape[1], draft.shape[0]))) if pf.exists() else None
-                    r = E.fix(draft, B, seed, plate, product=bool(j.get("ref")))
+                    r = E.fix(draft, B, seed, product=bool(j.get("ref")))
                 else:
                     r = E.make(B, j["w"], j["h"], seed, product)
             except Exception as e:

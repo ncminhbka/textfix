@@ -1,16 +1,14 @@
-"""FLUX.2-klein trên máy chủ: vẽ nháp (prompt -> ảnh) và XOÁ LỚP PHỦ (sửa ảnh: nháp làm ảnh tham chiếu + lời dặn ngắn).
+"""FLUX.2-klein trên máy chủ: vẽ nháp (prompt -> ảnh).
 
   F = Flux("distill").load()                       # DiT + VAE + bộ mã hoá chữ (Qwen3-4B) nạp một lần, giữ trong VRAM
   draft = F.generate(prompt_en, 1024, 1024, seed)  # refs=[ảnh sản phẩm] nếu người dùng tải ảnh lên
-  plate = erase(F, draft, seed)                    # bản xoá đã căn theo nháp
 
-Sửa ảnh theo đúng cách FLUX.2 nhận ảnh tham chiếu (flux2.sampling.encode_image_refs): mã hoá VAE, ghép token ảnh tham chiếu sau
-token ảnh đang khử nhiễu với trục thời gian RoPE t = 10, 20...; chỉ lấy dự đoán của phần ảnh đang khử nhiễu. Tham số mặc định
-đúng BFL (flux2/util.py): distill 4 bước, base 50 bước CFG 4.0.
+Ảnh tham chiếu theo đúng cách FLUX.2 nhận (flux2.sampling.encode_image_refs): mã hoá VAE, ghép token ảnh tham chiếu sau token
+ảnh đang khử nhiễu với trục thời gian RoPE t = 10, 20...; chỉ lấy dự đoán của phần ảnh đang khử nhiễu. Tham số mặc định đúng
+BFL (flux2/util.py): distill 4 bước, base 50 bước CFG 4.0.
 
-LỜI DẶN XOÁ: câu NGẮN, không nhắc tên vật nào (07/10: lời dặn dài kể "sản phẩm, người, mặt, thẻ..." làm model distill vẽ thêm đúng
-thứ được nhắc -- thiệp cưới hiện sản phẩm lạ, tờ tuyển dụng hiện người; lời dặn ngắn: đổi ngoài chữ ~0% trên 12 nháp x 2 seed).
-Bản xoá bỏ toàn bộ lớp phủ (chữ, thẻ, pill, dải, icon, avatar, sao) và giữ ảnh -> nháp - bản xoá = lớp phủ (overlay.py).
+14/10: bước XOÁ LỚP PHỦ bằng FLUX (lời dặn "Remove all text...") đã rời nhánh main -- chữ nằm ở đâu do Hi-SAM trả lời
+(textfix/hisam.py), nền dưới chữ do LaMa vẽ lại (textfix/lonly.py). Đường cũ: nhánh git `legacy-flux-erase`.
 """
 
 from __future__ import annotations
@@ -20,8 +18,6 @@ from pathlib import Path
 
 import numpy as np
 
-ERASE_PROMPT = "Remove all text from this image. Keep everything else exactly the same."
-REG_MAX_SHIFT = 0.02   # căn bản xoá chỉ nhận khi dời <= 2% cạnh, co giãn <= 3% (lệch hơn = model vẽ lại, không phải lệch lưới)
 
 # cỡ sinh ~1 MP, bội số 16 (VAE nén 16x)
 SIZES = {"1:1": (1024, 1024), "4:5": (896, 1120), "9:16": (768, 1344), "16:9": (1344, 768), "2:3": (832, 1248),
@@ -179,35 +175,3 @@ class Flux:
             from PIL import Image
             out = np.asarray(Image.fromarray(out).resize((W, H), Image.LANCZOS))
         return out
-
-
-def register(draft: np.ndarray, plate: np.ndarray) -> tuple[np.ndarray, dict]:
-    """Căn bản xoá theo nháp: ECC affine trên ảnh xám cạnh dài 512 (mờ). Nhận khi lệch nhỏ (lệch lưới do đổi cỡ), không thì giữ."""
-    import cv2
-    H, W = draft.shape[:2]
-    if plate.shape[:2] != (H, W):
-        plate = cv2.resize(plate, (W, H), interpolation=cv2.INTER_LANCZOS4)
-    s = 512 / max(H, W)
-    g = [cv2.GaussianBlur(cv2.cvtColor(cv2.resize(x, (int(W * s), int(H * s)), interpolation=cv2.INTER_AREA), cv2.COLOR_RGB2GRAY),
-                          (0, 0), 1.5).astype(np.float32) for x in (draft, plate)]
-    M = np.eye(2, 3, dtype=np.float32)
-    try:
-        _, M = cv2.findTransformECC(g[0], g[1], M, cv2.MOTION_AFFINE, (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 100, 1e-5), None, 5)
-    except cv2.error:
-        return plate, {"ok": False, "why": "ecc"}
-    sx, sy = float(np.hypot(M[0, 0], M[1, 0])), float(np.hypot(M[0, 1], M[1, 1]))
-    tx, ty = float(M[0, 2] / s), float(M[1, 2] / s)
-    info = {"tx": round(tx, 2), "ty": round(ty, 2), "sx": round(sx, 4), "sy": round(sy, 4)}
-    if max(abs(tx) / W, abs(ty) / H) > REG_MAX_SHIFT or max(abs(sx - 1), abs(sy - 1)) > 0.03:
-        return plate, {**info, "ok": False, "why": "lệch lớn"}
-    if max(abs(tx), abs(ty)) < 0.3 and max(abs(sx - 1), abs(sy - 1)) < 1e-3:
-        return plate, {**info, "ok": True, "why": "không lệch"}
-    Mf = M.copy()
-    Mf[:, 2] /= s
-    out = cv2.warpAffine(plate, Mf, (W, H), flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP, borderMode=cv2.BORDER_REFLECT_101)
-    return out, {**info, "ok": True}
-
-
-def erase(F, draft: np.ndarray, seed: int, prompt: str = ERASE_PROMPT) -> np.ndarray:
-    """Bản xoá lớp phủ (FLUX sửa ảnh, lời dặn ngắn), đã căn theo nháp."""
-    return register(draft, F.edit(draft, prompt, seed))[0]

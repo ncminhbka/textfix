@@ -1,4 +1,4 @@
-"""DỰNG lệnh của designer lên nền (bản xoá) trong Chromium, đúng khung từng ô; báo lỗi khách quan cho vòng sửa.
+"""DỰNG lệnh của designer lên nền (nháp đã gỡ chữ) trong Chromium, đúng khung từng ô; báo lỗi khách quan cho vòng sửa.
 
   poster, res, log = render(page, base, P, M)   # mỗi lệnh = một div tại khung các ô của nó, HTML của VLM + thẻ tiện ích, co vừa khung
   errs = check(P, M, res, shrink_min=0.7)       # ô chưa quyết, khung / nội dung chồng nhau, tràn, phải co quá nhỏ
@@ -500,7 +500,7 @@ async (o) => {
 
 
 def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None) -> tuple[np.ndarray, list, list]:
-    """Dựng lệnh vẽ lên NỀN = bản xoá trong Chromium -> (ảnh, kết quả từng lệnh {id, size, shrink, over, ink, box}, log).
+    """Dựng lệnh vẽ lên NỀN (plate = nháp đã gỡ chữ, lonly.settle) trong Chromium -> (ảnh, kết quả từng lệnh {id, size, shrink, over, ink, box}, log).
     Mặc định khi VLM không nói: font = style.text_font, cỡ (1em) = cỡ chữ đo được của các dòng L trong lệnh (không có dòng: nửa cao
     khung), màu = màu đo của dòng."""
     from PIL import Image
@@ -1168,7 +1168,7 @@ def _role_groups(P: dict, M: dict, res: list, same_font: bool = True) -> list[li
     # DÒNG CÓ ĐẦU DÒNG (icon / tick ngay bên trái): nháp hay vẽ các mục một danh sách to nhỏ khác nhau (08/10 r01_s1: 34-38 so với
     # 30-32 px) -> cỡ nháp không đủ để nhận cùng vai; hai dòng cùng có đầu dòng và thẳng mép trái là một danh sách dù lệch tới 40%
     bul = {c["near"].split()[-1] for c in M.get("I") or [] if str(c.get("near") or "").startswith("left of")} | \
-        {l["id"] for l in M.get("L") or [] if l.get("mark")}   # dấu đầu dòng đã nhập vào ô của dòng (slots._row_marks)
+        {l["id"] for l in M.get("L") or [] if l.get("dot")}   # chấm tròn đầu dòng (slots._lead_dots)
     has_bul = {op["id"] for op in P["ops"] if any(m in bul for m in op.get("marks") or [])}
     lim = lambda a, b: 1.4 if a[0] in has_bul and b[0] in has_bul else 1.15   # noqa: E731
     par = {t[0]: t[0] for t in T}
