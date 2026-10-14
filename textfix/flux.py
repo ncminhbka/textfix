@@ -165,13 +165,3 @@ class Flux:
                  **_) -> np.ndarray:
         """B1: nháp. refs: ảnh sản phẩm người dùng tải lên (FLUX.2 nhận nhiều ảnh tham chiếu)."""
         return self._sample(self._encode(prompt), w, h, seed, self._refs(refs) if refs else None, neg)
-
-    def edit(self, img: np.ndarray, prompt: str, seed: int, neg: str | None = None) -> np.ndarray:
-        """B2: sửa ảnh theo lời dặn, ảnh vào làm tham chiếu duy nhất; ra cùng cỡ ảnh vào (đã là bội số 16)."""
-        H, W = img.shape[:2]
-        w, h = W // 16 * 16, H // 16 * 16
-        out = self._sample(self._encode(prompt), w, h, seed, self._refs([img]), neg)
-        if (w, h) != (W, H):
-            from PIL import Image
-            out = np.asarray(Image.fromarray(out).resize((W, H), Image.LANCZOS))
-        return out

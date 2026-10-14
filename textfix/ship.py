@@ -59,12 +59,6 @@ def pack(files: list[tuple[Path, str]], out_dir: Path, name: str, limit: int | N
     return zips
 
 
-def pack_dir(src: Path, out_dir: Path, name: str, pattern: str = "*", limit: int | None = None) -> list[Path]:
-    """Gói mọi tệp khớp pattern trong src (đệ quy), tên trong zip = đường dẫn tương đối từ src."""
-    files = [(p, str(p.relative_to(src)).replace("\\", "/")) for p in sorted(Path(src).rglob(pattern)) if p.is_file()]
-    return pack(files, out_dir, name, limit)
-
-
 def _in_notebook() -> bool:
     try:
         from IPython import get_ipython

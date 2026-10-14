@@ -1,10 +1,10 @@
 """DỰNG lệnh của designer lên nền (nháp đã gỡ chữ) trong Chromium, đúng khung từng ô; báo lỗi khách quan cho vòng sửa.
 
-  poster, res, log = render(page, base, P, M)   # mỗi lệnh = một div tại khung các ô của nó, HTML của VLM + thẻ tiện ích, co vừa khung
+  poster, res, log = render(page, base, P, M)   # mỗi lệnh = một div tại khung các dòng của nó, HTML của VLM, co vừa khung
   errs = check(P, M, res, shrink_min=0.7)       # ô chưa quyết, khung / nội dung chồng nhau, tràn, phải co quá nhỏ
 
 Khung lệnh = hợp khung các ô nó trỏ (lệnh chữ: chỉ các dòng L). Dòng model vẽ nghiêng: div dựng thẳng rồi xoay đúng góc.
-Lớp: vỏ (shape) trước, rồi chi tiết / chữ. Code không quyết thiết kế; phòng ngừa duy nhất: HTML an toàn (bỏ script / on* / URL / img).
+Chỉ có lệnh chữ (TextFix chỉ sửa chữ). Code không quyết thiết kế; phòng ngừa: HTML an toàn (bỏ script / on* / URL / img, thẻ hình).
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import re
 
 import numpy as np
 
-DRAW = ("text", "icon", "stars", "shape", "group")
+DRAW = ("text",)
 OVERLAP = 0.1   # chồng nhau > 10% diện tích phần tử nhỏ hơn = lỗi báo cho vòng sửa
 CONDENSE = 0.85   # chữ dài hơn ô theo chiều ngang: nén ngang (scaleX) tới 0.85 TRƯỚC khi co cỡ -- chữ giữ chiều cao như nháp
 ROT_MIN = 2.0   # độ: dòng model vẽ nghiêng >= 2 độ thì dựng nghiêng đúng góc đó (dưới 2 độ là nhiễu đo của OCR)
@@ -480,8 +480,7 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
     used = {tfont, dfont}
     med = float(np.median([m["size"] for m in M["L"]])) if M.get("L") else 0.0
     els, log, force = [], [], []
-    # LỚP: vỏ (shape / group) vẽ trước, chi tiết / chữ vẽ sau -- vỏ không bao giờ đè lên nội dung đặt trong nó
-    for op in sorted(P["ops"], key=lambda o: o.get("kind") not in ("shape", "group")):
+    for op in P["ops"]:
         if op.get("kind") not in DRAW or not (op.get("html") or op.get("box_style")):
             continue
         g = op_geom(op, M)
@@ -489,31 +488,22 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
             continue
         fix = op.get("fix") or {}
         b = g["rect"]
-        # 1em = cỡ chữ model vẽ ở các dòng của lệnh, hoặc các dòng NẰM TRONG khung lệnh (vỏ: cỡ chữ model vẽ trong vỏ);
-        # không có dòng nào: nửa cao khung; ô chỉ gồm chi tiết I#: cao ô (icon / hàng sao không ghi cỡ lấp đúng ô)
+        # 1em = cỡ chữ model vẽ ở các dòng của lệnh, hoặc các dòng NẰM TRONG khung lệnh; không có dòng nào: nửa cao khung
         Ls = [M["by"][m] for m in op.get("marks") or [] if m.startswith("L") and m in M["by"]] or \
             [m for m in M["L"] if _ov(m["box"], g["aabb"]) >= 0.6 and (m["box"][2] - m["box"][0]) * (m["box"][3] - m["box"][1]) > 0]
         size = float(np.median([m["size"] for m in Ls])) if Ls else 0.5 * (b[3] - b[1])
         mk = op.get("marks") or []
-        if mk and all(m.startswith("I") for m in mk):
-            size = b[3] - b[1]
         color = next((m["color"] for m in Ls if m.get("color")), "#161616")
         # MẶC ĐỊNH khi VLM không ghi (i-font / CSS trong lệnh thắng): tiêu đề dùng display_font, độ đậm = độ đậm đo trên nháp
         # (07/10: lệnh không ghi weight dựng ở 400 -> tiêu đề / tên đậm trong nháp thành chữ mảnh)
         fam = dfont if med and Ls and size >= HEAD * med else tfont
         st_w = [m["stroke"] / m["size"] for m in Ls if m.get("stroke") and m.get("size")]
         wt = WEIGHT(float(np.median(st_w))) if st_w else None
-        # chữ là TOÀN BỘ nội dung một vỏ (pill / nút một dòng): căn giữa dọc theo vỏ -- khung dòng OCR (thân chữ, mép
-        # sáng của vỏ) lệch lên, chữ căn giữa khung dòng trông "nảy lên" khỏi tâm vỏ (08/10 m03)
         lm = {m for m in mk if m.startswith("L")}
-        sh = next((s for s in M.get("S") or [] if lm and set(s.get("lines") or []) == lm and not s.get("icons")), None)
-        if sh and op.get("kind") == "text" and not g["angle"]:
-            cy, hh = (sh["box"][1] + sh["box"][3]) / 2, min(b[3] - b[1], 0.9 * (sh["box"][3] - sh["box"][1]))
-            b = [b[0], cy - hh / 2, b[2], cy + hh / 2]
         # font-size ghi ở box_style = CỠ GỐC của khung (để nguyên px thì nó đè cỡ khung: vòng co nhảy cỡ, cân cỡ cùng vai hỏng)
         bs_raw = op.get("box_style") or ""
         fsz = re.search(r"(?<![-\w])font-size\s*:\s*(\d+(?:\.\d+)?)px\s*;?", bs_raw)
-        if fsz and not (mk and all(m.startswith("I") for m in mk)):
+        if fsz:
             size, bs_raw = float(fsz.group(1)), bs_raw.replace(fsz.group(0), "")
         # VLM ghi cỡ bằng px poster (đọc thẳng từ số đo dòng / khung); đổi sang em theo cỡ khung để vòng co vẫn co đều mọi thứ
         html = re.sub(r"(\d+(?:\.\d+)?)px\b", lambda m: f"{float(m.group(1)) / max(size, 1.0):.4f}em", op.get("html") or "")
@@ -577,8 +567,7 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
             force.append(f"#c>.{cls},#c>.{cls} *{{text-shadow:{ring},0 0 .18em {c}!important;}}")
         els.append({"id": op["id"], "box": b, "html": h, "style": bs, "size": size, "color": color, "font": family(fam),
                     "fit": fix.get("fit") or op.get("fit") or "shrink", "angle": g["angle"], "cls": cls,
-                    "condense": fix.get("condense"), "icon": op.get("kind") == "icon" and bool(mk)
-                    and all(m.startswith("I") for m in mk), "iset": op.get("icon_set"), "nl": len(lm), "hfit": single,
+                    "condense": fix.get("condense"), "nl": len(lm), "hfit": single,
                     "path": path_of(op, M), "lead": any((M["by"].get(m) or {}).get("lead_icon") for m in lm)})
     log += _align_left(els)
     page.set_viewport_size({"width": W, "height": H})
@@ -803,12 +792,8 @@ def _group_frames(P: dict, M: dict, els: list[dict], res: list, W: int) -> tuple
                 else:
                     cx, hw = float(np.median([(x[0] + x[2]) / 2 for x in B0])), max(x[2] - x[0] for x in B0) / 2
                     b[0], b[2] = cx - hw, cx + hw
-                # RÀO: vỏ chứa dòng (chữ trong pill không tràn pill), phần tử khác cùng hàng, mép ảnh
+                # RÀO: phần tử khác cùng hàng, mép ảnh
                 lo, hi = 0.0, float(W)
-                for m in ops[e["id"]].get("marks") or []:
-                    sh = M["by"].get((M["by"].get(m) or {}).get("shell") or "")
-                    if sh:
-                        lo, hi = max(lo, min(b0[0], sh["box"][0] + 0.25 * size)), min(hi, max(b0[2], sh["box"][2] - 0.25 * size))
                 for x in els:
                     if x["id"] in ops or min(b0[3], x["box"][3]) - max(b0[1], x["box"][1]) <= 0.3 * (b0[3] - b0[1]):
                         continue
@@ -906,13 +891,13 @@ def _poly_ov(a, b) -> float:
 def check(P: dict, M: dict, res: list | None = None, shrink_min: float | None = 0.7) -> list[dict]:
     """LỖI KHÁCH QUAN cho vòng sửa (không cần mắt): ô chưa thuộc lệnh nào; ô dùng ở hai lệnh vẽ; khung hai lệnh chồng nhau; (sau
     dựng) nội dung hai lệnh chồng nhau, nội dung tràn khung dù đã co tới sàn, phải co dưới shrink_min (nhồi quá nhiều chữ).
-    Lệnh nằm trong khung một vỏ (shape / group) không tính là chồng; vỏ rỗng (chỉ CSS) không đo tràn / chồng nội dung."""
+    Lệnh rỗng (chỉ CSS) không đo tràn / chồng nội dung."""
     draw = [op for op in P["ops"] if op.get("kind") in DRAW and (op.get("html") or op.get("box_style"))]
     by_id = {op["id"]: op for op in P["ops"]}
     errs, seen = [], {}
-    if M.get("S") is not None:   # mọi ô phải thuộc một lệnh -- ô bỏ sót = chữ / chi tiết biến mất không ai quyết
+    if M.get("L") is not None:   # mọi dòng phải thuộc một lệnh -- dòng bỏ sót = chữ biến mất không ai quyết
         used = {m for op in P["ops"] for m in op.get("marks") or []}
-        left = [m["id"] for m in M["L"] + M["S"] + M["I"] if m["id"] not in used]
+        left = [m["id"] for m in M["L"] if m["id"] not in used]
         if left:
             errs.append({"type": "unassigned", "ops": [], "slots": left})
     for op in draw:
@@ -928,17 +913,14 @@ def check(P: dict, M: dict, res: list | None = None, shrink_min: float | None = 
         if pt:
             lm = M["by"][next(m for m in op["marks"] if m.startswith("L"))]
             polys[op["id"]] = _path_polys(pt, lm.get("size") or 1.0)
-    kinds = {op["id"]: op.get("kind") for op in draw}
     pairs = set()
     for i, a in enumerate(draw):
         for b in draw[i + 1:]:
             ba, bb = boxes[a["id"]], boxes[b["id"]]
             if not ba or not bb:
                 continue
-            # phần tử nằm gọn trong một VỎ (shape / group) không phải lỗi: vỏ chứa chữ / icon là bình thường
             o = _multi_ov(polys[a["id"]], polys[b["id"]])
-            inside = bool({kinds[a["id"]], kinds[b["id"]]} & {"group", "shape"}) and o >= 0.95
-            if o > OVERLAP and not inside:
+            if o > OVERLAP:
                 errs.append({"type": "boxes_overlap", "ops": [a["id"], b["id"]], "frac": round(o, 2)})
                 pairs.add((a["id"], b["id"]))
     for i, a in enumerate(res or []):
@@ -1026,7 +1008,7 @@ def autofix(P: dict, M: dict, errs: list[dict], res: list[dict]) -> tuple[dict, 
                 a, b = r["ink"], box[i]
                 area = max(1.0, (a[2] - a[0]) * (a[3] - a[1]))
                 return 1 - _ov(a, b) * min(area, (b[2] - b[0]) * (b[3] - b[1])) / area
-            cand = [i for i in ids if ops[i].get("kind") not in ("shape", "group") and not path_of(ops[i], M)]   # chữ theo đường không cắt khung
+            cand = [i for i in ids if not path_of(ops[i], M)]   # chữ theo đường không cắt khung
             if not cand:
                 continue
             area = lambda i: (box[i][2] - box[i][0]) * (box[i][3] - box[i][1])   # noqa: E731
@@ -1083,10 +1065,9 @@ def _role_groups(P: dict, M: dict, res: list, same_font: bool = True) -> list[li
             continue
         b = [min(m["box"][0] for m in Ls), min(m["box"][1] for m in Ls), max(m["box"][2] for m in Ls), max(m["box"][3] for m in Ls)]
         T.append((op["id"], float(np.median([m["size"] for m in Ls])), b))
-    # DÒNG CÓ ĐẦU DÒNG (icon / tick ngay bên trái): nháp hay vẽ các mục một danh sách to nhỏ khác nhau (08/10 r01_s1: 34-38 so với
-    # 30-32 px) -> cỡ nháp không đủ để nhận cùng vai; hai dòng cùng có đầu dòng và thẳng mép trái là một danh sách dù lệch tới 40%
-    bul = {c["near"].split()[-1] for c in M.get("I") or [] if str(c.get("near") or "").startswith("left of")} | \
-        {l["id"] for l in M.get("L") or [] if l.get("dot")}   # chấm tròn đầu dòng (slots._lead_dots)
+    # DÒNG CÓ ĐẦU DÒNG (chấm tròn, hoặc khung đã dời khỏi icon đứng trước): nháp hay vẽ các mục một danh sách to nhỏ khác nhau
+    # (08/10 r01_s1: 34-38 so với 30-32 px) -> hai dòng cùng có đầu dòng và thẳng mép trái là một danh sách dù lệch tới 40%
+    bul = {l["id"] for l in M.get("L") or [] if l.get("dot") or l.get("lead_icon")}
     has_bul = {op["id"] for op in P["ops"] if any(m in bul for m in op.get("marks") or [])}
     lim = lambda a, b: 1.4 if a[0] in has_bul and b[0] in has_bul else 1.15   # noqa: E731
     par = {t[0]: t[0] for t in T}
@@ -1131,12 +1112,11 @@ def _role_groups(P: dict, M: dict, res: list, same_font: bool = True) -> list[li
     return [g for g in groups.values() if len(g) >= 2]
 
 
-KIND_COL = {"text": (230, 30, 30), "icon": (30, 120, 230), "stars": (240, 170, 0), "shape": (160, 40, 200), "group": (160, 40, 200),
-            "keep": (0, 160, 80), "skip": (170, 170, 170)}
+KIND_COL = {"text": (230, 30, 30), "keep": (0, 160, 80), "skip": (170, 170, 170)}
 
 
 def ops_image(img, M, P):
-    """Nháp mờ + khung từng lệnh (màu theo loại) + nhãn: loại và chữ / icon sẽ vẽ."""
+    """Nháp mờ + khung từng lệnh (màu theo loại: viết / giữ / xoá) + nhãn: loại và chữ sẽ viết."""
     import numpy as np
     from PIL import Image, ImageDraw, ImageFont
     im = Image.fromarray((img * 0.55 + 115).astype(np.uint8)).convert("RGB")

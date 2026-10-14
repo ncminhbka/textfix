@@ -342,7 +342,7 @@ function setDebug(on) { debug = on; try { localStorage.setItem("tf_debug", on ? 
 const VIEWS = [["poster", "Poster", false], ["poster_first", "Lượt đầu (trước khi mã sửa lỗi)", true], ["draft", "Nháp FLUX", true],
                ["hisam", "① Hi-SAM: nét chữ", true], ["ink", "② Mặt nạ gỡ chữ", true], ["clean", "③ LaMa: nền sạch (VLM nhìn)", true],
                ["base", "④ Nền dựng", true], ["ocr", "Dòng + OCR", true], ["ops", "Lệnh designer", true], ["steps", "Các bước", true]];
-const TN = { llm: "LLM", ve_nhap: "vẽ nháp", net_chu: "nét chữ (Hi-SAM)", dong: "đo dòng", go_chu: "gỡ chữ (LaMa)", vlm: "VLM thiết kế", dung: "dựng", duyet: "VLM sửa" };
+const TN = { llm: "LLM", ve_nhap: "vẽ nháp", net_chu: "nét chữ (Hi-SAM)", dong: "đo dòng", go_chu: "gỡ chữ (LaMa)", vlm: "VLM thiết kế", dung: "dựng" };
 function thumb(p, i) {
   const on = i === picked ? " on" : "", lab = `<div class="vlab">${i + 1}. ${esc(p.direction || "")}</div>`;
   if (p.status === "done") return `<div class="vcard${on}" onclick="picked=${i};show()"><img src="${p.poster_url}">${lab}</div>`;
@@ -385,7 +385,7 @@ async function loadPlan(P) {
   if (!PLANS[P.plan_url]) PLANS[P.plan_url] = fetch(P.plan_url).then(r => r.json());
   return PLANS[P.plan_url];
 }
-const KCOL = { L: "#e03131", S: "#1971c2", I: "#f08c00" };
+const KCOL = { L: "#e03131" };
 function plainHtml(s) { const d = document.createElement("div"); d.innerHTML = s || ""; return d.textContent; }
 async function drawOcr() {
   const P = current.posters[picked], pl = await loadPlan(P), svg = $("ocrsvg"), img = $("ocrimg");

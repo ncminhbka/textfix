@@ -104,7 +104,7 @@ def draw(flux, B: dict, W: int, H: int, seed: int, product: np.ndarray | None = 
 
 def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -> dict:
     """TRẠM THIẾT KẾ: dòng (OCR + nét chữ) -> gỡ mọi dòng (LaMa, MỘT lần) -> VLM điền chữ -> rà lệnh -> trả điểm ảnh nháp cho dòng
-    giữ -> dựng -> kiểm -> sửa bằng code -> vòng duyệt (slots.REVIEW_MODE, mặc định tắt). d = draw(...)."""
+    giữ -> dựng -> kiểm -> sửa bằng code. d = draw(...)."""
     from . import lonly, render, slots
     draft, ink, T = d["draft"], d["ink"], dict(d["timing"])
     t0 = time.time()
@@ -169,7 +169,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     if empty and not wrote(raw):
         errs.append({"type": "empty_plan", "ops": []})
     log += rlog + [f"LỖI: {e}" for e in errs]
-    poster_first, errs_first = poster, errs   # bản lượt đầu (debug: so trước / sau vòng sửa)
+    poster_first, errs_first = poster, errs   # bản lượt đầu (debug: so trước / sau khi mã sửa lỗi)
     sev = lambda E: sum(e["type"] in slots.SEVERE for e in E)   # noqa: E731
     for k in range(render.FIX_ROUNDS if sev(errs) else 0):   # SỬA BẰNG CODE: lỗi nặng đo được -> sửa, dựng lại, giữ khi bớt lỗi
         P2, flog2 = render.autofix(P, M, errs, res)
@@ -186,43 +186,6 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
         if not sev(errs):
             break
     T["dung"] = time.time() - t0
-    t0 = time.time()   # VÒNG DUYỆT (slots.REVIEW_MODE): "errors" -- 1 lượt, chỉ khi có lỗi nặng; "full" -- thẩm mỹ cả tấm
-    changes = log[:]   # code đã đổi gì trong quyết định của VLM (chặn chữ, căn cột, cân cỡ...) -- vòng duyệt phải biết
-    for k in range(slots.review_rounds() if slots.review_needed(errs) else 0):
-        progress(f"VLM duyệt {k + 1}")
-        try:
-            P2, vlog2 = slots.validate(slots.review(draft, poster, M, P, errs, res, B["prompt_en"], B["texts"], vlm,
-                                                    product=product, changes=changes), M, B["texts"], product=product)
-        except Exception as e:   # vòng duyệt hỏng (VLM trả sai, quá giờ): giữ bản đang có
-            log.append(f"vòng duyệt {k + 1} hỏng: {type(e).__name__}: {str(e)[:200]}")
-            break
-        if not P2.get("review_patches"):
-            log.append(f"vòng duyệt {k + 1}: không sửa gì ({P2.get('review_why')})")
-            break
-        poster2, res2, rlog2 = render.render(page, base_of(P2)[0], P2, M)
-        errs2 = render.check(P2, M, res2)
-        log += [f"-- vòng duyệt {k + 1} --", f"VLM: {P2.get('review_why')}"] + vlog2 + rlog2 + [f"LỖI CÒN: {e}" for e in errs2]
-        if not slots.accept(P, errs, P2, errs2):   # mất câu khách / thêm lỗi nặng: hoàn lại đúng các lệnh gây hỏng
-            P3 = slots.salvage(P, errs, P2, errs2)
-            if P3 is not None:
-                poster3, res3, rlog3 = render.render(page, base_of(P3)[0], P3, M)
-                errs3 = render.check(P3, M, res3)
-                log.append(f"-> hoàn lại {P3['salvaged']}, giữ các vá khác")
-                if slots.accept(P, errs, P3, errs3):
-                    P2, poster2, res2, errs2, rlog2 = P3, poster3, res3, errs3, rlog3
-            if P2 is not P3:
-                log.append("-> bản duyệt mất câu khách / thêm lỗi nặng, giữ bản trước")
-                break
-        if slots.REVIEW_MODE == "full":
-            better, why = slots.judge(draft, poster, poster2, vlm)
-            log.append(f"giám khảo: {'bản duyệt' if better else 'bản trước'} đẹp hơn ({why})")
-        else:   # chế độ errors: không gọi giám khảo, rào đo lường (accept) đã qua là giữ
-            better = True
-        if not better:
-            break
-        poster, P, errs, res, changes = poster2, P2, errs2, res2, vlog2 + rlog2
-        log.append("-> giữ bản đã duyệt")
-    T["duyet"] = time.time() - t0
     tid = lambda m: int(m[1:]) if isinstance(m, str) and m[1:].isdigit() else m   # noqa: E731  "T5" -> 5
     miss_i = [i for i in map(tid, P.get("missing") or []) if isinstance(i, int) and 0 <= i < len(B["texts"])]
     code_miss = [i for i in slots.uncovered(P, B["texts"]) if i not in miss_i]   # VLM bỏ câu mà không khai

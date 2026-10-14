@@ -288,7 +288,7 @@ def design_one(job: dict, v: dict, d: dict, Bv: dict, product: bool, vd: Path, u
         save(r["steps"], vd / "steps.jpg", 88)
         P = r["plan"]
         M = {**P["slots"], "size": [d["draft"].shape[1], d["draft"].shape[0]],
-             "by": {m["id"]: m for m in P["slots"]["L"] + P["slots"]["S"] + P["slots"]["I"]}}
+             "by": {m["id"]: m for m in P["slots"]["L"]}}
         save(np.asarray(ops_image(r["draft"], M, P)), vd / "ops.jpg", 88)
         save(np.asarray(slots.marked_image(r["draft"], M)), vd / "slots.jpg", 88)
         first = r["poster_first"] is not r["poster"]

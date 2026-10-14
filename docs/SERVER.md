@@ -109,8 +109,6 @@ Lần đầu trình duyệt có thể hỏi "cho phép tải nhiều tệp": ch�
 
 ```python
 # ô notebook, thư mục làm việc = thư mục repo (%cd ~/work/<thư mục repo>)
-%run scripts/probe.py                          # 12 prompt bench/prompts_C.json: FLUX vẽ, Hi-SAM + LaMa, VLM thật -> probe_NN.zip
-%run scripts/probe.py --only p11_distill_s4    # một ca
 # máy chủ (bash scripts/start_server.sh) phải đang chạy:
 %run scripts/dev_batch.py                      # tập dev bench/dev2.json (40 yêu cầu như người dùng điền UI, 73 ảnh) qua máy chủ
                                                # -> dev2_<giờ>_NN.zip ĐẦY ĐỦ (nháp, nét chữ, lượt đầu, poster, plan); đứt giữa
@@ -125,7 +123,6 @@ Biến môi trường trong notebook: `%env` từng biến, hoặc chạy `sourc
 
 **Dùng cả 2 card:** máy chủ nạp mỗi A30 một FLUX (≈ 17 GB) + một Hi-SAM (1,3 GB, đỉnh ~4 GB khi chạy); LaMa nằm trên card đầu.
 
-`probe.py` ra `output/probe/<key>.jpg` (nháp | dòng | nét chữ | nền | poster | lệnh), `<key>_plan.json`, `<key>_poster.png`.
 
 ## Chạy một tập dev từ terminal và xem kết quả tại chỗ
 

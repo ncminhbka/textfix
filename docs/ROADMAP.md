@@ -49,10 +49,10 @@ Mã
 - [x] `scripts/erase_bench.py` theo đường mới. *(tuỳ chọn `--recheck` cho số vô lý > 100%: chưa dùng được)*
 - [x] `scripts/lonly_replay.py` theo đường mới (dựng lại tại máy với lệnh VLM đã lưu).
 - [x] Xoá khỏi `main`: `cleanup.py`, `overlay.py`, `textmask.py`, `flux.erase`, 12 script chỉ đường cũ dùng.
-- [ ] Cắt nốt trong `slots.py` lời dặn và bộ mô tả của đường ô vỏ / ô chi tiết (`SYSTEM`, `describe`, phần S / I của `validate`).
+- [x] Dọn mã trước chặng B (14/10): bỏ khỏi `slots.py` lời dặn cũ `SYSTEM` / `SYSTEM_V1` / `REVIEW` / `JUDGE` (có danh mục icon), `describe`, vòng VLM duyệt (`review`, `judge`, `salvage`, `accept`; nhánh cũ giữ), các luật ô vỏ / ô chi tiết / icon / hàng sao của `validate`; bộ dựng chỉ còn lệnh chữ; M chỉ còn dòng L; bỏ `flux.edit`, `geo.band_arc`, `ship.pack_dir`, `scripts/probe.py`. `slots.py` 2.021 -> ~1.150 dòng. Lời dặn VLM: 0 chữ "icon". Kiểm: 12 poster dựng lại trước / sau giống nhau (11 giống từng điểm ảnh, 1 lệch một dòng chấm, nhìn như nhau); chạy trọn trạm thiết kế với VLM giả; dựng UI.
 - [x] Bỏ bộ icon: `textfix/icons.py`, `assets/icons/` (1.544 SVG), `scripts/fetch_icons.py`, phần `<i-icon>` / `<i-stars>` của `render.expand`, mục đếm icon trong `check_server.py`. Bộ dựng gỡ thẻ icon / sao / svg khỏi chữ và ghi log thay vì vẽ.
 - [x] `docs/SERVER.md`, `README.md`, mục 14/10 trong `docs/TUNING.md`, `scripts/check_server.py` kiểm tệp Hi-SAM / LaMa.
-- [ ] `docs/DESIGN.md`, `PLAN_BLOCKS.md`, `SLOTS_GT.md` còn tả đường cũ: viết lại hoặc xoá.
+- [x] Xoá `docs/DESIGN.md`, `PLAN_BLOCKS.md`, `SLOTS_GT.md`, `tools/annotate.html` (tả / phục vụ đường cũ; còn trong git và các nhánh legacy). Dữ liệu `bench/slots_gt/` giữ nguyên.
 
 Đo tại máy (trước khi xin chạy máy chủ)
 - [x] Bước 4 trên 30 nháp accept2: 241 / 242 dòng cũ còn, 3 dòng cong còn đủ, thêm 4 cụm nét (chữ vòng trên huy hiệu trà).

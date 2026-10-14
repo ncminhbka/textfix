@@ -39,10 +39,6 @@ RUN_MIN = 24.0       # ... và cỡ lớn >= 24 px (chữ li ti trang trí -- d�
 
 BAND_MIN_H = 0.035   # DẢI CHỮ hiển thị: cao chữ >= 3.5% cạnh ngắn ảnh (chữ thân để OCR lo)
 BAND_GAP = 0.9       # hai mảnh nét cùng dải: khe ngang <= 0.9 cao chữ, cao lệch <= 1.6 lần, chồng nhau theo chiều dọc >= 0.3
-BAND_SAG = 0.6       # dải CONG: võng >= 0.6 cao chữ. Đo trên 60 dải của 162 nháp (12/10): 5 cung thật võng 0.73-1.47, dòng thẳng
-                     # dài (dấu thanh, chữ viết tay làm đường tâm gợn) <= 0.54
-BAND_SPAN = 6.0      # ... và dài >= 6 cao chữ (~5-6 chữ cái, như ARC_MIN_PARTS): dải ngắn vài chữ cái thì đường tâm đi theo
-                     # hình chữ (V, A, W, %), võng tới 1.9 mà không phải cung
 BAND_TILT = 4.0      # dải nghiêng: >= 4 độ
 
 
@@ -119,13 +115,6 @@ def bands(ink: np.ndarray, W: int, H: int) -> list[dict]:
                     "span": float(np.sum(np.hypot(np.diff(px), np.diff(py)))), "n": len(g),
                     "box": [float(xs_.min()), float(ys_.min()), float(xs_.max() + 1), float(ys_.max() + 1)], "mask": sel})
     return out
-
-
-def band_arc(b: dict) -> dict:
-    """Dải cong -> cùng khuôn với kết quả của `arcs` (đường CHÂN = đường tâm hạ nửa cao chữ)."""
-    center = np.array(b["pts"], np.float64)
-    return {"box": b["box"], "geo": "band", "path": _baseline(center, np.full(len(center), b["h"] / 2)), "scale": None,
-            "h": b["h"], "mask": b["mask"], "parts": max(b["n"], ARC_BLIND)}
 
 
 def _circle(pts: np.ndarray) -> tuple[float, float, float]:
@@ -388,7 +377,7 @@ def apply_arcs(L: list[dict], I: list[dict], found: list[dict], cap_em: float) -
             first = cov_L[0]
         else:   # OCR không đọc được chữ cong (cung dài, nhiều mảnh cùng cỡ đều nhau = chữ): ô mới, chữ OCR rỗng
             first = {"id": f"L{1 + max([int(l['id'][1:]) for l in L] or [0])}", "ocr": "", "caps": True, "color": None,
-                     "stroke": None, "shell": None, "base": None}
+                     "stroke": None, "base": None}
             L = L + [first]
         caps = all(l.get("caps") for l in cov_L) if cov_L else True
         new = {**first, "box": a["box"], "ocr_box": a["box"], "ocr": " ".join(l["ocr"] for l in cov_L),

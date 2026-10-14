@@ -17,7 +17,7 @@ form / prompt
   -> poster
 ```
 
-Lộ trình và tình trạng hiện tại: [docs/ROADMAP.md](docs/ROADMAP.md). [docs/DESIGN.md](docs/DESIGN.md) tả thiết kế trước 14/10 (ô vỏ / ô chi tiết, bản xoá FLUX): chỉ còn giá trị tham khảo.
+Lộ trình và tình trạng hiện tại: [docs/ROADMAP.md](docs/ROADMAP.md). Nhật ký tune, số đo, hướng đã thử và bỏ: [docs/TUNING.md](docs/TUNING.md). Thiết kế cũ (ô vỏ / ô chi tiết, bản xoá FLUX) nằm ở các nhánh `legacy-slots-si`, `legacy-flux-erase`.
 
 ## Chạy
 
@@ -28,7 +28,7 @@ pip install -r requirements.txt
 export TEXTFIX_LLM_URL=http://<host>:<port>/v1 TEXTFIX_MODEL=<model nhìn được ảnh> TEXTFIX_LLM_API_KEY=<khoá>
 python scripts/check_server.py --fix        # kiểm môi trường, phải in "SẴN SÀNG."
 bash scripts/start_server.sh                # giao diện ở cổng 8088
-python scripts/probe.py                     # thử engine trên bench/prompts_C.json, nhìn output/probe/*.jpg
+python scripts/dev_batch.py bench/accept2.json   # chạy một tập qua máy chủ đang bật, báo cáo + một zip
 ```
 
 Chạy trên máy chủ bằng ô notebook (`%run scripts/...`): kết quả tự gói thành zip < 24 MB và tự tải về ([docs/SERVER.md](docs/SERVER.md)).
@@ -42,7 +42,7 @@ Chạy trên máy chủ bằng ô notebook (`%run scripts/...`): kết quả t�
 | `textfix/flux.py` | FLUX.2-klein: vẽ nháp |
 | `textfix/hisam.py` | Hi-SAM: mặt nạ nét chữ của nháp |
 | `textfix/lonly.py` | Đường chỉ dòng chữ: gỡ chữ (mặt nạ + LaMa), lời dặn VLM, rà lệnh |
-| `textfix/slots.py` | Đo dòng chữ, gọi VLM, chặn chữ sai, vòng duyệt |
+| `textfix/slots.py` | Đo dòng chữ (OCR, chữ cong, chữ dọc, cụm nét lạ), gọi VLM, chặn chữ sai |
 | `textfix/render.py` | Dựng HTML đúng khung dòng (thẻ font), kiểm lỗi |
 | `textfix/ocr.py`, `glyph.py`, `geo.py` | OCR dòng, đo nét (cỡ, màu), chữ cong |
 | `textfix/fonts.py` | Bộ font OFL đủ dấu tiếng Việt |
@@ -50,7 +50,6 @@ Chạy trên máy chủ bằng ô notebook (`%run scripts/...`): kết quả t�
 | `server/` | Máy chủ FastAPI + giao diện form |
 | `scripts/dev_batch.py`, `batch_report.py` | Chạy một tập qua máy chủ, báo cáo + một zip |
 | `scripts/lonly_replay.py`, `erase_bench.py` | Máy cá nhân: dựng lại poster / đo bước gỡ chữ trên nháp đã lưu |
-| `tools/annotate.html` | Công cụ gán nhãn ô S / I / L / P (Chrome / Edge, ghi thẳng vào repo) |
 | `flux2/` | Mã suy luận FLUX.2 của Black Forest Labs (Apache-2.0), nguyên trạng |
 | `assets/` | Font (OFL) |
 

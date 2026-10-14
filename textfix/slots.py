@@ -21,24 +21,12 @@ import numpy as np
 CAP_EM = 0.72        # cao chữ hoa / em (cũng ~ cao chữ số, nét lên b d h k l t)
 TALL_MIN = 0.15      # dòng có >= 15% ký tự cao -> ước cỡ theo cao nét cao (glyph h_tall)
 X_EM = 0.53          # cao chữ thường (x-height) / em
-INK_IN_SHELL = 25.0  # trong vỏ: nét chữ = khác màu lòng vỏ >= 25 ΔE (cả lòng vỏ đều thuộc lớp phủ)
 GAP_SPLIT = 1.0      # trong một dòng OCR, khoảng KHÔNG nét rộng >= 1 cao dòng = hai mục riêng (khoảng cách từ ~0.3 cao dòng;
                      # OCR gộp "địa chỉ [icon] website" ở chân trang thành một dòng)
 LEADER_H = 0.3       # hàng chấm nối: cột có nét cao <= 0.3 cao dòng là chấm / gạch nối, coi như khoảng trống
 GAP_MIN = 0.4        # khoảng không nét quanh chỗ OCR chèn dấu cách kép: >= 0.4 cao dòng (khoảng cách từ thường ~0.3)
 ICON_W = 1.6         # khối kẹp giữa hai khoảng không ở chỗ cắt, rộng <= 1.6 cao dòng = icon giữa hai mục
 INK_DE = 25.0        # điểm nét = khác màu nền khung dòng (trung vị viền khung) >= 25 ΔE
-ROW_GAP = 0.5        # chi tiết giống nhau (cao lệch <= 25%) cùng hàng (tâm lệch <= 25% cao), cách nhau <= 0.5 cao = MỘT chi tiết
-                     # (hàng sao, hàng chấm: designer dựng cả hàng bằng một thẻ)
-DETAIL_MIN = 0.5     # chi tiết I: cạnh dài >= 0.5 cao dòng chữ trung vị của poster (icon designer đặt không nhỏ hơn nửa chữ thân;
-                     # nhỏ hơn = vụn: mép vật FLUX vẽ lại, mẩu hoạ tiết)
-SHELL_INK_DE = 8.0   # VỎ GIẢ: màu lòng "vỏ" gần trùng màu mực của dòng nằm trong nó (ΔE < 8) = nét chữ to bị coi là vỏ (vỏ thật
-                     # luôn khác màu chữ: 130 poster 12/10, 2 ô <= 0.4, ô kế 16.5) -> không tạo ô S
-KEEP_INK_MAX = 0.75  # GIỮ VỎ NHÁP: trong khung các dòng của vỏ, điểm "nét" (khác màu lòng) chiếm > 75% = lòng không phẳng màu
-                     # (ảnh / hoạ tiết / màu lòng đo sai) -> không lấp nét được, vỏ đó vẽ lại bằng CSS
-KEEP_HALO = 2        # nới mặt nạ nét chữ cũ (px): viền khử răng cưa
-
-
 def _lab(x):
     import cv2
     a = cv2.cvtColor(x, cv2.COLOR_RGB2LAB).astype(np.float32)
@@ -159,27 +147,6 @@ def lines(img: np.ndarray) -> list[dict]:
     return L
 
 
-def _rows(I: list[dict]) -> list[dict]:
-    """Gộp chi tiết giống nhau xếp thành hàng (ROW_GAP) thành một chi tiết."""
-    I = sorted(I, key=lambda c: c["box"][0])
-    out = []
-    for c in I:
-        x0, y0, x1, y1 = c["box"]
-        h = y1 - y0
-        prev = next((o for o in reversed(out) if o.get("shell") == c.get("shell")
-                     and abs((o["_h"]) - h) <= 0.25 * max(o["_h"], h)
-                     and abs((o["box"][1] + o["box"][3]) / 2 - (y0 + y1) / 2) <= 0.25 * max(o["_h"], h)
-                     and 0 <= x0 - o["box"][2] <= ROW_GAP * max(o["_h"], h)), None)
-        if prev is None:
-            out.append({**c, "box": list(c["box"]), "_h": h})
-        else:
-            b = prev["box"]
-            prev["box"] = [min(b[0], x0), min(b[1], y0), max(b[2], x1), max(b[3], y1)]
-    for o in out:
-        o.pop("_h")
-    return out
-
-
 def _split_gaps(img: np.ndarray, l: dict) -> list[dict]:
     """Tách dòng OCR (thẳng) thành các MỤC riêng:
     (a) khoảng không nét rộng >= GAP_SPLIT cao dòng;
@@ -260,20 +227,6 @@ def _split_gaps(img: np.ndarray, l: dict) -> list[dict]:
         bx = [float(x0 + a), float(y0), float(x0 + b), float(y1)]
         out.append({**l, "text": part, "box": bx, "poly": [[bx[0], bx[1]], [bx[2], bx[1]], [bx[2], bx[3]], [bx[0], bx[3]]]})
     return out or [l]
-
-
-def _anchor(l: dict) -> tuple[float, float]:
-    """Một điểm nằm TRÊN dòng chữ: tâm khung; dòng cong: giữa đường chân, nhích lên nửa cao chữ (tâm khung thẳng của một vòm chữ
-    rơi vào thứ nằm dưới vòm, không phải vào chữ)."""
-    pt = l.get("path")
-    if pt and len(pt) >= 2:
-        k = len(pt) // 2
-        (ax, ay), (bx, by) = pt[k - 1], pt[k]
-        ln = float(np.hypot(bx - ax, by - ay)) or 1.0
-        up = 0.35 * float(l.get("size") or 0.0)
-        return ((ax + bx) / 2 + (by - ay) / ln * up, (ay + by) / 2 - (bx - ax) / ln * up)
-    b = l["box"]
-    return ((b[0] + b[2]) / 2, (b[1] + b[3]) / 2)
 
 
 LEAD_GAP = (0.6, 4.0)   # khung OCR thừa bên trái nét chữ đầu tiên một khoảng 0,6-4 cao nét = khung ôm cả icon đứng trước dòng
@@ -443,7 +396,6 @@ def build(draft: np.ndarray, ink: np.ndarray, product: bool = False) -> dict:
         # KHUNG DÒNG = KHUNG OCR, nguyên bản (12/10: bỏ hẳn bước nắn khung theo nét mực -- trên nền ảnh chụp nét mực đo thiếu,
         # khung bị cắt hẹp / đẩy mép trái vào mỗi dòng một kiểu: 11-25% dòng, danh sách thò thụt, chữ co).
         l["ocr_box"] = list(l["box"])
-        l["shell"] = None
     I: list = []
     from . import geo
     glog, glog2, masks = [], [], {}
@@ -455,7 +407,7 @@ def build(draft: np.ndarray, ink: np.ndarray, product: bool = False) -> dict:
     mlog = _lead_dots(L, ink) + _trim_lead(L, ink)
     L, glog = _renumber(L, [], [], glog + glog2 + olog + mlog)
     _typo_notes(L, glog)
-    return {"L": L, "S": [], "I": [], "size": [W, H], "by": {m["id"]: m for m in L}, "mask": ink, "shells": {}, "geo_log": glog}
+    return {"L": L, "size": [W, H], "by": {m["id"]: m for m in L}, "geo_log": glog}
 
 
 GEO_NAME = {"arc": "cung tròn", "wave": "lượn sóng", "grow": "to dần / nhỏ dần"}
@@ -544,7 +496,7 @@ def _orphans(L: list, draft: np.ndarray, ink: np.ndarray, masks: dict) -> tuple[
         new = {"id": f"L{1 + max([int(l['id'][1:]) for l in L] or [0])}", "box": box, "ocr_box": list(box),
                "poly": [[x0, y0], [x1, y0], [x1, y1], [x0, y1]], "ocr": text, "base": None,
                "size": float(min(gh, y1 - y0) / (CAP_EM if caps or not text else 0.62)), "color": "#%02x%02x%02x" % tuple(int(v) for v in col),
-               "angle": 0.0, "caps": caps, "stroke": None, "stroke_contrast": None, "effect": None, "shell": None,
+               "angle": 0.0, "caps": caps, "stroke": None, "stroke_contrast": None, "effect": None,
                "missed": True, "orphan": True}
         L = L + [new]
         log.append(f"cụm nét chưa dòng nào nhận: {[round(v) for v in box]} ({px} điểm nét) đọc {text!r} -> {new['id']} (VLM quyết giữ / viết / xoá)")
@@ -622,7 +574,7 @@ def _geo_lines(L: list, I: list, draft: np.ndarray, A: np.ndarray, ink0: np.ndar
             col = np.median(draft[ink & part], axis=0) if (ink & part).any() else np.array([20, 20, 20])
             new = {"id": f"L{1 + max([int(l['id'][1:]) for l in L] or [0])}", "box": pbox, "ocr_box": list(pbox), "poly": poly, "ocr": text,
                    "base": None, "size": float(pext / (CAP_EM if caps else X_EM)), "color": "#%02x%02x%02x" % tuple(int(x) for x in col),
-                   "angle": float(ang), "caps": bool(caps), "stroke": None, "stroke_contrast": None, "effect": None, "shell": None,
+                   "angle": float(ang), "caps": bool(caps), "stroke": None, "stroke_contrast": None, "effect": None,
                    "missed": True}
             gone = [c for c in I if cen_in(c["box"], part)]
             I = [c for c in I if c not in gone]
@@ -695,17 +647,6 @@ def _stacked(near: np.ndarray, ink: np.ndarray, tilt: float, ext: float) -> list
     return out
 
 
-def attach_geo(M: dict, draft: np.ndarray, ink: np.ndarray, product: bool = False) -> list[str]:
-    """M đọc từ plan.json: chạy phần đo chữ theo cung trên các ô ĐÃ LƯU (không OCR lại) -> đổi M["L"], M["by"] tại chỗ, trả log.
-    Dùng cho đo / dựng lại tại máy."""
-    for l in M["L"]:
-        l.setdefault("poly", [[l["box"][0], l["box"][1]], [l["box"][2], l["box"][1]], [l["box"][2], l["box"][3]], [l["box"][0], l["box"][3]]])
-    L, I, log, masks = _geo_lines(M["L"], [], draft, _lab(draft), ink, [])
-    M["L"], M["I"] = L, []
-    M["by"] = {m["id"]: m for m in L}
-    return log
-
-
 def mark_printed(M: dict, product_ocr: list | None) -> list[str]:
     """CHỮ IN TRÊN SẢN PHẨM khách tải (13/10, người dùng: PHẢI GIỮ, không thay bằng bất cứ gì): dòng của nháp có chữ OCR gần
     trùng một dòng chữ đọc được trên ẢNH SẢN PHẨM (FLUX chép sản phẩm vào nháp rất sát) -> l["printed"] = True. Dòng đó luôn
@@ -725,9 +666,8 @@ def _hex_lab(hx: str) -> np.ndarray:
 
 def public(M: dict) -> dict:
     """Ô để ghi JSON."""
-    return {"L": [{k: m[k] for k in ("id", "box", "ocr_box", "ocr", "size", "color", "angle", "shell", "curve", "runs", "geo", "path", "scale", "missed", "orphan", "printed", "dot", "lead_icon", "vertical", "angle_ocr", "sag", "merged", "typo", "poly") if k in m}
-                  for m in M["L"]],
-            "S": M["S"], "I": M["I"]}
+    return {"L": [{k: m[k] for k in ("id", "box", "ocr_box", "ocr", "size", "color", "angle", "curve", "runs", "geo", "path", "scale", "missed", "orphan", "printed", "dot", "lead_icon", "vertical", "angle_ocr", "sag", "merged", "typo", "poly") if k in m}
+                  for m in M["L"]]}
 
 
 def marked_image(img: np.ndarray, M: dict):
@@ -742,8 +682,7 @@ def marked_image(img: np.ndarray, M: dict):
             f = ImageFont.truetype("DejaVuSans.ttf", s)
         except OSError:
             f = ImageFont.load_default()
-    items = [(m, (0, 140, 255), 4, "tl") for m in M["S"]] + [(m, (230, 20, 20), 2, "tl") for m in M["L"]] + \
-            [(m, (255, 150, 0), 2, "br") for m in M["I"]]
+    items = [(m, (230, 20, 20), 2, "tl") for m in M["L"]]
     for m, col, wd, corner in items:
         if m.get("path"):   # ô chữ cong: đường chân thay cho khung (khung thẳng của một vòm trùm cả thứ nằm dưới vòm)
             pt = [tuple(q) for q in m["path"]]
@@ -764,393 +703,6 @@ def marked_image(img: np.ndarray, M: dict):
 
 
 # ---------------------------------------------------------------------------------------------------- VLM
-SYSTEM = """You are a senior graphic designer finishing a poster. An image model drew the DRAFT from the PROMPT below. Its layout \
-and pictures are good; its overlay layer -- text, cards, pills, bands, buttons, icons, avatars, stars -- is rough and misspelt. \
-An eraser removed that whole layer (what is left is the BASE) and code measured what was removed as SLOTS. You decide what each \
-slot is and how it looks; the renderer draws your decision exactly inside the slot. Final poster = BASE + your slots, every \
-slot where the model drew it, at the size it drew.
-
-THE RULES THAT MATTER MOST
-1. The LOOK comes from the draft, the WORDS come from the client texts. Never take spelling from the image or the OCR \
-(the model draws TRƯỞNG for TRƯƠNG); copy client words character for character with every Vietnamese diacritic, and never \
-swap a word for a synonym (nghìn stays "nghìn").
-2. FIT. The room is what the model drew, never what the client wrote. Each line lists how many characters the model wrote \
-there: that is the most the line holds (real letters are wider than the model's thin ones); fewer is fine. A client text \
-longer than its room is REWRITTEN SHORT in the client's own words until it fits at the drawn size: keep the key words, drop \
-the rest. Example: "Hỗ trợ nấu cơm chín đều, giữ độ mềm dẻo và giúp việc chuẩn bị bữa ăn hằng ngày trở nên thuận tiện" drawn \
-as 2 lines of about 22 characters -> "Cơm chín đều, mềm dẻo<br>mỗi bữa ăn". Never the full sentence at a smaller size, never \
-more lines than the model drew, and the same inside a pill / button / badge ("Tặng buổi tư vấn đầu cho khách mới").
-3. FACTS -- names, prices, numbers, dates, phones, addresses, emails, links -- are never changed, abbreviated or invented: \
-exact, with their unit (35.000đ, 30 phút, 50%, 15-25 triệu; "Quận 3", never "Q.3"), or left out. A fact the model drew \
-that is in no client text is never written: skip that slot.
-4. Every slot id appears in exactly ONE op; never leave a slot out ("skip" drops it). Always return ops: an empty plan is a \
-blank poster.
-5. Each client text is written ONCE. The model often repeats a line (a date, a price, a badge label): write it in the slot \
-that fits best -- the biggest one for a headline -- and skip the copies.
-6. The rows of one list look exactly alike and keep the client's order. Items the model drew no row for are left out and \
-listed in "missing", never crammed into another row. A clean, well-fitted poster beats a complete one.
-
-IMAGES: the message names each one. DRAFT = what the model drew. SLOTS = the draft with every slot marked (blue S#, red L#, \
-orange I#); ZOOM = enlarged parts of it. BASE (when given) = the erased poster your slots are drawn on: what is really behind \
-each slot (shells the eraser kept are still there; a skipped slot shows this background).
-
-SLOTS, as listed after the images:
-- S# SHELL: a card / pill / badge / band / button / panel; box, fill color, corner radius, the L# / I# inside it.
-- I# DETAIL: a small non-text element (icon, avatar, star row, check, logo, ornament); box, color, its shell, the nearest line.
-- L# TEXT LINE: the garbled OCR letters, drawn text size in px, number of characters drawn (its room), color, its shell. \
-L# numbers follow the reading order block by block: a column is numbered top to bottom before the column beside it starts.
-
-ONE OP PER SLOT
-- S#: "shape" -- box_style = CSS matching the draft (start from the measured fill and radius; add border / shadow / gradient / \
-transparency the draft shows), html "". "keep" -- the draft's own pixels are put back (old letters of the L# lines inside are \
-wiped; you still write those lines): for a shape a CSS box cannot draw (ring, seal, starburst, ribbon, tilted or irregular \
-sticker) drawn cleanly in ONE flat color, for a shell that is part of the picture (printed on a product or object), and when \
-the S# box is clearly bigger than the shell you see. Not for glossy, gradient or see-through shells. "skip" -- junk only: a \
-shell holding a line you write is never skipped (the text would sit bare).
-- I#: "icon" -- html = ONE helper tag without a size (it fills the slot): <i-icon name="<lucide name>" color="#hex"></i-icon>; \
-a person -> name "circle-user"; a star row -> <i-stars n="5" fill="#f5b301" empty="#d9d9d9"></i-stars>. "text" -- the detail is \
-really a big character or number OCR missed (a step number in a circle). "keep" -- anything that is NOT lettering and that the \
-draft drew well: a frame line, divider, ornament, logo mark, a graphic printed on a product, and any piece of the PHOTO (the \
-eraser redrew it a little differently; "keep" gives the draft's back). Unsure between skip and keep for a non-letter -> "keep". \
-"skip" -- garbled letter fragments, duplicates, a bullet / icon whose row you dropped.
-- L#: "text" -- html = the text; one op may take several CONSECUTIVE lines of ONE block stacked one under the other \
-(["L5","L6"], <br> between the lines), never lines standing side by side (only two pieces of one drawn line that OCR cut \
-apart go together). "keep" -- text printed on a product, package, screen, dial or object in the photo: never rewrite or add \
-words there. "skip" -- junk / duplicates.
-- "keep" never applies to POSTER lettering however decorated (a headline on a ribbon, 3D or metallic letters, badge text): \
-the draft's letters are misspelt, so it is always rewritten as a text op.
-- CURVED LINE slot (the list says so; SLOTS shows its curve): one line of lettering along an arch, a smile or a ring. ONE \
-text op with that single slot, one line, no <br>: the renderer lays your letters along the measured curve. Never in the same \
-op as another slot; a ring with text on top and at the bottom is two slots, two ops.
-- A line "drawn at N degrees" is tilted and the renderer rotates it itself: never write transform rotate / skew anywhere. \
-Tilted lines stacked in one sticker / ribbon / tag are ONE op.
-- "OCR missed this line": real lettering of the draft (usually a big decorated headline). Look at the DRAFT to see which \
-client text it is and write it there.
-- "row mark in front": a bullet / check / small icon sits at the left INSIDE that line's slot. Start the row's html with \
-the mark and a space -- "• " for a dot, <i-icon name="check" color="#hex"></i-icon> for a check or real icon (drawn at text \
-size) -- the same mark on every row of the list. Never a ring or circle icon for a dot. A row whose mark the BASE still \
-shows gets only the text.
-
-TEXT
-- Write each line at the size measured for its slot, with the model's line breaks; fine print and footers too, never \
-smaller "to be safe". Set "client": "T<i>" on every op writing (part of) a client text.
-- One client text drawn over several stacked lines (MENU / TRÀ SỮA) is one op with all those slots. Read the garbled OCR to \
-find them: a short line under a line that ends its sentence is that text's second line.
-- Client texts marked OURS are filler we wrote (headline, tagline, button, section label): shorten, reword or drop them \
-freely; they carry no facts.
-- Text the model invented (in no client text): write what it was meant to say from its role and the PROMPT, a natural line of \
-about the same length in the poster's language. Never copy garbled OCR. Never invent a fact.
-- Star ratings are <i-stars n="..."></i-stars>, never star characters, and never "5 sao" / "5.0" next to the stars.
-- html: inline spans only (color / weight / italic / size for emphasis), inline CSS, no <img>, URLs or scripts; sizes in poster \
-px. The slot is a flex box centered both ways; left-aligned text needs box_style "justify-content:flex-start; text-align:left".
-
-LISTS AND GROUPS
-- One item per drawn row, in the client's order, each starting with a capital letter; item / price rows keep their pairing. \
-More rows than items: fill top to bottom and skip the LAST extra rows with their marks, never a hole in the middle. More \
-items than rows: one item per row, the rest go to "missing".
-- GROUPS -- you declare, the renderer obeys. Ops that belong together carry the same "group" name ("benefits", "menu-names", \
-"menu-prices", "badges", "headline"), the same "group_kind" and "align":
-  "list" = separate items, one per row: drawn on ONE margin at ONE size, font, weight and color.
-  "flow" = ONE sentence the draft broke over several lines that you did not merge into one op: all lines drawn alike.
-  "align" = "left" | "center" | "right", as the draft aligned them.
-  Write the ops of a group identically yourself (same font key, weight, size, color, case, letter-spacing; only the words \
-change). Every list and every multi-line sentence that is not one merged op MUST be a group. Lines the draft drew at clearly \
-different sizes (a small "GIẢM" beside a huge "50%", a big headline over a small tagline) are NOT a group: "group": null.
-- Icons in front of list rows are ONE set: every row you write keeps exactly one, same style and color.
-
-SHELLS
-- A line inside an S# shell, or on a shell the BASE still shows, never gets its own background, border or shadow (no shell \
-inside a shell). A list row or body line never gets a background bar: use a text-shadow for contrast.
-- Lost shell: the DRAFT shows a button / pill / band behind a line, the BASE does not and no S# covers it -> recreate it in \
-that text op's box_style (background, border-radius, a little padding, the draft's colors). A call-to-action is never bare text.
-- A badge / seal the BASE still shows is never left empty: when its drawn lines match no client text, write ONE short phrase \
-from the client texts there (the key number or benefit) and skip the other lines.
-- Badge / sticker with a big middle line: the key word or number big in the big slot, the rest small in the small slots \
-(Giảm / 50%); leftover slots are skipped, not filled with made-up words.
-
-STYLE -- the poster should look like the draft with clean text, not like another design
-- One type system: style.display_font for headlines, style.text_font for the rest (keys from the catalog); <i-font key="..." \
-weight="700">...</i-font> only where a line needs another font. Pick fonts whose family matches the draft's letterforms \
-(condensed, rounded, geometric, serif, script, display) and whose letter width is within about 0.05em of the width listed for \
-the line (caps width for all-caps lines): a wider font gets shrunk, a narrower one looks lost.
-- Match each line's weight, case, italic and tracking: a heavy headline stays heavy (800-900), a script stays a script, \
-slanted stays italic, a wide headline is never set condensed. The measured weight / strokes / shadow are hints; the image \
-wins. Effects with inline CSS, as strong as the draft: -webkit-text-stroke or text-shadow for outlines, text-shadow for \
-shadows and glows, background-clip:text with a linear-gradient for gradient or metallic letters.
-- Colors: put the draft's 3-5 main colors in style.palette and take every text, shell and icon color from it or from the \
-measured colors; no new hues. Same role, same color and font.
-- Contrast: every text must read clearly on what is really behind it (check the BASE); on a busy or mid-tone background add \
-a subtle text-shadow.
-- Hierarchy and alignment as the draft shows them: headline > price / offer / call-to-action > body > fine print; a centered \
-block stays centered, a left column stays left.
-
-OUTPUT: one JSON object
-{"style": {"display_font": "<key>", "text_font": "<key>", "palette": ["#hex"], "notes": "..."},
- "ops": [{"id": "o1", "slots": ["L1"], "kind": "text|keep|skip|shape|icon", "client": "T0" | null, "html": "...",
-          "box_style": "...", "group": "name" | null, "group_kind": "list" | "flow" | null,
-          "align": "left" | "center" | "right" | null, "why": "a few words"}],
- "missing": ["T5"], "notes": "..."}
-
-FONT CATALOG (key: family, class): {fonts}
-
-LUCIDE ICONS (common ones by theme; any other Lucide name also works -- the renderer maps an unknown name to the nearest \
-icon): {icons}"""
-
-# Lời dặn designer bản đầy đủ trước 13/10 (dài gấp đôi, kèm cả 1544 tên icon): TEXTFIX_PROMPT=v1 để so trên máy chủ.
-SYSTEM_V1 = """You are a senior graphic designer finishing a poster. An image model was given the PROMPT below and drew the DRAFT. \
-Its layout, composition and pictures are good; its overlay layer is broken: text is garbled, icons / avatars / stars are \
-malformed, cards / pills / bands are rough. An eraser removed the WHOLE overlay layer: every text, card, pill, band, button, \
-icon, avatar and star -- only the picture remains (the BASE). Code measured exactly what was removed and split it into SLOTS. \
-You decide what each slot is and how it should look; the renderer draws your decision exactly inside that slot. The final \
-poster = the BASE + your slots. Keep the model's layout: every slot stays where the model drew it, at its size.
-
-AESTHETICS COME FIRST. For layout and look, follow the draft. A clean, consistent, well-fitted poster beats a complete one. \
-But the WORDS come from the client texts, never from the image.
-
-IMAGES: the message names each image. DRAFT = what the model drew. SLOTS = the draft with every slot marked (blue S#, red \
-L#, orange I#); ZOOM images are enlarged parts of it. BASE (when given) = the erased poster the renderer draws your slots on: \
-what will really be behind each slot (shells the eraser kept are still there; skipped slots leave this background).
-
-SLOTS:
-- S# SHELL: a card / pill / badge / band / button / panel the model drew; measured box, fill color, corner radius, and which \
-L# / I# lie inside it.
-- I# DETAIL: a small non-text element (icon, avatar, star row, check mark, bullet, logo, emoji...); measured box and color, \
-the shell it is in, the nearest line.
-- L# TEXT LINE: what OCR read (garbled), the drawn text size in px, how many characters the model wrote there (its CAPACITY), \
-the measured color, the shell it is in.
-
-FOR EACH SLOT, ONE op (a text op may take several consecutive lines of one text block):
-- S#: kind "shape", slots ["S1"], box_style = CSS for the shell matching the draft (start from the measured fill and radius; \
-add border / shadow / gradient / transparency if the draft shows it), html "". Or kind "skip" if the shell is junk, or kind \
-"keep" if it is part of the picture (a graphic printed on a product, package or object: its original pixels are restored).
-  A shell whose SHAPE a CSS box cannot draw (a ring or double ring, a seal, a starburst / scalloped badge, a ribbon, a tilted or irregular sticker) and that the draft drew cleanly in ONE flat color: kind "keep" -- the renderer puts the draft's own shell back and wipes the old letters of the L# lines inside; you still write those lines as text ops. Not for glossy, gradient or see-through shells, and not when the shell carries lettering outside its L# lines (curved text along its edge): those are "shape". Also "keep" when the S# box is clearly bigger than the shell you see in the draft (the slot swallowed a \
-frame line or a band next to the pill): a "shape" would paint the whole box, "keep" restores exactly what the draft had. \
-A shell that holds a line you write is never "skip": the text would sit bare on the background.
-- I#: kind "icon", slots ["I3"], html = ONE helper tag without a size (it fills the slot): <i-icon name="<lucide name>" \
-color="#hex"></i-icon>; a person avatar -> <i-icon name="circle-user" color="#hex"></i-icon>; a star row -> <i-stars n="5" \
-fill="#f5b301" empty="#d9d9d9"></i-stars>. Pick the icon from what the model drew and what the nearby text means. Or kind \
-"text" (html = the text) if the detail is really a big character or number OCR missed (a step number "1" in a circle), or kind "skip" for junk or duplicates, or kind "keep" for a detail that belongs to the picture (a logo or graphic printed on a product, \
-package or object, a sign in the scene: its original pixels are restored).
-  "keep" is also right for anything that is NOT lettering and that the draft drew well: a frame line, a divider, an ornament, a sparkle, a logo mark, and any piece of the PHOTO itself (the eraser redrew part of the picture a little differently: "skip" would leave the eraser's version, "keep" gives the draft's back). Unsure between "skip" and "keep" for something that is not lettering -> "keep". "skip" is for garbled letter fragments, duplicates and bullets / icons whose row is dropped; "icon" is for a bullet / check / icon / avatar / star row (redrawn clean).
-- L#: kind "text", slots ["L5"] or ["L5","L6"], html = the text. Or kind "keep" for text printed on a product, package, screen \
-or object in the photo (its original pixels are restored, never redraw such text), or kind "skip" for junk / duplicates.
-- A CURVED LINE slot (the list says so; SLOTS shows its curve instead of a box) is one line of lettering that follows an arch, \
-a smile or a ring. Write it as ONE text op with that single slot, one line, no <br>, no transform / rotate of your own: the \
-renderer lays your letters along the measured curve. Style it like any headline (font, weight, color, outline). A ring with \
-text on top and at the bottom is two slots, each its own op. Never put a CURVED LINE slot in the same op as any other slot: \
-if the list shows more slots than the phrase needs around the curve, write the whole phrase on the curve and "skip" the others.
-- A line listed "drawn at N degrees" is tilted: the renderer rotates the op to the measured angle itself. Never write \
-transform: rotate / skew anywhere (box_style or html) -- it would be turned twice. Tilted lines stacked in one sticker / \
-ribbon / tag are ONE op (<br> between them).
-- A slot marked "OCR missed this line" is real lettering of the draft (usually a big decorated headline): look at the DRAFT to \
-see which client text it is and write that text there; never skip it because its OCR letters look wrong.
-- "keep" never applies to POSTER lettering, however decorated it is \
-(a headline on a ribbon or banner, curved, 3D or metallic letters, badge and sticker text): the draft's letters are often \
-misspelt, so it is always rewritten as a text op with the client's spelling.
-- A product's screen, display, dial, label or packaging text is part of the picture: "keep" it (or "skip"), never write \
-words or numbers there.
-- Every slot id appears in exactly ONE op -- never leave a slot out (use "skip" to drop it).
-
-TEXT
-- Decide what the model meant to write on each line and write it at the size it drew, keeping its line breaks (<br> \
-between the lines of a multi-line op).
-- FIT -- the room is what the model drew, never what the client wrote. Each line lists how many characters the model wrote \
-there: that is the most the line holds (the model's letters are thin; real letters are wider), fewer is fine. A client text \
-longer than its room is REWRITTEN SHORT, in the client's own words, until it fits at the drawn size: keep the key words, \
-drop the rest. A 20-word description drawn as two short lines becomes one short phrase ("Hỗ trợ nấu cơm chín đều, giữ độ \
-mềm dẻo và giúp việc chuẩn bị bữa ăn hằng ngày trở nên thuận tiện" in a 2 x 22-character slot -> "Cơm chín đều, \
-mềm dẻo<br>mỗi bữa ăn"). Never the full sentence at a smaller size, never extra lines the model did not draw.
-- Facts (names, prices, numbers, dates, phones, addresses, emails, links) are never changed, abbreviated or invented -- keep \
-them exact (Quận 3 stays "Quận 3", never "Q.3") or leave them out; the unit belongs to the number (15-25 triệu, 35.000đ, \
-30 phút, 50%): never drop it. Never swap a client word for a synonym (nghìn stays "nghìn", never "ngàn"). Set \
-"client": "T<i>" on ops writing (part of) a client text; list client texts the model did not draw, or that you dropped, in \
-"missing".
-- Client texts marked OURS are filler copy we wrote (a headline, tagline, button or section label the client did not give): \
-you may shorten, reword or drop them freely so the poster fits and looks right; they never carry facts. All other client \
-texts follow the rules above and below.
-- SPELLING: copy client words character for character, with every Vietnamese diacritic. The draft's letters are often \
-wrong (TRƯỞNG or TRƯỜNG drawn for TRƯƠNG, Thứ Bẩy for Thứ Bảy): never take spelling from the image or the OCR.
-- ONCE: each client text is written once. The image model often repeats a line (the same date, price or badge label twice): \
-write it in the slot that fits it best and skip the copies. Never write a word that is in no client text inside an op that \
-claims a client text.
-- One client text drawn over several stacked lines (MENU / TRÀ SỮA): one op with all those slots, <br> between the lines. \
-Read the OCR letters to find those lines even when garbled: a short slot below a line that ends its sentence ("chainn vi" \
-under "Coffee rang moc") is that text's second line, never the start of another text.
-- BLOCKS: L# numbers follow the reading order block by block -- a column of text is numbered top to bottom before the \
-column beside it starts. The slots of one op are consecutive lines of ONE block, stacked one under the other; lines side by \
-side belong to different ops. (Only pieces of ONE drawn line that OCR cut in two -- same height, same size, a word gap \
-apart -- go together.)
-- List items, steps and item / price rows keep the client's order and pairing (each name with its own price, steps \
-1, 2, 3 in order), even where the draft drew them in another order.
-- Text the model invented: write what it was meant to say from its role, position and the PROMPT, a natural line of about the \
-same length in the poster's language (usually Vietnamese). Never copy garbled OCR. Commit; do not hedge. But a FACT the \
-model drew that is in no client text (an address, phone, price, date, percentage, website) is never written: skip that slot.
-- Star ratings are always <i-stars n="..."></i-stars>, never star characters (the fonts have no star glyph). The stars \
-ARE the rating: never write "5 sao" / "5 stars" / "5.0" next to a star row (a client text that only says "5 sao" is shown \
-as the stars alone).
-- html: inline spans only (color / weight / italic / size for emphasis), inline CSS only, no <img>, no URLs, no scripts. Sizes \
-in px of the poster (as listed per line). The slot is a flex box centered both ways; for left-aligned text use box_style \
-"justify-content:flex-start; text-align:left".
-- One consistent type system: style.display_font for headlines, style.text_font for the rest (font keys from the catalog); use \
-<i-font key="..." weight="700">...</i-font> only when a line needs another font. Colors: follow the draft; text must stay \
-clearly readable on what is behind it (on the BASE the shell under a line may be gone if you skip it).
-
-LOOK: REPRODUCE THE DRAFT'S STYLE -- the final poster should look like the draft with clean text, not like a different design.
-- Typography per line: match what the model drew (look at the images; the measured weight / caps / strokes / shadow / outline \
-are hints, the image wins when they disagree). Pick catalog fonts whose family matches the draft's letterforms (condensed, \
-rounded, geometric, serif, script, display), then reproduce the rest with \
-inline CSS: font-weight, font-style:italic, text-transform, letter-spacing for tracked headlines, -webkit-text-stroke or \
-text-shadow for outlines, text-shadow for drop shadows and glows, background-clip:text with a linear-gradient for gradient or \
-metallic (gold / silver) lettering. Keep effects as strong as in the draft -- no weaker, no stronger.
-- Color harmony: put the draft's 3-5 main colors in style.palette (dominant background tone, 1-2 accents, dark and light text \
-tones). Take every text, shell and icon color from that palette or from the measured colors; no new hues. Lines with the same \
-role share the same color and font.
-- Hierarchy: headline > price / offer / call-to-action > body > fine print, by size, weight and color contrast, as the draft \
-shows it. Never make body text compete with the headline.
-- Contrast: every text needs strong contrast with what is really behind it (check the BASE): light text on dark, dark on light; \
-when the background is busy or mid-tone, add a subtle text-shadow or a shell, in the poster's palette.
-- Lost shells: if the DRAFT shows a button, pill, badge or band behind a line but the BASE does not (the eraser removed it and \
-no S# slot covers it), recreate it in that text op's box_style (background, border-radius, a little padding) in the draft's \
-colors -- a call-to-action must never end up as bare text. Only then: a line inside an S# shell, or on a shell the BASE still shows, never gets its own background or border (no card inside a card).
-- Alignment: keep the draft's alignment per block -- a centered headline stays centered, a left column stays left.
-- Size: write every line at the size measured for its slot; fine print, labels and footers too -- never smaller "to be safe".
-- Lists: keep the draft's list structure -- one item per row, each row keeps its own text next to its bullet / check / icon; \
-never merge list rows into one block and never leave a bullet or icon without its text. Every list row (bullet / feature / step) starts with a capital letter, and all rows of one list carry the same "group" name with "group_kind": "list".
-- Row marks: a line listed with "row mark in front" has a bullet / check / small icon at its left INSIDE the slot. Start that \
-row's html with the mark and a space: "• " for a dot, <i-icon name="..." color="#hex"></i-icon> for a real icon or check \
-mark (drawn at the size of the text) -- the same kind of mark on every row of the list, never a big ring for a dot. A row \
-without that note whose mark the BASE still shows gets only the text; a mark the eraser removed that has no I# slot is \
-drawn the same way, at the start of the row's html.
-- Slanted (italic / oblique) lettering in the draft stays italic; tracked (widely spaced) headlines keep their letter-spacing.
-- Weight and family: a heavy / black headline stays heavy (font-weight 800-900 in a font that has it), a script stays a \
-script font, a wide headline is never set in a condensed font (or the reverse). Unset weight = the weight measured on the draft.
-- Letter width: each line lists how wide the drawn letters are (em per character) and the catalog lists each font's width \
-(mixed case / caps). Pick a font within about 0.05em of the line (caps width for all-caps lines): a wider font does not fit \
-the slot and gets shrunk, a narrower one looks lost in it.
-- Same role, same look: rows of one list / menu / table, the items of one card set, the labels of one badge set share ONE \
-font, size, weight and color -- write the same font-size on all of them (the smallest that fits), never one row big and the \
-next small. Left-aligned columns: "justify-content:flex-start; text-align:left" on every row so the left edges line up.
-- GROUPS -- you decide, the renderer obeys. Slots that belong together get the same "group" name on their ops (e.g. \
-"benefits", "menu-names", "menu-prices", "badges", "headline"), with the same "group_kind" and "align" on every op of the group:
-  * "group_kind": "list" -- separate items of one list / menu / feature set / step set / badge set, one item per row. The \
-renderer puts every row on ONE margin and draws all rows exactly alike: ONE size (the size that fits the longest row), font, weight and color.
-  * "group_kind": "flow" -- ONE sentence or phrase that the draft broke over several lines and that you did not merge into a \
-single op (a two-line headline, a paragraph). The renderer draws all its lines exactly alike: ONE size, font, weight and color.
-  * "align": "left" | "center" | "right" -- how the draft aligned the lines of the group.
-  Write every op of a group IDENTICALLY yourself: the same font key, the same weight, the same size, the same color, the same \
-case and letter-spacing in html / box_style -- copy the first op's styling to the others and change only the words.
-  Every list and every multi-line sentence that is not one merged op MUST be a group. Lines the draft deliberately drew \
-different (a huge "FLASH SALE" over a small tagline, a big price next to its small unit) are NOT a group: "group": null.
-- More rows than items: the image model sometimes drew more list rows or bullets than there are client items. A long item \
-may continue on the next row (that row's bullet skipped); otherwise skip the extra rows AND their bullets / icons. \
-Fill the rows top to bottom in order and skip only the LAST extra rows -- never leave an empty row in the middle of a list \
-(a garbled or repeated row in the middle is just the next row of the list).
-- More items than rows, or one client text holding several items ("A, B, C, D") where the draft drew bullets: ONE item per \
-drawn bullet, each short enough for its row, first letter capital, in the client's order. Never pack two or three items \
-into one row and never leave a drawn bullet empty while another row is crammed; items that get no row are dropped \
-("missing") or two short ones share a row only where the draft drew them so.
-- Text in a pill / button / badge / band: the shell fixes the room -- FIT applies strictly (facts exact: "Tặng buổi tư vấn \
-đầu cho khách mới"), never a full sentence shrunk to fine print inside its shell.
-- A badge / seal / shell the BASE still shows is never left EMPTY: when the lines the model drew inside it are invented \
-or do not match any client text, write ONE short phrase taken from the client texts there (the key number or benefit: \
-"14 ngày", "1 tỷ lợi khuẩn", "Tặng bình giữ nhiệt") and skip the other lines -- an empty badge is worse than a short one.
-- No background bars: a list row or a body line never gets its own background / box in box_style. For contrast on a busy \
-picture use a text-shadow (or a lighter / darker text color from the palette). Only a call-to-action or offer whose pill \
-the draft showed gets a recreated shell.
-- List icons are ONE set: when the rows of a list have an icon in front, EVERY row you write keeps exactly one icon op -- \
-never skip the icon of a row you write, and when the model drew two small marks in front of one row, put both I# slots \
-in ONE icon op. Same style and color on every row.
-- Badges / coins / stickers with a big middle line: put the key word or number of the client text big in the big slot and \
-the rest small in the small slots (Giảm / 50%; Tặng / quà); skip slots left over rather than filling them with made-up words.
-- Never a shell inside a shell: when the BASE still shows a pill / card / band behind a line, or its S# slot is drawn as a \
-shape, the text op gets NO background, border or box-shadow of its own.
-
-OUTPUT: one JSON object
-{"style": {"display_font": "<key>", "text_font": "<key>", "palette": ["#hex"], "notes": "..."},
- "ops": [{"id": "o1", "slots": ["L1"], "kind": "text|keep|skip|shape|icon", "client": "T0" | null, "html": "...",
-          "box_style": "...", "group": "name" | null, "group_kind": "list" | "flow" | null,
-          "align": "left" | "center" | "right" | null, "why": "a few words"}],
- "missing": ["T5"], "notes": "..."}
-
-FONT CATALOG (key: family, class): {fonts}
-
-LUCIDE ICON NAMES: {icons}"""
-
-REVIEW = """You are the same designer, now the ART DIRECTOR reviewing the rendered poster before it goes to the client. Your first pass \
-was a plan made without seeing the result; now you SEE it. Use that: judge the PROOF with your eyes, not the plan.
-
-You get: the DRAFT (the look to reach), the PROOF (exactly what the client will see), PROOF-IDS (the same with every op's \
-box and id), COMPARE crops (draft left, proof right, enlarged, for the busy areas), the rendered ops (what each wrote; \
-drafted size -> rendered font size, weight, font), the CODE CHANGES (what the engine changed in your plan on its own, see \
-below) and the ERRORS a checker measured.
-
-CODE CHANGES are deliberate and must not be undone: diacritics corrected to the client's spelling, duplicate lines skipped, \
-invented words removed, cut-short client texts restored, font keys mapped, left edges of a column aligned, icons of one row \
-/ column set to one size, lines of one role set to the size of the smallest one. When a change made something look worse (a \
-whole list became small because one row was long), fix the cause (shorten or rebreak that row, use a narrower font for the \
-role) -- do not reverse the change.
-
-Look at the PROOF as a whole and then area by area against the DRAFT, and write down every flaw a careful designer would not \
-ship. Typical flaws:
-- an orphan: a price with no item on its row, a bullet / icon / number with no text, a lone word;
-- an empty or under-filled shell: a badge, coin, pill, button or card the draft filled with big text that now holds tiny \
-text or nothing;
-- text not centred in its shell, or touching its edge;
-- one role in different sizes, weights, colors or fonts (list rows, prices, card titles, badge labels);
-- icons of one set in different sizes or styles;
-- text that is hard to read on what is behind it;
-- style that drifted from the draft: font family and width, weight, case, italic, effects, colors;
-- awkward line breaks, crowding, text much smaller than the draft drew it.
-Then fix each flaw with patches, and also every ERROR.
-
-Your tools (you may use any of them):
-- rewrite html / box_style of an op: font, weight, size, color, effects, line breaks, letter-spacing, padding, alignment;
-- MERGE slots: one op over several slots (e.g. all lines of a coin or badge in one op, the key word or number big on its own \
-line) -- the op is drawn over the union of its slots; stacked slots get one line each with <br> between them, never all \
-on one line;
-- move a client text to a better slot, split one over two slots, or give a slot to another op;
-- turn a slot into a shape (recreate a lost pill / band behind text), an icon, keep or skip;
-- delete an orphan or junk op that carries no client text.
-Change only what is wrong -- ops that look right stay untouched. Facts stay exact; step / list numbers stay in order (1, 2, 3 -- \
-never renumber a step to make room for another text). Never drop a client text: a poster \
-missing its words is worse than any flaw. Slots never move.
-
-OUTPUT one JSON object: {"findings": [{"ops": ["o7"], "flaw": "...", "fix": "..."}], "patches": [{"id": "o6", "slots": \
-[...], "kind": "...", "html": "...", "box_style": "...", "client": ..., "delete": false}], "why": "..."} -- findings first \
-(what you see), then one patch per fix; a patch lists only the fields it changes; "delete": true removes that op; a patch \
-with a NEW id (e.g. "n1") and its slots adds a new op. Empty "patches" only when the PROOF is already as good as the draft's \
-look allows."""
-
-
-def _rewritten(op: dict, ops: list[dict], patches: dict) -> bool:
-    """Chữ của lệnh op (bỏ dấu) có nằm trong một lệnh khác (sau vá) không: vòng duyệt gộp / chuyển chữ sang lệnh khác rồi mới xoá."""
-    mine = _flat(_plain(op.get("html")))
-    for o in ops + [p for p in patches.values() if p.get("id") not in {x["id"] for x in ops}]:
-        if o.get("id") == op["id"]:
-            continue
-        q = patches.get(o.get("id")) or {}
-        if q.get("delete"):
-            continue
-        if mine and mine in _flat(_plain(q.get("html", o.get("html")))):
-            return True
-    return False
-
-
-def _px(b) -> str:
-    return f"{b[2] - b[0]:.0f}x{b[3] - b[1]:.0f}px"
-
-
-def _fits(w: float, m: dict, n: int = 4) -> list[str]:
-    """Font trong danh mục có độ rộng chữ gần nét nháp nhất (cùng nhóm: nét dày-mảnh -> serif / viết tay, còn lại sans) --
-    tên cụ thể từng dòng: con số độ rộng chung chung bị VLM bỏ qua (08/10: 70 lệnh bị co, font rộng hơn nét nháp 23%,
-    gần như toàn Montserrat -- font rộng nhất bộ)."""
-    from .fonts import CATALOG, WIDTH
-    cls = ("serif", "script") if (m.get("stroke_contrast") or 0) >= 2.2 else ("sans",)
-    col = 1 if m.get("caps") else 0
-    keys = [k for k in WIDTH if CATALOG[k][1] in cls and "Italic" not in CATALOG[k][0]]   # bản nghiêng: VLM tự chọn khi nháp nghiêng
-    return sorted(keys, key=lambda k: abs(WIDTH[k][col] - w))[:n]
-
-
 def _look(m: dict) -> str:
     """Kiểu chữ đo trên nháp: độ đậm (độ dày nét / cỡ chữ), nét dày-mảnh (chữ có chân / viết tay), viết hoa, bóng / viền."""
     out = []
@@ -1188,47 +740,12 @@ def _curve_note(m: dict) -> str:
             f"room for about {n} characters")
 
 
-def describe(M: dict) -> str:
-    sh = "\n".join(f"{s['id']}: shell {_px(s['box'])}, "
-                   + (f"outline only (no fill) {s['border']} ~{s['border_px']:.0f}px" if s.get("border") else f"fill {s['fill']}")
-                   + f", radius ~{s['radius']:.0f}px, contains "
-                   f"{', '.join(s['lines'] + s['icons']) or 'nothing'}" for s in M["S"]) or "(none)"
-    de = "\n".join(f"{c['id']}: detail {_px(c['box'])}, color {c['color']}" + (f", inside {c['shell']}" if c.get("shell") else "")
-                   + (f", {c['near']}" if c.get("near") else "") for c in M["I"]) or "(none)"
-    tilt = lambda m: (_curve_note(m) if m.get("path") else f", drawn at {m['angle']:.0f} degrees" if abs(m.get("angle") or 0) >= 2   # noqa: E731
-                      else "") + (", OCR missed this line: the letters read here are a guess" if m.get("missed") else "") \
-        + (", row mark in front (inside this slot)" if m.get("mark") else "") \
-        + (", PRINTED ON THE CLIENT'S PRODUCT: kind \"keep\"" if m.get("printed") else "")
-    li = "\n".join(f"{m['id']}: \"{m['ocr']}\" (text ~{m['size']:.0f}px, ~{len(m['ocr'])} characters, color {m['color']}"
-                   + (f", inside {m['shell']}" if m.get("shell") else "") + f"{tilt(m)}{_look(m)})" for m in M["L"]) or "(none)"
-    return f"Shells:\n{sh}\n\nDetails:\n{de}\n\nText lines:\n{li}"
-
-
-PROMPT_V1 = os.environ.get("TEXTFIX_PROMPT", "") == "v1"
-# ICON GỢI Ý theo chủ đề (13/10): trước đây gửi cả 1544 tên Lucide = 48% lời dặn; trên 207 poster đã lưu VLM chỉ dùng 26 tên,
-# 20 tên phủ 91% số lần dùng. Tên ngoài danh sách vẫn dùng được (render.nearest tìm tên gần nhất).
-ICON_HINTS = {
-    "marks": "check circle-check square-check badge-check x plus minus arrow-right chevron-right star heart sparkles",
-    "contact": "phone smartphone mail map-pin globe clock calendar calendar-days message-circle send navigation",
-    "shop": "shopping-cart shopping-bag store tag percent gift credit-card wallet banknote truck package receipt ticket",
-    "people": "circle-user user users baby graduation-cap briefcase award trophy crown thumbs-up handshake smile",
-    "food": "utensils coffee cup-soda pizza cake ice-cream-cone soup salad beef fish croissant wine beer apple cookie",
-    "home": "house bed sofa lamp bath shower-head washing-machine refrigerator air-vent fan tv key wrench hammer paintbrush",
-    "health": "leaf flower sprout droplets sun moon scissors dumbbell bike heart-pulse stethoscope pill shield-check",
-    "tech": "wifi zap battery-charging camera headphones laptop monitor gamepad-2 qr-code download cloud lock rocket",
-    "travel": "plane car bus ship map compass mountain palmtree tent umbrella luggage hotel",
-    "learn": "book-open pencil lightbulb music palette mic languages calculator",
-}
-
-
 def _system(base: str) -> str:
+    """Lời dặn VLM + danh mục font (khoá, họ font, lớp, bề rộng chữ). Không còn danh mục icon: TextFix chỉ sửa chữ."""
     from .fonts import CATALOG, WIDTH
     fonts = "; ".join(f"{k}: {v[0]} ({v[1]}" + (f", {WIDTH[k][0]:.2f} / caps {WIDTH[k][1]:.2f}em" if k in WIDTH else "") + ")"
                       for k, v in CATALOG.items())
-    if PROMPT_V1 and base is SYSTEM:
-        return SYSTEM_V1.replace("{fonts}", fonts).replace("{icons}", "")
-    return base.replace("{fonts}", fonts).replace("{icons}", "")   # 14/10: bộ icon đã gỡ, TextFix chỉ sửa chữ
-
+    return base.replace("{fonts}", fonts)
 
 def _obj(x) -> dict:
     """Đầu ra VLM về dict: đôi khi trả JSON lồng trong chuỗi, hoặc mảng."""
@@ -1269,93 +786,19 @@ PRODUCT_NOTE = ("The client uploaded a photo of their product and the image mode
                 "marks PRINTED ON THE CLIENT'S PRODUCT were recognised by code as product text: they are always \"keep\".")
 
 
-VIEWS = {   # ảnh gửi designer (thử: scripts/vlm_probe.py). D nháp, S nháp đánh dấu ô, Q 4 góc phóng 2x, X bản xoá (nền dựng),
-    "A": "DSQ",    # Z vùng cắt phóng to quanh cụm ô
-    "AX": "DSQX",
-    "BX": "DSX",
-    "CX": "SXZ",
-}
-VIEW = "BX"  # chốt 07/10 (vlm_probe 23 ảnh dev): ít lỗi nhất, giữ chữ sản phẩm tốt nhất (29/30), rẻ nhất (~12k token)
-
-
-def _quarters(mk) -> list[bytes]:
-    """4 góc chồng 10%, phóng 2x: đọc được ô nhỏ."""
-    from PIL import Image
-    W, H = mk.size
-    out = []
-    for (a, b) in ((0, 0), (1, 0), (0, 1), (1, 1)):
-        x0, y0 = int(a * W * 0.45), int(b * H * 0.45)
-        q = mk.crop((x0, y0, x0 + int(W * 0.55), y0 + int(H * 0.55)))
-        out.append(_png(q.resize((q.width * 2, q.height * 2), Image.LANCZOS)))
-    return out
-
-
-def _clusters(mk, M: dict, n_max: int = 4, side: int = 1024) -> list[bytes]:
-    """Vùng cắt quanh CỤM ô, phóng cạnh dài = side: chỗ có ô được phóng, chỗ chỉ có ảnh thì không."""
-    from PIL import Image
-    out = []
-    for b in _cluster_boxes(M, *mk.size, n_max=n_max):
-        c = mk.crop(b)
-        z = side / max(c.size)
-        out.append(_png(c.resize((max(1, int(c.width * z)), max(1, int(c.height * z))), Image.LANCZOS)))
-    return out
-
-
-def _cluster_boxes(M: dict, W: int, H: int, n_max: int = 4) -> list[list[int]]:
-    """CỤM ô: khung ô nới 4% cạnh ngắn chạm nhau = một cụm; gộp cặp cụm làm tăng diện tích ít nhất tới <= n_max."""
-    pad = 0.04 * min(W, H)
-    boxes = [[b["box"][0] - pad, b["box"][1] - pad, b["box"][2] + pad, b["box"][3] + pad] for b in M["L"] + M["S"] + M["I"]]
-    if not boxes:
-        return []
-    ov = lambda a, b: a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]   # noqa: E731
-    un = lambda a, b: [min(a[0], b[0]), min(a[1], b[1]), max(a[2], b[2]), max(a[3], b[3])]   # noqa: E731
-    cl = [list(b) for b in boxes]
-    merged = True
-    while merged:
-        merged = False
-        for i in range(len(cl)):
-            for j in range(i + 1, len(cl)):
-                if ov(cl[i], cl[j]):
-                    cl[i] = un(cl[i], cl.pop(j))
-                    merged = True
-                    break
-            if merged:
-                break
-    while len(cl) > n_max:   # gộp cặp làm tăng diện tích ít nhất
-        area = lambda b: (b[2] - b[0]) * (b[3] - b[1])   # noqa: E731
-        i, j = min(((i, j) for i in range(len(cl)) for j in range(i + 1, len(cl))),
-                   key=lambda ij: area(un(cl[ij[0]], cl[ij[1]])) - area(cl[ij[0]]) - area(cl[ij[1]]))
-        cl[i] = un(cl[i], cl.pop(j))
-    return [[max(0, int(b[0])), max(0, int(b[1])), min(W, int(b[2])), min(H, int(b[3]))] for b in sorted(cl, key=lambda b: (b[1], b[0]))]
-
-
-def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, product: bool = False, base: np.ndarray | None = None,
-         view: str | None = None, meta: dict | None = None, system: str | None = None, desc: str | None = None,
-         base_label: str | None = None) -> dict:
-    """base: bản xoá đã dọn (nền dựng) cho các cấu hình có X. meta: nhận số token / thời gian (llm.json_call).
-    system / desc / base_label: lời dặn, bảng mô tả ô và nhãn ảnh nền khác mặc định (textfix/lonly.py)."""
+def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, system: str, desc: str, base: np.ndarray,
+         product: bool = False, meta: dict | None = None) -> dict:
+    """Một lời gọi VLM: lời dặn (system), PROMPT của FLUX, câu khách, bảng mô tả dòng (desc), ba ảnh DRAFT / SLOTS / BASE.
+    meta: nhận số token / thời gian (llm.json_call). -> kế hoạch đã chuẩn hoá ô (_to_marks)."""
     mk = marked_image(draft, M)
     W, H = mk.size
-    v = VIEWS[view or VIEW]
-    imgs = []
-    for c in v:
-        if c == "D":
-            imgs += ["DRAFT:", _png(draft)]
-        elif c == "S":
-            imgs += ["SLOTS (marked):", _png(mk)]
-        elif c == "Q":
-            imgs += ["ZOOM (4 quarters of SLOTS, 2x):", *_quarters(mk)]
-        elif c == "X" and base is not None:
-            imgs += [base_label or "BASE (erased poster, your slots are drawn on it):", _png(base)]
-        elif c == "Z":
-            imgs += ["ZOOM (slot clusters of SLOTS, enlarged):", *_clusters(mk, M)]
+    imgs = ["DRAFT:", _png(draft), "SLOTS (marked):", _png(mk),
+            "BASE (the draft with the old letters wiped; your text is drawn on it):", _png(base)]
     user = (f"PROMPT given to the image model:\n{prompt}\n\nClient texts (exact words):\n{_texts(texts)}\n\nPoster size: {W}x{H}px.\n\n"
-            + (PRODUCT_NOTE + "\n\n" if product else "") + f"{desc or describe(M)}")
-    args = (system or _system(SYSTEM), [user, *imgs]) + ((meta,) if meta is not None else ())
+            + (PRODUCT_NOTE + "\n\n" if product else "") + desc)
+    args = (system, [user, *imgs]) + ((meta,) if meta is not None else ())
     return _to_marks(call(*args))
 
-
-STAR_WORDS = re.compile(r"(>)[\s(]*\d+(?:[.,]\d+)?\s*(?:sao|stars?)[\s)]*(<)", re.I)   # mẩu chữ CHỈ ghi số sao, giữa hai thẻ
 SWAP_SIM = 0.6      # chữ VLM viết chệch được thay bằng chữ khách khi giống >= 0.6 và cùng chữ cái đầu
 CLIENT_LIKE = 0.6   # chữ OCR của ô giống câu khách >= 0.6 (bỏ dấu, chữ thường) = chữ poster chứa câu khách
 PRINTED = re.compile(r"\b(printed|on (the )?(product|package|packaging|label|can|bottle|jar|box|screen))\b", re.I)
@@ -1380,14 +823,14 @@ def _client_like(ocr: str, texts: list[dict]) -> int | None:
 
 
 def validate(P: dict, M: dict, texts: list[dict] | None = None, product: bool = False) -> tuple[dict, list[str]]:
-    """Phòng ngừa nhẹ, có ghi log: id ô không có -> bỏ id; lệnh không còn ô nào -> bỏ lệnh. texts (câu khách): chặn chữ (_guard).
+    """Phòng ngừa nhẹ, có ghi log: id ô không có -> bỏ id; lệnh không còn ô nào -> bỏ lệnh; một ô một lệnh. texts (câu khách): chặn chữ (_guard).
     product: khách tải ảnh sản phẩm (chữ in trên sản phẩm có thật)."""
     log, ops = [f"bỏ lệnh sai khuôn: {d}" for d in P.get("dropped") or []], []
     by = M["by"]
     # MỘT Ô, MỘT LỆNH (13/10 accept1 b05: VLM ghi thêm lệnh keep / skip cho ô đã có lệnh chữ -> chữ nháp dán lại nằm dưới chữ mới,
-    # hai lớp chữ đè nhau): ô nằm ở nhiều lệnh thuộc về lệnh "nặng" nhất -- viết chữ > vẽ (vỏ, icon) > giữ > bỏ; ngang nhau: lệnh
+    # hai lớp chữ đè nhau): ô nằm ở nhiều lệnh thuộc về lệnh "nặng" nhất -- viết chữ > giữ > bỏ; ngang nhau: lệnh
     # đứng trước. Các lệnh kia mất ô đó.
-    rank = {"text": 0, "shape": 1, "icon": 1, "stars": 1, "keep": 2, "skip": 3}
+    rank = {"text": 0, "keep": 1, "skip": 2}
     src, owner = list(P.get("ops", [])), {}
     for i, op in enumerate(src):
         for m in op.get("marks") or []:
@@ -1405,25 +848,11 @@ def validate(P: dict, M: dict, texts: list[dict] | None = None, product: bool = 
             log.append(f"{op.get('id')}: bỏ id không có {sorted(set(op.get('marks') or []) - set(mk))}")
         if not mk:
             continue
-        # CHẤM ĐẦU DÒNG VẼ BẰNG ICON VÒNG TRÒN (13/10 accept1 b06, c01, f02: <i-icon name="circle"> / "○" đầu dòng thành vòng rỗng
-        # to trước chữ dù lời dặn cấm): trong lệnh chữ, icon tròn / ký tự vòng tròn đứng đầu dòng -> "• "
-        if op.get("kind") == "text" and op.get("html"):
-            h2 = re.sub(r"(^|<br\s*/?>)(\s*)<i-icon\b[^>]*\bname=[\"'](?:circle|dot|circle-dot|circle-small)[\"'][^>]*>(?:\s*</i-icon>)?\s*",
-                        lambda m: m.group(1) + "• ", op["html"], flags=re.I)
-            h2 = re.sub(r"(^|<br\s*/?>|>)(\s*)[○◯◦⚪⭕●⬤]\s*", lambda m: m.group(1) + "• ", h2)
-            if h2 != op["html"]:
-                log.append(f"{op.get('id')}: vòng tròn đầu dòng -> chấm '•'")
-                op = {**op, "html": h2}
         # DÒNG TRỐNG TRONG LỆNH GỘP (dev3 g09_v1: "CƠM<br>NGON<br><br>TẬN<br><br>NƠI" -- VLM để trống dòng nó bỏ, khối chữ thủng lỗ):
         # các dòng của một lệnh chữ luôn liền nhau
         if op.get("kind") == "text" and re.search(r"(<br\s*/?>\s*){2,}", op.get("html") or "", re.I):
             log.append(f"{op.get('id')}: bỏ dòng trống giữa các dòng của lệnh")
             op = {**op, "html": re.sub(r"(<br\s*/?>\s*){2,}", "<br>", op["html"], flags=re.I)}
-        # ICON VIẾT VÀO Ô DÒNG CHỮ (13/10 run 2638: VLM đặt icon vào L9, L11 -- hai dòng của đoạn mô tả): ô L là chữ, icon ở đó
-        # là nhầm ô -> bỏ lệnh (nền đã xoá sạch)
-        if op.get("kind") in ("icon", "stars") and all(m.startswith("L") for m in mk):
-            log.append(f"{op.get('id')}: {op['kind']} viết vào ô dòng chữ {mk} -> skip")
-            op = {**op, "kind": "skip", "html": "", "why": "guard: icon on a text line"}
         # Ô CHỮ CONG ĐI MỘT MÌNH (13/10 run ba93: VLM gộp ô vòm với ô thẳng bên cạnh thành một lệnh -> bộ dựng không có đường
         # nào cho "một vòm + một khung", dựng thành khối chữ thẳng đè lên hình giữa con dấu). Lệnh chữ có ô cong lẫn ô L khác:
         # cả câu viết theo đường cong (dài nhất nếu nhiều), các ô L còn lại để trống -- chữ nén trên vòm vẫn đúng dáng nháp.
@@ -1461,61 +890,14 @@ def validate(P: dict, M: dict, texts: list[dict] | None = None, product: bool = 
             if k is not None:
                 log.append(f"{op.get('id')}: keep chữ nháp {ocr!r} trùng câu khách T{k} -> viết lại {texts[k]['text']!r}")
                 op = {**op, "kind": "text", "html": texts[k]["text"], "client": f"T{k}", "why": "guard: client text was kept"}
-        # SAO ĐÃ VẼ thì không viết thêm "5 sao" (12/10 run 38ef: hàng sao + chữ "5 sao"): bỏ mẩu chữ chỉ ghi số sao đứng cạnh thẻ sao
-        if "<i-stars" in (op.get("html") or ""):
-            h = STAR_WORDS.sub(lambda m: m.group(1) + m.group(2), ">" + op["html"] + "<")[1:-1]
-            if h != op["html"]:
-                log.append(f"{op.get('id')}: đã có hàng sao -> bỏ chữ ghi số sao")
-                op = {**op, "html": h}
         ops.append({**op, "marks": mk, "slots": mk})
-    # VỎ (12/10, xem 65 ô vỏ của 130 poster):
-    #  - vỏ đang chứa dòng chữ ĐƯỢC VIẾT mà bị "skip" -> chữ nằm trần trên nền (2ad2_v1 khung giá, 4af9_v0 pill trắng) -> vẽ lại
-    #    theo số đo (màu lòng / viền, bo góc);
-    #  - vỏ "keep" (giữ điểm ảnh nháp) mà không lấp được nét chữ cũ (lòng không phẳng màu: keepable = False) -> vẽ lại theo số đo.
-    live = {m for op in ops if op.get("kind") == "text" and op.get("html") for m in op["marks"]}
-    for i, op in enumerate(ops):
-        sid = [m for m in op["marks"] if m.startswith("S")]
-        if not sid or len(sid) != len(op["marks"]) or op.get("kind") not in ("skip", "keep"):
-            continue
-        s0 = by[sid[0]]
-        inside = [m for m in s0.get("lines") or [] if m in live]
-        # màu lòng đo được gần trùng màu chữ bên trong: số đo sai (hoặc vỏ giả) -> không vẽ, chữ sẽ chìm
-        same = s0.get("fill") not in (None, "none") and any(
-            by[m].get("color") and float(np.linalg.norm(_hex_lab(by[m]["color"]) - _hex_lab(s0["fill"]))) < SHELL_INK_DE for m in inside)
-        # lệnh chữ bên trong đã tự có nền / viền (VLM vẽ vỏ ngay trên lệnh chữ rồi bỏ ô vỏ -- dev3 g04): vẽ thêm là vỏ lồng vỏ
-        own = any(re.search(r"background|border\s*:", (o.get("box_style") or "") + (o.get("html") or ""), re.I)
-                  for o in ops if o.get("kind") == "text" and set(o["marks"]) & set(inside))
-        if same or own:
-            continue
-        if (op["kind"] == "skip" and inside) or (op["kind"] == "keep" and s0.get("keepable") is False and inside):
-            css = (f"border:{max(1.0, s0.get('border_px') or 2):.0f}px solid {s0['border']}" if s0.get("border")
-                   else f"background:{s0.get('fill')}") + f"; border-radius:{s0.get('radius') or 0:.0f}px"
-            log.append(f"{op.get('id')}: vỏ {sid[0]} {op['kind']} mà chứa chữ được viết {inside} -> vẽ lại theo số đo ({css})")
-            ops[i] = {**op, "kind": "shape", "html": "", "box_style": css, "why": "guard: shell holding written text"}
     if texts:
         ops, lg = _guard(ops, M, texts)
         log += lg
     log += _pack_lists(ops, by)
     if texts:
         log += _list_order(ops, by)
-    # ICON / CHẤM ĐẦU DÒNG TRƠ: chi tiết đi kèm một dòng (near "left of L5") mà dòng đó bị skip -> bỏ luôn chi tiết (09/10 dev3
-    # p08, p11: icon / chấm đầu dòng không có chữ). Chạy SAU chặn chữ và dồn hàng: dòng bị bỏ ở hai bước đó cũng tính.
-    dead = {m for op in ops if op.get("kind") == "skip" for m in op["marks"] if m.startswith("L")}
-    live = {m for op in ops if op.get("kind") in ("text", "keep") for m in op["marks"]}
-    for i, op in enumerate(ops):
-        if op.get("kind") in ("icon", "stars") and all(m.startswith("I") for m in op["marks"]):
-            tied = _tied(op, by)
-            if tied and all(t in dead and t not in live for t in tied):
-                log.append(f"{op.get('id')}: chi tiết đi kèm dòng bị bỏ {tied} -> skip")
-                ops[i] = {**op, "kind": "skip", "html": "", "why": "guard: orphan bullet / icon"}
-    log += _icon_sets(ops, by)
     return {**P, "ops": ops}, log
-
-
-def _tied(op: dict, by: dict) -> list[str]:
-    """Các dòng mà chi tiết của lệnh đi kèm (đứng bên trái / nằm trên dòng đó)."""
-    near = [(by[m].get("near") or "").split() for m in op.get("marks") or [] if m in by]
-    return [n[-1] for n in near if len(n) >= 2 and n[0] in ("left", "on")]
 
 
 def _lists(ops: list[dict], by: dict) -> dict:
@@ -1598,50 +980,12 @@ def _pack_lists(ops: list[dict], by: dict) -> list[str]:
     return log
 
 
-def _icon_sets(ops: list[dict], by: dict) -> list[str]:
-    """ICON CỦA MỘT DANH SÁCH là MỘT BỘ (12/10 run 93f1: ba hàng -- icon to, hai icon nhỏ chồng nhau, không icon): khi từ nửa số
-    hàng (>= 2) của danh sách VLM khai có icon đầu hàng, thì mỗi hàng đúng MỘT icon: hàng có nhiều icon giữ cái trên cùng, hàng
-    có ô icon mà VLM bỏ -> vẽ lại bằng icon hay dùng nhất của bộ. Gắn "icon_set" cho cả bộ: bước dựng cho cùng cỡ, thẳng một cột."""
-    log = []
-
-    def top(j):
-        return min(by[m]["box"][1] for m in ops[j]["marks"])
-    for name, idx in _lists(ops, by).items():
-        rows = {i: set(ops[i]["marks"]) for i in idx}
-        icons, skipped = {i: [] for i in idx}, {i: [] for i in idx}
-        for j, op in enumerate(ops):
-            mk = op.get("marks") or []
-            if not mk or not all(m.startswith("I") for m in mk) or op.get("kind") not in ("icon", "skip"):
-                continue
-            row = next((i for i, r in rows.items() if set(_tied(op, by)) & r), None)
-            if row is not None:
-                (icons if op["kind"] == "icon" else skipped)[row].append(j)
-        have = [i for i in idx if icons[i]]
-        if len(have) < 2 or 2 * len(have) < len(idx):
-            continue
-        htmls = [ops[j].get("html") or "" for i in idx for j in icons[i]]
-        tpl = max(sorted(set(htmls)), key=htmls.count)
-        for i in idx:
-            js = sorted(icons[i], key=top)
-            for j in js[1:]:
-                log.append(f"{ops[j].get('id')}: hàng {ops[i].get('id')} đã có icon {ops[js[0]].get('id')} -> skip")
-                ops[j] = {**ops[j], "kind": "skip", "html": "", "why": "guard: one icon per list row"}
-            if not js and skipped[i]:
-                j = min(skipped[i], key=top)
-                log.append(f"{ops[j].get('id')}: hàng {ops[i].get('id')} mất icon (các hàng khác của '{name}' có) -> vẽ lại")
-                ops[j] = {**ops[j], "kind": "icon", "html": tpl, "why": "guard: list row lost its icon"}
-                js = [j]
-            for j in js[:1]:
-                ops[j] = {**ops[j], "icon_set": name}
-    return log
-
-
 def uncovered(P: dict, texts: list[dict]) -> list[int]:
     """Câu khách KHÔNG có trên poster, đo bằng mã (09/10 dev2 d05: VLM bỏ "Thêm huyết 5.000đ" mà không khai "missing"): câu
     có chữ (bỏ dấu, chữ thường) không nằm trong chữ của mọi lệnh viết / giữ. -> chỉ số câu."""
     have = set()
     for op in P.get("ops", []):
-        if op.get("kind") in ("text", "group", "shape") and op.get("html"):   # thẻ inline nối chữ ("TR<span>Ư</span>ỜNG") hoặc
+        if op.get("kind") == "text" and op.get("html"):   # thẻ inline nối chữ ("TR<span>Ư</span>ỜNG") hoặc
             h = op["html"]                                                        # tách cột ("<span>tên</span><span>giá</span>")
             have |= set(WORD.findall(_fold(_plain(h)))) | set(WORD.findall(_fold(_plain(re.sub(r"<[^>]+>", " ", h)))))
     out = []
@@ -1650,13 +994,6 @@ def uncovered(P: dict, texts: list[dict]) -> list[int]:
         if w and not w <= have:
             out.append(i)
     return out
-
-
-def score(P: dict, errs: list[dict]) -> tuple:
-    """So bản lượt đầu / sau vòng sửa (nhỏ hơn = tốt hơn): trước hết số câu khách được viết (08/10 m03: vòng sửa bỏ tiêu đề
-    "KHAI TRƯƠNG" để hết lỗi too_small và được giữ vì ít lỗi hơn), rồi số lỗi, rồi mức chồng / tràn."""
-    told = {_tid(op.get("client")) for op in P.get("ops", []) if op.get("kind") == "text" and op.get("html")} - {None}
-    return -len(told), len(errs), sum(e.get("frac", 0) + e.get("px", 0) / 100 for e in errs)
 
 
 def _fold(s: str) -> str:
@@ -1804,12 +1141,8 @@ def _guard(ops: list[dict], M: dict, texts: list[dict]) -> tuple[list[dict], lis
             m.startswith("L") for m in out[i]["marks"]) else 0.0
         sim = {i: SequenceMatcher(None, ocr(i), f).ratio() for i in idx}
         idx = sorted(idx, key=lambda i: (-(sim[i] >= 0.5), -big(i) if sim[i] >= 0.5 else 0.0, -sim[i]))
-        if M.get("lonly"):   # chế độ chỉ dòng chữ: nháp vẽ câu đó hai chỗ thì viết cả hai, bỏ một là một nút trống (mix1 i05)
-            log.append(f"lặp chữ {f!r} ở {[out[i].get('id') for i in idx]}: giữ cả (chế độ chỉ dòng chữ, nháp vẽ nhiều chỗ)")
-            continue
-        for i in idx[allowed:]:
-            log.append(f"{out[i].get('id')}: lặp chữ {_plain(out[i]['html'])!r} (giữ {out[idx[0]].get('id')}) -> skip")
-            out[i] = {**out[i], "kind": "skip", "html": "", "why": "guard: duplicate"}
+        # nháp vẽ câu đó hai chỗ thì viết cả hai: bỏ một là một nút trống (mix1 i05) -- không bỏ dòng nào nháp đã vẽ
+        log.append(f"lặp chữ {f!r} ở {[out[i].get('id') for i in idx]}: giữ cả (nháp vẽ nhiều chỗ)")
     # 4. CÂU NGẮN (<= 3 chữ: lương "15-25 triệu", giá, nhãn) không được cắt bớt -- câu dài mới được rút gọn (08/10 h06: vòng sửa
     #    bỏ "triệu" cho vừa ô). Một lệnh viết câu đó mà thiếu chữ -> trả nguyên câu khách vào đúng chỗ chữ trong html.
     for k, t in enumerate(txt):
@@ -1830,192 +1163,6 @@ def _guard(ops: list[dict], M: dict, texts: list[dict]) -> tuple[list[dict], lis
     return out, log
 
 
-def _ids_image(proof: np.ndarray, M: dict, P: dict):
-    """Bản dựng + khung và id từng lệnh vẽ (màu theo loại) -- để VLM trỏ đúng lệnh khi duyệt."""
-    from PIL import Image, ImageDraw, ImageFont
-    from .render import KIND_COL, op_box
-    im = Image.fromarray(proof).convert("RGB")
-    d = ImageDraw.Draw(im)
-    f = ImageFont.load_default(size=max(12, im.width // 60))
-    for op in P["ops"]:
-        b = op_box(op, M) if op.get("kind") not in ("skip", "keep") else None
-        if not b:
-            continue
-        col = KIND_COL.get(op.get("kind"), (230, 30, 30))
-        b = [min(b[0], b[2]), min(b[1], b[3]), max(b[0], b[2]), max(b[1], b[3])]
-        d.rectangle(b, outline=col, width=2)
-        tw, th = d.textbbox((0, 0), op["id"], font=f)[2:]
-        d.rectangle([b[0], max(0, b[1] - th - 2), b[0] + tw + 2, max(0, b[1] - th - 2) + th + 2], fill=col)
-        d.text((b[0] + 1, max(0, b[1] - th - 2)), op["id"], fill=(255, 255, 255), font=f)
-    return im
-
-
-def _compare(draft: np.ndarray, proof: np.ndarray, M: dict, n_max: int = 3, side: int = 1280) -> list[bytes]:
-    """Ảnh SO SÁNH vùng đông ô: nháp (trái) | bản dựng (phải), cùng vùng cắt, phóng -- toàn cảnh 1024px quá nhỏ để thấy chữ
-    trong huy hiệu / chân trang (08/10)."""
-    from PIL import Image
-    H, W = draft.shape[:2]
-    out = []
-    for b in _cluster_boxes(M, W, H, n_max=n_max):
-        a, c = Image.fromarray(draft).crop(b), Image.fromarray(proof).crop(b)
-        im = Image.new("RGB", (a.width * 2 + 12, a.height), "white")
-        im.paste(a, (0, 0))
-        im.paste(c, (a.width + 12, 0))
-        z = min(side / im.width, side / im.height, 3.0)
-        out.append(_png(im.resize((max(1, int(im.width * z)), max(1, int(im.height * z))), Image.LANCZOS)))
-    return out
-
-
-def review(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[dict], res: list[dict], prompt: str,
-           texts: list[dict], call, product: bool = False, meta: dict | None = None, changes: list[str] | None = None) -> dict:
-    """VÒNG DUYỆT (luôn chạy, 08/10 thay vòng sửa chỉ-khi-có-lỗi): VLM xem bản dựng cả tấm như giám đốc nghệ thuật -- sửa lỗi
-    khách quan (render.check) VÀ lỗi thẩm mỹ tự thấy (mồ côi, chữ nhỏ / mảnh trong huy hiệu, lệch tâm vỏ, cùng vai khác cỡ /
-    độ đậm, icon không đều...). Gửi: nháp, bản dựng, bản dựng có id lệnh, danh sách lệnh kèm cỡ / độ đậm / font DỰNG THẬT (không
-    cần OCR bản dựng: code biết chính xác đã viết gì ở đâu), lỗi. -> P mới (vá / xoá / thêm lệnh); rào chắn ở slots.accept."""
-    by_res = {r["id"]: r for r in res or []}
-    rows = []
-    for op in P["ops"]:
-        r = by_res.get(op["id"]) or {}
-        row = {k: op.get(k) for k in ("id", "marks", "kind", "client", "html", "box_style") if op.get(k) not in (None, "")}
-        Ls = [M["by"][m] for m in op.get("marks") or [] if m.startswith("L") and m in M["by"]]
-        if r.get("fs"):
-            row["rendered"] = {"drafted_px": round(float(np.median([m["size"] for m in Ls]))) if Ls else None,
-                               "font_px": round(r["fs"]), "weight": r.get("fw"), "font": (r.get("ff") or "").split(",")[0].strip("'\" ")}
-            if r.get("shrink", 1) < 0.9 and len(Ls) == 1 and len(Ls[0].get("ocr") or "") >= 4:
-                # VÌ SAO nhỏ: font rộng hơn nét nháp (gợi ý font đúng độ rộng) hay chữ dài hơn chỗ nháp vẽ
-                from .fonts import WIDTH
-                from .render import font_key
-                L0 = Ls[0]
-                fk = font_key(row["rendered"]["font"])
-                dw = (L0["box"][2] - L0["box"][0]) / (len(L0["ocr"]) * L0["size"])
-                if fk in WIDTH:
-                    row["rendered"]["why_small"] = (f"font {WIDTH[fk][1 if L0.get('caps') else 0] / dw:.2f}x wider than the drafted "
-                                                    f"letters; same-width fonts (only if their letter shape matches the draft): "
-                                                    f"{', '.join(_fits(dw, L0))}; text "
-                                                    f"{len(_plain(op.get('html') or '')) / len(L0['ocr']):.2f}x the drafted length")
-        rows.append(row)
-    ch = [c for c in changes or [] if not c.startswith("--")]
-    user = (f"PROMPT given to the image model:\n{prompt}\n\nClient texts (exact words):\n{_texts(texts)}\n\n"
-            + (PRODUCT_NOTE + "\n\n" if product else "") + f"{describe(M)}\n\nStyle: {json.dumps(P.get('style'), ensure_ascii=False)}"
-            f"\n\nRendered ops:\n{json.dumps(rows, ensure_ascii=False)}\n\nCODE CHANGES (engine log, op ids):\n"
-            + ("\n".join(ch) or "(none)") + "\n\nERRORS:\n"
-            + ("\n".join(json.dumps(e, ensure_ascii=False) for e in errs if REVIEW_MODE == "full" or e["type"] in SEVERE) or "(none)"))
-    full = REVIEW_MODE == "full"
-    imgs = ["DRAFT:", _png(draft), "PROOF:", _png(proof), "PROOF-IDS:", _png(_ids_image(proof, M, P))] + \
-        (["COMPARE (draft | proof):", *_compare(draft, proof, M)] if full else [])
-    sysmsg = _system(SYSTEM) + "\n\n" + REVIEW + ("" if full else "\n\n" + ONLY_ERRORS)
-    out = _obj(call(*((sysmsg, [user, *imgs]) + ((meta,) if meta is not None else ()))))
-    new, patches = [], {p.get("id"): p for p in out.get("patches") or [] if isinstance(p, dict) and p.get("id")}
-    for op in P["ops"]:
-        p = patches.pop(op["id"], None)
-        if p is None:
-            new.append(op)
-        elif p.get("delete") and op.get("kind") == "text" and _tid(op.get("client")) is not None and op.get("html") and                 not _rewritten(op, P["ops"], patches):
-            # xoá lệnh đang viết (một phần) câu khách mà không lệnh nào khác viết lại phần đó -> không xoá (08/10 server bánh mì
-            # v1: vòng duyệt xoá dòng "Bánh Mì", poster chỉ còn "Cô Ba")
-            new.append(op)
-        elif p.get("delete"):   # xoá = không vẽ gì; ô vẫn đã quyết (skip), không thành "ô bỏ sót" (08/10 h08: cả lượt bị loại)
-            new.append({"id": op["id"], "kind": "skip", "marks": op.get("marks") or [], "why": "review: delete"})
-        else:
-            q = {**op, **{k: v for k, v in p.items() if k not in ("id", "delete")}}
-            if "slots" in p:
-                q["marks"] = list(p["slots"] or [])
-            new.append({k: v for k, v in q.items() if v is not None or k == "client"})
-    for pid, p in patches.items():   # lệnh MỚI (ô chưa quyết)
-        if p.get("slots") and not p.get("delete"):
-            new.append({**{k: v for k, v in p.items() if k != "delete"}, "marks": list(p["slots"])})
-    # ô bị lệnh khác lấy đi (gộp ô) thì bỏ khỏi lệnh cũ; lệnh cũ hết ô thì bỏ
-    regrab = {p.get("id") for p in out.get("patches") or [] if isinstance(p, dict) and p.get("slots")}   # lệnh vá có ô mới thắng
-    owner = {}
-    for op in sorted(new, key=lambda o: o["id"] not in regrab):
-        for m in op.get("marks") or []:
-            owner.setdefault(m, op["id"])
-    new = [{**op, "marks": [m for m in op.get("marks") or [] if owner.get(m) == op["id"]]} for op in new]
-    new = [op for op in new if op["marks"]]
-    return _to_marks({**P, "ops": new, "review_why": out.get("why"), "review_findings": out.get("findings"),
-                      "review_patches": len(out.get("patches") or [])})
-
-
-REVIEW_ROUNDS = 2   # chế độ "full": dựng -> duyệt -> dựng -> duyệt; dừng sớm khi VLM không sửa gì / bản duyệt bị loại
-# CHẾ ĐỘ (08/10, sau lượt 3-4: duyệt thẩm mỹ tốn ~20 s / poster, ~2 / 15 poster đẹp hơn, ~5 xấu đi -> không đáng):
-#   "errors" (mặc định) -- MỘT lượt, CHỈ khi lượt đầu có lỗi nặng (SEVERE), chỉ sửa đúng các lỗi đó (~1 / 3 poster)
-#   "full"   -- duyệt thẩm mỹ cả tấm, REVIEW_ROUNDS lượt, có giám khảo (slots.judge)
-#   "off"    -- không bao giờ gọi VLM lần hai (độ trễ cố định; lỗi nặng còn nguyên trên poster)
-# 08/10 (sau đợt server 1): mặc định "off" -- lỗi nặng sửa bằng code (render.autofix); bật lại bằng TEXTFIX_REVIEW=errors
-# nếu quan sát thấy code không cứu được
-REVIEW_MODE = os.environ.get("TEXTFIX_REVIEW", "off")
-ONLY_ERRORS = """MODE: FIX ONLY THE ERRORS. Fix exactly the ERRORS listed and nothing else -- every op not involved in an error \
-stays untouched; no aesthetic changes. Output "findings" for the errors only."""
-
-
-def review_rounds() -> int:
-    return REVIEW_ROUNDS if REVIEW_MODE == "full" else 1
-
-
-def review_needed(errs: list[dict]) -> bool:
-    """Có chạy vòng duyệt cho bản này không (theo REVIEW_MODE)."""
-    if REVIEW_MODE == "off":
-        return False
-    return REVIEW_MODE == "full" or any(e["type"] in SEVERE for e in errs)
 SEVERE = ("empty_plan", "unassigned", "content_overlap", "boxes_overlap", "overflow", "low_contrast", "mark_twice")
 
 
-JUDGE = """You are an art director choosing which of two finished renders of the same poster to send to the client. The DRAFT \
-shows the intended look. Pick the better poster: closer to the draft's look (type style, weight, size, colors, layout), \
-cleaner, every text easy to read, nothing cut off, overlapping, crammed, tiny or orphaned, badges / pills / buttons properly \
-filled. Judge only what you see. Reply with one JSON object: {"better": 1 or 2, "why": "a few words"}."""
-
-
-def judge(draft: np.ndarray, before: np.ndarray, after: np.ndarray, call, meta: dict | None = None) -> tuple[bool, str]:
-    """GIÁM KHẢO thẩm mỹ cho vòng duyệt (08/10 lượt 4: bản duyệt qua được rào đo lường nhưng xấu đi -- vòng tròn -50% phình
-    cắt chữ, huy hiệu lộn xộn hơn): VLM so trước / sau cạnh nhau (thứ tự xáo theo nội dung ảnh, chống thiên vị vị trí) -> True
-    khi bản SAU đẹp hơn. Lỗi / trả sai khuôn -> giữ bản sau (rào đo lường đã qua)."""
-    import hashlib
-    swap = hashlib.md5(after[::16, ::16].tobytes()).digest()[0] % 2 == 1
-    one, two = (after, before) if swap else (before, after)
-    try:
-        out = _obj(call(*((JUDGE, ["DRAFT:", _png(draft), "POSTER 1:", _png(one), "POSTER 2:", _png(two)])
-                         + ((meta,) if meta is not None else ()))))
-        b = int(str(out.get("better")).strip()[:1])
-        assert b in (1, 2)
-    except (ValueError, TypeError, AttributeError, AssertionError):
-        return True, "judge: không đọc được -> giữ bản duyệt"
-    return (b == 1) == swap, str(out.get("why") or "")[:200]
-
-
-def salvage(P: dict, errs: list[dict], P2: dict, errs2: list[dict]) -> dict | None:
-    """Bản duyệt bị loại (accept = False) thường chỉ hỏng ở một hai lệnh, phần còn lại là sửa tốt (08/10 h08: xoá một huy hiệu
-    làm ô bỏ sót -> mất cả ba huy hiệu đã dựng lại đẹp). Hoàn lại ĐÚNG các lệnh gây lỗi nặng mới / làm mất câu khách về bản
-    trước, giữ các vá khác. None khi không có gì để cứu."""
-    key = lambda e: (e["type"], tuple(sorted(e.get("ops") or [])), tuple(sorted(e.get("slots") or [])))   # noqa: E731
-    seen = {key(e) for e in errs if e["type"] in SEVERE}
-    old = {o["id"]: o for o in P["ops"]}
-    bad = set()
-    for e in errs2:
-        if e["type"] in SEVERE and key(e) not in seen:
-            bad |= set(e.get("ops") or [])
-            bad |= {o["id"] for o in P["ops"] for s in e.get("slots") or [] if s in (o.get("marks") or [])}
-    told = lambda Q: {_tid(o.get("client")): o["id"] for o in Q["ops"] if o.get("kind") == "text" and o.get("html")}   # noqa: E731
-    lost = set(told(P)) - set(told(P2)) - {None}
-    bad |= {i for c, i in told(P).items() if c in lost}
-    if not bad:
-        return None
-    new = [old[o["id"]] if o["id"] in old and o["id"] in bad else o for o in P2["ops"] if o["id"] in old or o["id"] not in bad]
-    new += [old[i] for i in bad if i in old and i not in {o["id"] for o in new}]
-    owner = {}
-    for op in sorted(new, key=lambda o: o["id"] not in bad):   # lệnh hoàn lại lấy lại ô của nó
-        for m in op.get("marks") or []:
-            owner.setdefault(m, op["id"])
-    new = [{**op, "marks": [m for m in op.get("marks") or [] if owner.get(m) == op["id"]]} for op in new]
-    return {**P2, "ops": [op for op in new if op["marks"]], "salvaged": sorted(bad)}
-
-
-def accept(P: dict, errs: list[dict], P2: dict, errs2: list[dict]) -> bool:
-    """Giữ bản sau vòng duyệt? Sửa thẩm mỹ không đo được, nên tin VLM -- trừ khi nó làm hỏng điều đo được: viết ít câu khách hơn,
-    hoặc thêm lỗi NẶNG (ô bỏ sót, chồng nhau, tràn, chìm nền). too_small / uneven_size được phép tăng (chữ to lên trong huy hiệu
-    có thể chạm sàn co)."""
-    sev = lambda E: sum(1 for e in E if e["type"] in SEVERE)   # noqa: E731
-    return score(P2, [])[0] <= score(P, [])[0] and sev(errs2) <= sev(errs)
-
-
-# ---------------------------------------------------------------------------------------------------- nền

@@ -9,7 +9,8 @@ nét chữ của nháp), dưới chữ là gì do LaMa vẽ lại:
   ink = hisam.strokes(draft)                  # nét chữ (trạm vẽ)
   M   = view(slots.build(draft, ink))         # chỉ còn L: dòng OCR + cụm nét chưa dòng nào nhận ("orphan": VLM quyết giữ / xoá)
   P   = fix_ops(plan(...), M)                 # lệnh của VLM: chỉ ô L, không nền / viền riêng
-  bg, mask = erase(draft, ink, M, P)          # nền dựng = nháp, LaMa lấp đúng mặt nạ nét chữ của các dòng không giữ
+  clean, mask = erase(draft, ink, M)         # LaMa MỘT lần: gỡ mọi dòng (nền VLM nhìn)
+  base, mask = settle(draft, clean, ink, M, P)   # dòng VLM "keep" trả về điểm ảnh nháp
 """
 
 from __future__ import annotations
@@ -19,17 +20,15 @@ import re
 
 import numpy as np
 
-LONLY = True   # không còn cờ: main chỉ có đường này (đường cũ ô vỏ / ô chi tiết: nhánh legacy-slots-si)
-
 INK_SAME = 25.0   # điểm cùng màu mực của dòng: cách màu mực <= 25 ΔE
 INK_IN = 0.7      # mảng cùng màu mực là nét chữ khi >= 70% của nó nằm trong vùng dòng (vòng con dấu, viền nút: phần lớn ở ngoài)
 GLYPH_MAX = 2.0   # ... và cạnh dài <= 2 cao dòng (một chữ cái / chữ số); dài hơn là hình khác cùng màu mực
 
 
 def view(M: dict) -> dict:
-    """Ô để VLM và bộ dựng làm việc: chỉ dòng chữ."""
-    L = [{**l, "shell": None} for l in M["L"]]
-    return {**M, "L": L, "S": [], "I": [], "shells": {}, "by": {l["id"]: l for l in L}, "lonly": True}
+    """Ô để VLM và bộ dựng làm việc: chỉ dòng chữ (plan.json cũ có thể còn S / I / shell: bỏ)."""
+    L = [{k: v for k, v in l.items() if k != "shell"} for l in M["L"]]
+    return {"L": L, "size": M["size"], "by": {l["id"]: l for l in L}, "geo_log": M.get("geo_log") or []}
 
 
 LOOSE = 0.4       # ghép dòng bị bỏ với câu khách còn thừa: chữ nháp giống >= 0.4
@@ -209,7 +208,7 @@ def describe_l(M: dict) -> str:
 
 SYSTEM_L = """You are a senior graphic designer finishing a poster. An image model drew the DRAFT from the PROMPT below. Everything in it \
 is good except its lettering, which is garbled and misspelt. The renderer keeps the draft exactly as it is -- pictures, cards, \
-pills, badges, big icons, ornaments -- and only replaces the lettering: code measured every TEXT LINE of the draft as a slot \
+pills, badges, symbols, ornaments -- and only replaces the lettering: code measured every TEXT LINE of the draft as a slot \
 L#, wiped the old letters (the BASE image shows the result) and now draws what you write exactly inside each slot. The final \
 poster is the draft with clean, correct text.
 
@@ -217,7 +216,7 @@ THE RULES THAT MATTER MOST
 1. The LOOK comes from the draft, the WORDS come from the client texts. Never take spelling from the image or the OCR \
 (the model draws TRƯỞNG for TRƯƠNG); copy client words character for character with every Vietnamese diacritic, and never \
 swap a word for a synonym (nghìn stays "nghìn").
-2. EVERY LINE THE MODEL DREW IS WRITTEN. Never leave an L# out and never skip one (only "STRAY LETTERING" may be skipped): an empty spot next to its icon or inside \
+2. EVERY LINE THE MODEL DREW IS WRITTEN. Never leave an L# out and never skip one (only "STRAY LETTERING" may be skipped): an empty spot on its row or inside \
 its card looks broken. When the draft has more lines than the client has texts (the model repeated a row, or drew an extra \
 one), fill the extra lines in this order: (a) a client text that has no line yet; (b) a short phrase taken from another \
 client text (from the description: "Cơm chín đều"); (c) a short natural phrase of your own that fits that spot and that \
@@ -237,8 +236,8 @@ it, the copy gets other words by rule 2.
 in "missing", never crammed into another row.
 
 IMAGES: the message names each one. DRAFT = what the model drew. SLOTS = the draft with every text line marked (red L#). \
-BASE = the draft with the old letters wiped: what will really be behind each line. Cards, pills, buttons and icons are already \
-there: never draw a background, border, box or shadow box of your own, and never write a big icon -- only text.
+BASE = the draft with the old letters wiped: what will really be behind each line. Cards, pills, buttons and every picture \
+are already there: never draw a background, border, box or shadow box of your own. You write letters only.
 
 TEXT LINES, as listed after the images: the garbled OCR letters, the drawn text size in px, the number of characters drawn \
 (its room), the color. L# numbers follow the reading order block by block: a column is numbered top to bottom before the \
@@ -256,8 +255,8 @@ lays your letters along the measured curve.
 lines stacked in one sticker / ribbon are ONE op.
 - "OCR missed this line": real lettering of the draft (usually a big decorated headline). Look at the DRAFT to see which \
 client text it is and write it there.
-- ICONS ARE NOT YOURS. Every icon, check mark, tick, leaf, arrow or little picture in front of a line is still on the BASE, \
-exactly as the model drew it: never write an icon, never an <i-icon>, never an svg. A plain BULLET DOT is not an icon: \
+- LETTERS ONLY. Whatever stands in front of a line -- a check mark, tick, leaf, arrow or little picture -- stays on the BASE \
+exactly as the model drew it: never put a picture or a symbol in your html. A plain BULLET DOT counts as a letter: \
 when the list says a line's "bullet dot was wiped with the letters", you may start that line with "• " (the same on every \
 row of that list). On any other line a dot the draft drew is still on the BASE: never add one there.
 - "STRAY LETTERING the reader could not read": letter shapes the stroke detector found where OCR read nothing (the listed \
@@ -265,7 +264,7 @@ letters may be empty). Look at the DRAFT and decide: kind "keep" when it is lett
 object in the picture, or decoration that looks fine; kind "text" when it is clearly one of the client texts drawn there; \
 kind "skip" (it is wiped, the spot stays empty) only when it is garbled junk that would look wrong on the poster. When \
 unsure: "keep".
-- Step numbers, big icons and pictures beside a line are still on the BASE: never repeat them in the text ("1.", "Bước 2").
+- Step numbers and pictures beside a line are still on the BASE: never repeat them in the text ("1.", "Bước 2").
 
 TEXT
 - Write each line at the size measured for its slot, with the model's line breaks; fine print and footers too. Set \
@@ -313,8 +312,7 @@ FONT CATALOG (key: family, class): {fonts}"""
 def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, product: bool = False, base: np.ndarray | None = None,
          meta: dict | None = None) -> dict:
     from . import slots
-    return slots.plan(draft, M, prompt, texts, call, product=product, base=base, meta=meta, system=slots._system(SYSTEM_L),
-                      desc=describe_l(M), base_label="BASE (the draft with the old letters wiped; your text is drawn on it):")
+    return slots.plan(draft, M, prompt, texts, call, slots._system(SYSTEM_L), describe_l(M), base, product=product, meta=meta)
 
 
 BOX = re.compile(r"(?:^|;)\s*(?:background(?:-color|-image)?|border(?:-(?:top|right|bottom|left|radius|width|color|style))?|"
@@ -555,12 +553,6 @@ def settle(draft: np.ndarray, clean: np.ndarray, ink: np.ndarray, M: dict, P: di
     mask = erase_mask(draft, ink, M, kept, log)
     a = cv2.GaussianBlur(mask.astype(np.float32), (0, 0), 1.0)[..., None]
     return (clean * a + draft * (1 - a)).round().clip(0, 255).astype(np.uint8), mask
-
-
-def draft_base(draft: np.ndarray, ink: np.ndarray, M: dict, P: dict | None = None, log: list | None = None) -> np.ndarray:
-    """Một lần gọi cho script đo / dựng lại: gỡ rồi trả dòng giữ."""
-    clean, _m = erase(draft, ink, M)
-    return settle(draft, clean, ink, M, P, log)[0]
 
 
 def hisam_image(draft: np.ndarray, ink: np.ndarray) -> np.ndarray:
