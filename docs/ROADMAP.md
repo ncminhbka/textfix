@@ -122,6 +122,18 @@ viết dấu ngoặc" -> HƯỚNG ĐỀ XUẤT (chưa duyệt): LLM viết promp
 luật: câu nguồn khách gồm chữ khách viết, câu AI ngắn không số / lời hứa, trường form bị sót thêm lại + tách trường danh sách.
 Câu hỏi mở: có ghi vai trước mỗi câu ("headline "A"") không; cần đo trên máy chủ (5 ca dev2 so lượt cũ).
 
+## Bước đo dòng (OCR) -- ghi nhận 14/10 khuya
+
+OCR quyết móng của chặng B (mọi khung, cỡ, lề lấy từ dòng L#) và hậu kiểm của nó là CỤM LUẬT VÁ theo kiểu sai (`slots._split_gaps`,
+`_stacked`, `_trim_lead`, `_lead_dots`, `TILT_*`, `_orphans`, `fill.TALL`).
+- Tên + giá gộp một dòng: thường ổn (khe >= 1 cao dòng tách trước VLM; VLM ghép hai câu -> cắt tại khe nét). Hỏng khi VLM không
+  nhận ra hai câu, hoặc không có khe rõ.
+- Hai hàng gộp một khung: YẾU NHẤT -- `TALL` đoán số hàng theo chiều cao, chia câu đều; cỡ chữ đo từ chiều cao khung có thể to
+  gấp đôi (e03 huy chương, i02 dấu chồng, d25v1 chữ xếp dọc).
+- Tỉ trọng: OCR / Hi-SAM chia dòng khác nhau ~4% số dòng (18 / 546, probe 65 nháp, có cả ca Hi-SAM sai); ~5-10% poster -- ít hơn
+  FLUX (chỗ ngắn / thiếu câu ~15-20%), VLM (~15%), LLM (~15-20% brief) nhưng là nguồn lỗi chính còn lại PHÍA CODE.
+- Hướng: dòng thẳng theo Hi-SAM phân cấp, OCR chỉ bù chữ cong và đọc chữ trên sản phẩm; bỏ gần hết cụm luật vá. Sau deadline.
+
 ## Giới hạn đã biết, chưa xử lý
 
 - Chữ neon quầng rộng: còn bóng mờ sau khi gỡ.
