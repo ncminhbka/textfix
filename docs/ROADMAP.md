@@ -179,6 +179,28 @@ P2 -- nhỏ / hiếm:
 - [ ] D4. (P2) Không có bước kiểm FLUX đã vẽ đủ câu / có vẽ sản phẩm khách tải (giới hạn model; chỉ ghi "missing").
 - Chặng A (Hi-SAM + LaMa): người dùng chốt, không audit lại; giới hạn đã biết ở mục cuối.
 
+## AUDIT TỪNG TỆP 14/10 khuya (21 tệp textfix/ + server/; scripts/ là công cụ dev, chưa audit) -- phát hiện MỚI
+
+- [ ] `flux2/text_encoder.py` (+ `brief.py`): FLUX đọc prompt tối đa 512 TOKEN (cắt bớt). 4 / 272 prompt_en đã lưu dài hơn
+  (tới 642): câu khách nằm sau mốc đó FLUX không thấy, không vẽ ("GIẤC NGỦ NGON MỖI ĐÊM", "An Yoga"...). (P1) Hướng "code nối
+  chữ vào cuối prompt" sẽ làm CHỮ bị cắt trước -- chữ phải đặt đầu, hoặc giới hạn độ dài phần tả cảnh.
+- [ ] `textfix/glyph.py`: màu / độ dày nét / hiệu ứng của dòng đo bằng k-means màu trong khung OCR, KHÔNG dùng mặt nạ nét
+  Hi-SAM (đã có, đáng tin hơn) -> chọn nhầm cụm thì ra màu viền thay màu chữ, sai độ đậm (bảng VLM + màu code dùng). 4 hằng số
+  ghi "TẠM" chọn theo ca (q01, s08, p13). (P1)
+- [ ] `textfix/slots.py` `lines`: cỡ chữ = cao nét / (cao chữ hoa hay chữ thường) theo việc CHỮ OCR có viết hoa không -- chữ giun
+  OCR đọc sai hoa / thường -> cỡ lệch ~36%. Sau khi VLM ghép đã biết câu khách thật -> lấy hoa / thường từ câu khách. (P1)
+- [ ] `textfix/render.py` `render_units`: tập cùng vai co theo mục chật nhất KHÔNG có sàn (phần tử tập dựng `fit:"none"`, bỏ qua
+  sàn 12 px) -- một mục ghép sai / chỗ quá ngắn kéo cả tập co (dev2 d26v0 tập liên hệ x0,15). Tràn khung của mục trong tập
+  không được sửa (`autofix_units` bỏ qua tập). (P0, cùng nhóm A5)
+- [ ] `textfix/lonly.py` `_lama`: LaMa luôn chạy trên "cuda" (= card 0) cho mọi luồng thiết kế, chung card với một bản FLUX
+  + Hi-SAM; nạp lần đầu không khoá (nhiều luồng cùng nạp). Rủi ro hết VRAM card 0 khi tải cao lúc demo. (P1)
+- [ ] `server/app.py` + `textfix/flux.py`: API nhận tỉ lệ "3:4" (brief có, LLM được dặn bố cục dọc) nhưng `flux.SIZES` không có ->
+  âm thầm vẽ vuông 1:1. UI chỉ có 4 tỉ lệ nên chỉ lộ qua API. (P2)
+- [ ] `textfix/render.py` `_el`: emoji bị xoá âm thầm (không font nào có hình emoji) -- câu khách có emoji mất ký tự. (P2)
+- [ ] `textfix/audit.py`: cờ cũ không còn kích hoạt ("-> câu khách", "không nối lại đúng câu khách") -- chỉ ảnh hưởng báo cáo. (P2)
+- [ ] `textfix/geo.py`: ~25 ngưỡng cho chữ cong (một phần có số đo: ARC_SPAN trên 18 vùng); `RUNS` tắt -- mã chết. (P2)
+- Không thấy vấn đề đáng kể: `browser.py`, `config.py`, `hisam.py`, `multigpu.py`, `ocr.py`, `ship.py`.
+
 ## Giới hạn đã biết, chưa xử lý
 
 - Chữ neon quầng rộng: còn bóng mờ sau khi gỡ.
