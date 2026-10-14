@@ -235,7 +235,7 @@ def main(argv: list[str] | None = None) -> int:
             cmp = compare(H, ocr)
             row = {"size": [Ww, Hh], "enc": round(t2 - t1, 3), "amg": round(t3 - t2, 3), "card": card, **cmp}
             (out / "lines" / f"{c['key']}.json").write_text(json.dumps(
-                {"lines": [{k2: v for k2, v in r.items() if k2 != "_mask"} for r in H], "ocr": ocr, "compare": cmp}, ensure_ascii=False), encoding="utf-8")
+                {"lines": [{k2: v for k2, v in r.items() if k2 != "_mask"} for r in H], "ocr": ocr, "compare": cmp}, ensure_ascii=False, default=lambda o: o.item() if hasattr(o, "item") else str(o)), encoding="utf-8")
             vis = img.astype(np.float32).copy()
             for i, r in enumerate(H):
                 col = np.array(COLS[r["para"] % len(COLS)], np.float32)
@@ -264,7 +264,7 @@ def main(argv: list[str] | None = None) -> int:
             info.setdefault("runs", {}).update(rows)
             info.setdefault("cards", {})[card] = {"load_s": round(t_load, 1), "free_before_gb": round(free0, 1),
                                                   "peak_gb": round(torch.cuda.max_memory_allocated() / 2**30, 2) if gpu else 0.0, "images": len(rows)}
-            info_out.write_text(json.dumps(info, ensure_ascii=False, indent=1), encoding="utf-8")
+            info_out.write_text(json.dumps(info, ensure_ascii=False, indent=1, default=lambda o: o.item() if hasattr(o, "item") else str(o)), encoding="utf-8")
     if a.shard:
         return 0
     runs = list((info.get("runs") or {}).values())
