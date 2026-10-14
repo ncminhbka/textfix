@@ -49,11 +49,10 @@ Input: the user's poster form (category + filled fields, JSON) and/or a free pro
 0. intent -- "poster" when the user wants words on the image: any quoted string, any filled form field, or a poster / banner / flyer / ad / menu / sign whose content (name, offer, price, date, slogan, ...) the user gave. "image" when the user only wants a picture (photo, illustration, artwork, wallpaper, ...) and gives no words to show. Vietnamese users say "ảnh" for posters too: "ảnh feedback ...", "ảnh quảng cáo ...", "ảnh khuyến mãi / giới thiệu / tuyển dụng / khai trương ...", "banner", "poster", "menu" are POSTERS even with no words given (you write the support copy, see 2); "ảnh một con bò", "cho tôi đứng cạnh con chó" are pictures. Never "image" when there is any user text to show. Most users are not prompt writers: a short vague prompt ("tạo poster", "làm banner cho quán tôi", "đẹp nhé") next to a filled form is "poster", and it never cancels the form -- every filled form field is still a text.
    For "image": texts = [], and prompt_en (and every variant) is a plain FLUX.2 image prompt following the same upsampling guidelines (subject, details, materials, lighting, mood, composition) WITHOUT poster layout and without adding any text; the rules about texts below do not apply.
 
-1. prompt_en -- an English prompt for FLUX.2 that draws the WHOLE poster including its text. Follow the official FLUX.2 prompt-upsampling guidelines:
-   - Strictly preserve the user's subject and intent. Convert the request into a detailed paragraph.
-   - Add concrete visual specifics: subject, form, materials, textures, lighting (quality, direction, color), shadows, spatial relationships, environment, mood, and a clean professional poster layout (where the headline, price / offer, list and footer sit; flat graphic text, badges, pills or cards where suitable).
-   - Text in images: put EVERY text of the poster in double quotes, EXACTLY as written in "texts" below (Vietnamese with full diacritics), and say its role, typographic style and its place (e.g. headline "..." in a bold condensed sans-serif at the top center). Quote each text ONCE (the image model draws every quoted string it reads, so a text quoted twice is drawn twice); refer back to it without quotes ("the shop name"). Never add any text that is not in "texts".
-   - Put texts on calm areas, never on the main subject.
+1. prompt_en -- an English prompt for FLUX.2 that draws the WHOLE poster including its text. Follow the official FLUX.2 prompt-upsampling guidelines of Black Forest Labs, nothing more:
+   - Rewrite the request to be more descriptive while strictly preserving its core subject and intent. Convert natural language to a detailed paragraph.
+   - Add concrete visual specifics: form, scale, textures, materials, lighting (quality, direction, color), shadows, spatial relationships and environmental context.
+   - Text in images: put EVERY text of the poster in double quotes, EXACTLY as written in "texts" below (Vietnamese with full diacritics). How the lettering looks and where it sits is the image model's own design choice: do not prescribe fonts, sizes or positions for it. Quote each text ONCE (the image model draws every quoted string it reads, so a text quoted twice is drawn twice); refer back to it without quotes ("the shop name"). Never add any text that is not in "texts" -- no extra signs, labels or screens carrying words.
    - A star rating the user asks for ("đánh giá 5 sao", "review 5 sao") is a PICTURE: describe a row of gold stars; never make
      "5 sao" a text and never quote it.
    - Never invent commercial claims: no price, discount, promotional offer, deadline / date, phone number, address or warranty that the user did not give.
@@ -76,10 +75,10 @@ Input: the user's poster form (category + filled fields, JSON) and/or a free pro
      that adds something new ("ghi thêm ...", an extra offer, a scene description) overrides nothing: every filled form field
      it does not contradict stays in texts (a form price stays when the prompt only adds a combo discount).
 3. variants -- ALTERNATIVE DESIGN DIRECTIONS for the same poster, exactly as many as asked below (empty list when none are asked).
-   Each: name (2-4 words, e.g. "big type centered", "split photo / text", "card layout", "dark premium") and its own complete
+   Each: name (2-4 words, e.g. "close-up product", "wide scene", "dark premium", "bright pastel") and its own complete
    prompt_en following every rule of 1. Same subject, same product, same texts (every text in double quotes, exactly the same),
-   same user style / color hints -- but a clearly DIFFERENT composition: layout (where the text block sits, centered / left /
-   split / top band / framed card), scale of the subject, background treatment, typographic mood and palette within the hints.
+   same user style / color hints -- but a clearly DIFFERENT visual direction: scene, scale and framing of the subject,
+   background treatment, lighting and palette within the hints (still no prescribed fonts, sizes or text positions).
    The directions must differ from prompt_en and from each other, and all must stay professional and suit the category.
 Answer only the JSON object."""
 
@@ -130,7 +129,7 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
         hints.append(f"main brand color: {design['color']} (use it as the dominant accent color of the design)")
     if product_image:
         hints.append("the user uploaded a photo of their product, given to the image model as reference image 1: the poster must "
-                     "feature exactly that product (say 'the product from image 1' in prompt_en). The product keeps its own "
+                     "feature exactly that product (call it the product from image 1, without quotes, in prompt_en). The product keeps its own "
                      "printed label, logo and text exactly as in the photo: never describe, quote or ask for any text ON the "
                      "product, and never place a poster text on it -- poster texts go around the product")
     if aspect in ORIENT:
@@ -388,10 +387,17 @@ def _cap_first(s: str) -> str:
 OTHER_QUOTES = re.compile(r"“([^”\n]{1,120})”|‘([^’\n]{1,120})’|(?<![\w'])'(?=\S)([^'\n]{2,120}?)(?<=\S)'(?![\w'])")
 
 
+IMAGE_REF = re.compile(r"\bimages? \d\b", re.I)
+
+
 def _unify_quotes(pe: str) -> str:
     """'...', ‘...’, “...” -> "..." (chữ trong ngoặc là chữ in). Dấu nháy trong từ tiếng Anh ("shop's", "customers'") không phải
     ngoặc: ngoặc mở không đứng sau chữ cái, ngoặc đóng không đứng trước chữ cái."""
-    return OTHER_QUOTES.sub(lambda m: '"' + next(g for g in m.groups() if g is not None) + '"', pe)
+    def one(m):
+        g = next(g for g in m.groups() if g is not None)
+        # cụm tham chiếu ảnh của lời dặn ("the product from image 1") không phải chữ in: bỏ ngoặc
+        return g if IMAGE_REF.search(g) else '"' + g + '"'
+    return QUOTED.sub(lambda m: m.group(1) if IMAGE_REF.search(m.group(1)) else m.group(0), OTHER_QUOTES.sub(one, pe))
 
 
 def _approved(q: str, texts: list[dict]) -> bool:
