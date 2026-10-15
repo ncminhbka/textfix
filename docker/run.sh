@@ -30,5 +30,18 @@ if torch.cuda.is_available():
 else:
     print("[textfix] CHÚ Ý: không dùng được GPU -> Hi-SAM + LaMa chạy CPU (chậm). Driver quá cũ cho torch này? thử TEXTFIX_KEEP_COMPAT=1")
 EOF
+# tên máy FLUX / LLM / VLM phải phân giải được TRONG container (mạng docker không có DNS nội bộ của notebook)
+"$PY" - <<'EOF' || true
+import os, socket
+from urllib.parse import urlparse
+for k in ("TEXTFIX_FLUX_URL", "TEXTFIX_LLM_URL", "TEXTFIX_VLM_URL"):
+    host = urlparse(os.environ.get(k) or "").hostname
+    if not host:
+        continue
+    try:
+        print(f"[textfix] {k}: {host} -> {socket.gethostbyname(host)}")
+    except OSError as e:
+        print(f"[textfix] LỖI {k}: không phân giải được {host} ({e}) -- docker run thêm --add-host {host}:<IP> hoặc --dns <máy DNS>")
+EOF
 mkdir -p "${TEXTFIX_RUNS:-/data/runs}"
 exec "$PY" server/app.py --port "${TEXTFIX_PORT:-8004}" "$@"

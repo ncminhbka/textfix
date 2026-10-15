@@ -52,6 +52,11 @@ find "$CTX" -name __pycache__ -prune -exec rm -rf {} +
 du -sh "$CTX"
 
 echo "3. docker build -> $TAG"
-docker build --build-arg PY="$PY" -t "$TAG" "$CTX"
+# container build nằm trên mạng mặc định của docker máy thật: không có DNS nội bộ của notebook (lỗi "Temporary failure in name
+# resolution" khi pip gọi Nexus) -> build bằng mạng máy thật, và ghi cứng IP Nexus phân giải ngay trong notebook
+NET=(--network "${BUILD_NETWORK:-host}")
+NEXUS_IP="$(getent hosts nexus.kcntt.net | awk '{print $1; exit}')"
+[ -n "$NEXUS_IP" ] && NET+=(--add-host "nexus.kcntt.net:$NEXUS_IP") && echo "   nexus.kcntt.net -> $NEXUS_IP"
+docker build "${NET[@]}" --build-arg PY="$PY" -t "$TAG" "$CTX"
 docker image ls "$TAG"
 echo "Xong. Chạy: xem docs/DOCKER.md (docker run ... -p 8004:8004 ...)"

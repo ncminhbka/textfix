@@ -42,6 +42,10 @@ docker logs -f textfix-demo                           # đợi dòng "Sẵn sàn
 curl -s localhost:8004/api/health                     # từ notebook có thể không tới được cổng máy thật: dùng http://<IP máy chủ>:8004
 ```
 
+`docker logs` in ngay lúc khởi động địa chỉ FLUX / LLM / VLM phân giải ra IP nào. Báo "không phân giải được": mạng docker không
+có DNS nội bộ, thêm vào `docker run` một `--add-host <tên máy>:<IP>` cho mỗi máy (IP lấy trong notebook: `getent hosts <tên máy>`),
+hoặc `--dns <IP máy DNS>` (xem `cat /etc/resolv.conf` trong notebook).
+
 Kết quả từng lượt chạy (ảnh debug, plan.json) nằm ở `~/work/textfix-data/runs/`, mở được từ JupyterLab.
 
 Tự kiểm trong container (thư mục, thư viện, Hi-SAM / LaMa, Chromium, OCR, gọi thử LLM / VLM / FLUX):
