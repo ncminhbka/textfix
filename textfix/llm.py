@@ -15,6 +15,9 @@ import time
 from pathlib import Path
 
 
+RETRIES = 2   # gọi lại khi trả lời hỏng / lỗi mạng (14/10 audit A2 / D2: một JSON hỏng làm hỏng cả job)
+
+
 def client(base_url: str, key_env: str = "TEXTFIX_LLM_API_KEY"):
     from openai import OpenAI
     key = os.environ.get(key_env) or os.environ.get("TEXTFIX_LLM_API_KEY") or "none"
@@ -32,7 +35,8 @@ def json_call(base_url: str, model: str, key_env: str = "TEXTFIX_LLM_API_KEY", t
     cache = Path.home() / ".cache" / "textfix" / tag
     cl = None
 
-    def call(system: str, parts: list, meta: dict | None = None) -> dict:
+    def call(system: str, parts: list, meta: dict | None = None, fresh: bool = False) -> dict:
+        """fresh: không đọc cache (vẫn ghi) -- gọi lại để lấy câu trả lời KHÁC cho cùng đầu vào."""
         nonlocal cl
         if meta is not None:
             meta.update(images=sum(isinstance(p, bytes) for p in parts), cached=False)
@@ -41,7 +45,7 @@ def json_call(base_url: str, model: str, key_env: str = "TEXTFIX_LLM_API_KEY", t
         for p in parts:
             h.update(p if isinstance(p, bytes) else str(p).encode())
         f = cache / f"{h.hexdigest()}.json"
-        if f.exists():
+        if f.exists() and not fresh:
             if meta is not None:
                 meta["cached"] = True
             return json.loads(f.read_text(encoding="utf-8"))
@@ -51,10 +55,21 @@ def json_call(base_url: str, model: str, key_env: str = "TEXTFIX_LLM_API_KEY", t
         fmt = ({"type": "json_schema", "json_schema": {"name": tag, "schema": schema, "strict": True}} if schema
                else {"type": "json_object"})
         t0 = time.time()
-        r = cl.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": content}],
-                                       response_format=fmt, extra_body=extra_body())
-        out = json.loads(r.choices[0].message.content)   # trả lời hỏng: ném lỗi, không vào cache
+        # trả lời hỏng (JSON cụt / sai) hoặc lỗi mạng / quá giờ: gọi lại, tối đa RETRIES lần; hết lượt thì ném lỗi, không vào cache
+        for k in range(RETRIES + 1):
+            try:
+                r = cl.chat.completions.create(model=model, messages=[{"role": "system", "content": system},
+                                                                      {"role": "user", "content": content}],
+                                               response_format=fmt, extra_body=extra_body())
+                out = json.loads(r.choices[0].message.content)
+                if not isinstance(out, dict):
+                    raise ValueError(f"trả lời không phải JSON object: {type(out).__name__}")
+                break
+            except Exception:
+                if k == RETRIES:
+                    raise
         if meta is not None:
+            meta["attempts"] = k + 1
             u = getattr(r, "usage", None)
             meta.update(s=round(time.time() - t0, 1), prompt_tokens=getattr(u, "prompt_tokens", None),
                         completion_tokens=getattr(u, "completion_tokens", None))
