@@ -1,0 +1,109 @@
+{
+ "key": "dev2_20261014_095226_ac91_v0",
+ "src": "dev2/runs/run_20261014_095226_ac91/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    383,
+    35,
+    634,
+    76
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Khech han no gin",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    134,
+    86,
+    879,
+    181
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Nuc gaci kat cé ga",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    241,
+    180,
+    777,
+    220
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Uong mat lang, ga nrtoat cut da!",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    209,
+    222,
+    808,
+    267
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Uuing mat ling, gyu nhratat cut da!!",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    416,
+    487,
+    442,
+    604
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "Asse a 0",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    448,
+    455,
+    587,
+    814
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "ocaiool ",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    350,
+    926,
+    673,
+    971
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Gé quan hom nay",
+   "eval": true
+  }
+ ]
+}

@@ -1,0 +1,109 @@
+{
+ "key": "mix1_20261014_084124_2c80_v0",
+ "src": "mix1/runs/run_20261014_084124_2c80/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    194,
+    40,
+    713,
+    177
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "XA KhO",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    151,
+    167,
+    742,
+    281
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "CUOI MUA",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    393,
+    335,
+    525,
+    383
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "GIAM",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    371,
+    382,
+    552,
+    444
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "DE 70%",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    76,
+    957,
+    381,
+    999
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "giay tfe thao nam nu",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    365,
+    1052,
+    542,
+    1093
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Guy Bus ha",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    608,
+    973,
+    826,
+    1006
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "01/12 - 07/12",
+   "eval": true
+  }
+ ]
+}

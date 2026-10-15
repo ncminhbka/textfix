@@ -148,6 +148,29 @@ def advance(key: str | None, text: str) -> float:
     return sum(adv.get(ord(c), avg) for c in text)
 
 
+CAP_EM, X_EM = 0.72, 0.53   # cao chữ hoa / chữ thường (em) khi không đọc được font: trung vị danh mục
+
+
+@lru_cache(maxsize=64)
+def heights(key: str | None) -> tuple[float, float]:
+    """(cao chữ hoa, cao chữ thường) theo em, đo trên HÌNH chữ "H" / "x" của font (số khai trong bảng OS/2 có font ghi sai:
+    Bungee ghi chữ thường 0,50 mà chữ thường của nó là chữ hoa 0,72). Danh mục chênh 0,59-0,86 (hoa), 0,30-0,73 (thường): cỡ
+    tính từ cao nét nháp phải chia cho số của ĐÚNG font sẽ dựng. Khoá lạ / thiếu fontTools -> (CAP_EM, X_EM)."""
+    try:
+        from fontTools.pens.boundsPen import BoundsPen
+        from fontTools.ttLib import TTFont
+        f = TTFont(str(FONTS_DIR / next(iter(CATALOG[key][3].values()))))
+        upm, gs, cmap = f["head"].unitsPerEm, f.getGlyphSet(), f.getBestCmap()
+
+        def top(ch):
+            p = BoundsPen(gs)
+            gs[cmap[ord(ch)]].draw(p)
+            return p.bounds[3] / upm
+        return round(top("H"), 3), round(top("x"), 3)
+    except Exception:
+        return CAP_EM, X_EM
+
+
 def family(key: str) -> str:
     fam, _, fb, _ = CATALOG[key]
     return f"'{fam}', {fb}"

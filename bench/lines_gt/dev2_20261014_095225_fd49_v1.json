@@ -1,0 +1,193 @@
+{
+ "key": "dev2_20261014_095225_fd49_v1",
+ "src": "dev2/runs/run_20261014_095225_fd49/v1",
+ "size": [
+  768,
+  1344
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    66,
+    93,
+    438,
+    164
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "CA PHE DAM",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    70,
+    181,
+    422,
+    238
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "VI DO SANG",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    71,
+    320,
+    413,
+    370
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Ca phe hoa tan",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    70,
+    387,
+    241,
+    430
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Clsscic",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    74,
+    407,
+    405,
+    453
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Thomdim, pha naah",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    66,
+    463,
+    185,
+    504
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "30 giay",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    76,
+    987,
+    362,
+    1041
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Chii 89.000d",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    67,
+    1054,
+    240,
+    1130
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Y hu nu",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    73,
+    1174,
+    292,
+    1208
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tap thua Ba Sau",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    70,
+    1224,
+    238,
+    1257
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "0905 111 222",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    453,
+    675,
+    499,
+    858
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "NESCAFE.",
+   "eval": true
+  },
+  {
+   "id": "L12",
+   "box": [
+    529,
+    793,
+    614,
+    1011
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "NESEAFE",
+   "eval": true
+  },
+  {
+   "id": "L13",
+   "box": [
+    596,
+    808,
+    644,
+    1000
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "CLASSIC",
+   "eval": true
+  }
+ ]
+}

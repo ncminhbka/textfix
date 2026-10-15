@@ -1,0 +1,151 @@
+{
+ "key": "mix1_20261014_084124_fff1_v0",
+ "src": "mix1/runs/run_20261014_084124_fff1/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    262,
+    525,
+    285,
+    542
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "",
+   "eval": false
+  },
+  {
+   "id": "L2",
+   "box": [
+    287,
+    323,
+    429,
+    680
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "weo.wm",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    532,
+    61,
+    964,
+    144
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "GIAI KHAT",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    545,
+    143,
+    963,
+    239
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "NGAY HE",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    651,
+    291,
+    919,
+    338
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Mua 12 lon",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    659,
+    349,
+    931,
+    400
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "nican 10%",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    652,
+    632,
+    954,
+    668
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "nuic nlon lon 500ml",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    63,
+    904,
+    410,
+    959
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tap hhio Cé Ba",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    61,
+    965,
+    402,
+    1002
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Ten haug si sang kroai",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    711,
+    932,
+    957,
+    969
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "0914222333",
+   "eval": true
+  }
+ ]
+}

@@ -1,0 +1,165 @@
+{
+ "key": "mix1_20261014_084124_a69b_v0",
+ "src": "mix1/runs/run_20261014_084124_a69b/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    527,
+    63,
+    729,
+    96
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Diont paam kbirt",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    526,
+    104,
+    869,
+    156
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Phanti kuho",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    526,
+    166,
+    937,
+    218
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "mam tun mani",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    526,
+    227,
+    816,
+    280
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "katc haan",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    529,
+    367,
+    966,
+    409
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Cét diuc kyo ninh wonn",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    524,
+    419,
+    958,
+    462
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "tho tuvan kti, kohg mai",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    525,
+    461,
+    687,
+    524
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "coi hug.",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    584,
+    586,
+    791,
+    633
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dung hhan",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    585,
+    649,
+    806,
+    698
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Gia mop cii",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    568,
+    769,
+    847,
+    816
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Anh Quang Huy",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    683,
+    914,
+    937,
+    964
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Barber Pho",
+   "eval": true
+  }
+ ]
+}

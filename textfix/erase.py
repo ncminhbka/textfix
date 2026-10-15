@@ -5,13 +5,15 @@
   base, mask = settle(draft, clean, ink, M, plan)   # dòng VLM chọn "keep" trở về điểm ảnh nháp (không gọi LaMa lần nữa)
 
 Chất lượng gỡ chữ do mặt nạ quyết: LaMa sạch khi mặt nạ ôm sát nét, hỏng khi mặt nạ trùm cả nút / icon. Mỗi dòng cùng một cách:
-  1. NÉT    điểm nét Hi-SAM trong vùng dòng, cộng trọn các mảng nét chạm lõi dòng mà phần lớn nằm trong vùng (đuôi chữ, dấu thanh
-            thò khỏi khung OCR). Hi-SAM đã trả lời "có phải chữ không", nên vòng con dấu, viền nút, hoạ tiết không bị kéo vào.
+  1. NÉT    các MẢNH nét Hi-SAM của dòng: mỗi mảnh thuộc đúng một dòng (dòng có nhiều điểm của nó nhất, >= nửa mảnh --
+            lines.ink.own, cùng luật bước đo dòng), nên đuôi chữ / dấu thanh thò khỏi khung đi cùng chữ và hai dòng sát nhau không
+            gỡ chung một mảnh; cộng nét không dòng nào sở hữu nằm trong lõi dòng. Hi-SAM đã trả lời "có phải chữ không", nên vòng
+            con dấu, viền nút, hoạ tiết không bị kéo vào. Mảnh TRANG TRÍ đầu dòng (chấm "•", lines.lead) không phải chữ: ở lại.
   2. DỰ PHÒNG  Hi-SAM thấy quá ít ở dòng (chữ rất nhỏ): thêm các mảng cùng màu mực cỡ một chữ cái; vẫn không có thì lấy lõi dòng.
   3. QUẦNG  Hi-SAM chỉ thấy thân nét. Trong dải sát nét, điểm khác nền của dòng là viền dày / bóng đổ / quầng sáng; nền phẳng thì
             lan tiếp theo đuôi mờ. Quầng phải dính vào nét (icon đứng cách chữ một khe nền thì không), không lấn sang dòng khác.
   4. DẤU CÂU  mảng đậm nhỏ nằm gọn trong lõi dòng, giữa nét đầu và nét cuối (gạch nối, dấu chấm Hi-SAM bỏ qua).
-Nét của dòng giữ (chữ in trên sản phẩm) không bao giờ vào mặt nạ. Còn sót quầng mờ / nét nhỏ thì chữ dựng mới đè lên.
+Nét của dòng giữ (chữ in trên sản phẩm) và mảnh trang trí không bao giờ vào mặt nạ. Còn sót quầng mờ / nét nhỏ thì chữ dựng mới đè lên.
 Số đo và các hướng đã thử, đã bỏ: docs/TUNING.md (mục gỡ chữ), công cụ đo scripts/erase_bench.py.
 """
 
@@ -24,6 +26,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .color import hex_lab, lab
+from .lines.ink import Ink, own
 
 # --- vùng của dòng (theo cao dòng)
 GROW_HOLD = 0.3     # vùng "thuộc dòng" (giữ / đếm chồng lấn)
@@ -31,7 +34,6 @@ GROW_SEARCH = 0.6   # vùng tìm nét / quầng
 GROW_CORE = 0.1     # lõi dòng
 HEIGHT_CAP = 2.2    # cỡ dòng <= 2,2 lần cao mảng nét cao (khung OCR trùm hai hàng thì "cỡ" phình, dải quầng nuốt icon)
 # --- 1. nét
-WHOLE = 0.5         # mảng nét chạm lõi dòng thuộc trọn về dòng khi >= nửa diện tích nằm trong vùng dòng
 MASK_GROW = float(os.environ.get("TEXTFIX_MASK_GROW", "0.12"))   # nới quanh nét (viền khử răng cưa còn lại thì LaMa vẽ lại hình chữ)
 # --- 2. dự phòng
 WEAK = 0.08         # Hi-SAM phủ < 8% lõi dòng = thấy quá ít (dòng thường 21-30%)
@@ -114,6 +116,9 @@ class _Page:
     regions: dict
     count: np.ndarray
     hold: np.ndarray
+    owner: np.ndarray    # mảnh nét -> số thứ tự dòng sở hữu trong M["L"] (-1: không dòng nào)
+    index: dict          # id dòng -> số thứ tự
+    keep: np.ndarray     # điểm không bao giờ gỡ: mảnh của dòng giữ, mảnh trang trí (nới 2 px: viền khử răng cưa)
 
 
 @dataclass
@@ -143,7 +148,7 @@ def erase_mask(draft: np.ndarray, ink: np.ndarray, M: dict, kept: set, log: list
         mask[w.s] |= grown | halo
         sources[src] += 1
         n_halo += bool(halo.sum() > HALO_LINE * max(1.0, float(grown.sum())))
-    mask &= ~(pg.ink & pg.hold)
+    mask &= ~(pg.ink & pg.hold) & ~pg.keep
     if log is not None:
         free = pg.ink & ~mask & ~pg.hold
         log.append("nền = nháp trừ chữ (Hi-SAM + LaMa): mặt nạ %.1f%% ảnh; dòng theo %s; %d dòng có quầng; %d dòng giữ nguyên; nét "
@@ -163,7 +168,16 @@ def _page(draft: np.ndarray, ink: np.ndarray, lines: list[dict], kept: set) -> _
         count += regions[l["id"]]
         if l["id"] in kept:
             hold |= regions[l["id"]]
-    return _Page(H, W, lab(draft), ink, n_cc, cc, stats, regions, count, hold)
+    owner = np.full(n_cc, -1, int)
+    for k, ids in enumerate(own(Ink(ink), [regions[l["id"]] for l in lines])):
+        owner[ids] = k
+    index = {l["id"]: k for k, l in enumerate(lines)}
+    keep = np.isin(cc, [i for i in range(1, n_cc) if owner[i] >= 0 and lines[owner[i]]["id"] in kept])
+    for x0, y0, x1, y1 in (b for l in lines for b in (l.get("ink") or {}).get("ornament") or []):
+        sl = (slice(y0, y1), slice(x0, x1))
+        keep[sl] |= ink[sl]
+    keep = _dilate(keep, _disk(2)) if keep.any() else keep
+    return _Page(H, W, lab(draft), ink, n_cc, cc, stats, regions, count, hold, owner, index, keep)
 
 
 def _window(pg: _Page, l: dict) -> _Window | None:
@@ -187,12 +201,9 @@ def _strokes(pg: _Page, l: dict, w: _Window) -> tuple[np.ndarray, str]:
     """Bước 1 + 2: nét của dòng -> (mặt nạ trong cửa sổ, nguồn: "nét" / "màu mực" / "lõi dòng")."""
     import cv2
     ik, c_ = pg.ink[w.s], pg.cc[w.s]
-    area = pg.stats[:, cv2.CC_STAT_AREA]
-    got = ik & w.r
-    inside = np.bincount(c_[w.r], minlength=pg.n_cc)
-    whole = [i for i in np.unique(c_[ik & w.r0]) if i > 0 and inside[i] >= WHOLE * area[i]]
-    if whole:
-        got |= np.isin(c_, whole) & w.r2
+    own_ = pg.owner[c_]
+    got = ((own_ == pg.index[l["id"]]) & w.r2) | (ik & w.r0 & (own_ < 0))
+    got &= ~pg.keep[w.s]
     core = max(1.0, float(w.r0.sum()))
     if float((got & w.r0).sum()) >= WEAK * core:
         return got, "nét"

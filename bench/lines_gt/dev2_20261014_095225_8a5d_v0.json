@@ -1,0 +1,95 @@
+{
+ "key": "dev2_20261014_095225_8a5d_v0",
+ "src": "dev2/runs/run_20261014_095225_8a5d/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    77,
+    78,
+    548,
+    196
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "BLACK",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    77,
+    201,
+    564,
+    316
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "FRIDAY",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    67,
+    329,
+    539,
+    430
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Sale up to 70%",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    82,
+    687,
+    385,
+    743
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Chii 3 dany:",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    87,
+    744,
+    401,
+    780
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "28r1 28-30/11",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    119,
+    862,
+    403,
+    924
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Shop now",
+   "eval": true
+  }
+ ]
+}

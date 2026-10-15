@@ -1,0 +1,151 @@
+{
+ "key": "accept2_20261014_040159_57a8_v0",
+ "src": "accept2/runs/run_20261014_040159_57a8/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    205,
+    97,
+    679,
+    236
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "MENU",
+   "eval": true
+  },
+  {
+   "id": "L2a",
+   "box": [
+    167,
+    358,
+    558,
+    427
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Ca pne sua da 25.000d",
+   "eval": true
+  },
+  {
+   "id": "L2b",
+   "box": [
+    566,
+    358,
+    760,
+    427
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Ca pne sua da 25.000d",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    168,
+    512,
+    379,
+    585
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Bacxiu",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    566,
+    530,
+    753,
+    582
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "29.000d",
+   "eval": true
+  },
+  {
+   "id": "L5a",
+   "box": [
+    175,
+    638,
+    582,
+    696
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tra daoo cam 35.00d",
+   "eval": true
+  },
+  {
+   "id": "L5b",
+   "box": [
+    590,
+    638,
+    755,
+    696
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tra daoo cam 35.00d",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    183,
+    802,
+    455,
+    861
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Sinh to bo",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    574,
+    809,
+    754,
+    860
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "39.000d",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    290,
+    1019,
+    590,
+    1052
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Mo ciu 6.30-22:00",
+   "eval": true
+  }
+ ]
+}

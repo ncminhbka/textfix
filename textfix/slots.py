@@ -48,64 +48,80 @@ def _tall(c: str) -> bool:
     return c.isupper() or c.isdigit() or unicodedata.normalize("NFD", c)[0] in "bdfhklt"
 
 
-TILT_MIN = 4.0     # độ: dòng đo ra nghiêng dưới 4 độ là nhiễu đo của OCR -> thẳng (13/10: 57 / 1505 dòng ở 2-4 độ, nháp vẽ thẳng)
-TILT_SURE = 10.0   # ... từ 10 độ trở lên là nghiêng thật (nhãn dán, dải xéo); ở giữa chỉ tin khi dòng đủ dài:
-TILT_PAIR = 2.5    # ... VÀ có dòng khác trong poster nghiêng cùng góc (lệch <= 2,5 độ): nghiêng thật đi theo cụm (nhãn hai dòng);
-                   # một dòng dài nghiêng lẻ 4-10 độ là OCR gộp hai mẩu lệch hàng (accept2 q02 "Hương dịu nhẹ" đo 8,4 độ)
-TILT_LONG = 3.0    # cạnh dài / cạnh ngắn của đa giác >= 3 (từ ngắn "MC", "200g", "Glow Up" đo sai tới 8 độ)
-VERT_TALL = 2.2    # dòng viết DỌC: đa giác OCR cao >= 2,2 lần rộng, đọc được >= 3 ký tự
+VERT_TALL = 2.2    # dòng viết DỌC theo khung OCR: cao >= 2,2 lần rộng, đọc được >= 3 ký tự (khi nét không đủ để nói hướng)
 
 
-def _line_angle(l: dict) -> float:
-    """Góc DỰNG của một dòng OCR: bỏ nhiễu đo (người dùng 13/10: chữ ngả nghiêng dù nháp viết thẳng)."""
-    a = float(l.get("angle") or 0.0)
-    if abs(a) >= TILT_SURE:
-        return a
-    if abs(a) < TILT_MIN:
-        return 0.0
-    pl = l.get("poly")
-    if pl and len(pl) == 4:
-        e = sorted(float(np.hypot(pl[i][0] - pl[(i + 1) % 4][0], pl[i][1] - pl[(i + 1) % 4][1])) for i in range(4))
-        reach = e[-1] / max(1.0, e[0])
-    else:
-        reach = (l["box"][2] - l["box"][0]) / max(1.0, l["box"][3] - l["box"][1])
-    return a if reach >= TILT_LONG else 0.0
-
-
-def _vertical(img: np.ndarray, l: dict) -> dict:
-    """Dòng viết DỌC (chữ chạy dọc mép poster): OCR trả đa giác cao - hẹp với góc 0 và chữ rác (đọc sai chiều) -> mã coi là dòng
-    ngang trong ô hẹp, chữ dựng ngang bé tí (accept2 "Ngày hội siêu sale"). Đọc lại theo hai chiều +90 / -90, lấy chiều tin hơn:
-    ghi góc, chữ đọc được và đa giác theo chiều đọc. Không phải dòng dọc: trả nguyên."""
+def _vertical(img: np.ndarray, l: dict, sure: bool) -> dict:
+    """Dòng viết DỌC (chữ chạy dọc mép poster, dọc bao bì): OCR trả khung cao - hẹp với góc 0 và chữ rác (đọc sai chiều). Đọc lại
+    theo hai chiều +90 / -90, lấy chiều tin hơn: ghi góc, chữ đọc được và đa giác theo chiều đọc.
+    sure: nét đã nói dòng dọc (lines.angle) -> dọc kể cả khi bộ đọc không ra chữ (chữ trên bao bì); không thì chỉ khi khung
+    OCR cao >= VERT_TALL lần rộng và bộ đọc ra chữ. Không phải dòng dọc: trả nguyên."""
     from .ocr import MIN_REC, read_rect
     b = l["box"]
     w, h = b[2] - b[0], b[3] - b[1]
-    if h < VERT_TALL * w or abs(float(l.get("angle") or 0.0)) >= TILT_SURE or sum(ch.isalnum() for ch in l["text"]) < 3:
+    if not sure and (h < VERT_TALL * w or sum(ch.isalnum() for ch in l["text"]) < 3):
         return l
     c = ((b[0] + b[2]) / 2, (b[1] + b[3]) / 2)
     best = max(((*read_rect(img, c, h, w, a), a) for a in (90.0, -90.0)), key=lambda t: t[1])
-    if best[1] < MIN_REC or not any(ch.isalnum() for ch in best[0]):
+    readable = best[1] >= MIN_REC and any(ch.isalnum() for ch in best[0])
+    if not (readable or sure):
         return l
     x0, y0, x1, y1 = b
     poly = [[x1, y0], [x1, y1], [x0, y1], [x0, y0]] if best[2] > 0 else [[x0, y1], [x0, y0], [x1, y0], [x1, y1]]
-    return {**l, "text": best[0], "angle": best[2], "poly": poly, "vertical": True}
+    return {**l, "text": best[0] if readable else l["text"], "angle": best[2], "poly": poly, "vertical": True}
 
 
-def lines(img: np.ndarray) -> list[dict]:
-    """Dòng OCR + số đo nét: cao thân chữ -> cỡ chữ (px), màu, góc nghiêng."""
+def orient(img: np.ndarray, ink: np.ndarray, raw: list[dict]) -> list[dict]:
+    """Hướng mỗi dòng OCR (raw: {box, poly, angle = góc OCR, text}) theo nét + OCR (textfix.lines); dòng dọc đọc lại để chọn
+    chiều. Sửa raw tại chỗ (angle, và text / poly / vertical với dòng dọc). -> số đo nét từng dòng (lines.measure_lines)."""
+    from .erase import line_region
+    from .lines import Ink, measure_lines
+    H, W = img.shape[:2]
+    G = measure_lines(img, Ink(ink), [line_region(l, H, W, 0.1) for l in raw], [float(l.get("angle") or 0.0) for l in raw],
+                      [l["box"] for l in raw])
+    for k, (l, g) in enumerate(zip(raw, G)):
+        l["angle"] = g["angle"]
+        if g["x0"] is not None:   # khung bộ dò ôm cả thứ đứng trước chữ: khung dòng bắt đầu từ nét chữ đầu tiên (lines.lead)
+            b = l["box"]
+            l["box"] = [g["x0"], b[1], b[2], b[3]]
+            l["poly"] = [[g["x0"], b[1]], [b[2], b[1]], [b[2], b[3]], [g["x0"], b[3]]]
+            l["lead_icon"] = True
+        if g["shape"] != "tilt":
+            raw[k] = _vertical(img, l, g["shape"] == "vertical")
+    return G
+
+
+def _ink(g: dict) -> dict:
+    """Số đo nét ghi kèm dòng (plan.json): bỏ phần đã dùng (kiểu, góc) và id mảnh (chỉ có nghĩa trong lượt chạy)."""
+    return {k: v for k, v in g.items() if k not in ("shape", "angle", "ids", "x0")}
+
+
+def reorient(img: np.ndarray, ink: np.ndarray, L: list[dict]) -> None:
+    """orient cho dòng đã lưu trong plan.json (dựng lại lượt cũ theo luật hiện hành): góc gốc là angle_ocr; dòng cong giữ nguyên."""
+    todo = [l for l in L if not l.get("path")]
+    raw = [{"box": l["box"], "poly": l.get("poly"), "angle": l.get("angle_ocr", l.get("angle")) or 0.0, "text": l.get("ocr") or ""}
+           for l in todo]
+    G = orient(img, ink, raw)
+    for l, r, g in zip(todo, raw, G):
+        l.update(box=r["box"], angle=r["angle"], poly=r["poly"], ocr=r["text"], ink=_ink(g))
+        if r.get("lead_icon"):
+            l["lead_icon"] = True
+        l.pop("vertical", None)
+        if r.get("vertical"):
+            l["vertical"] = True
+        l["shape"] = shape_of(l)
+
+
+def lines(img: np.ndarray, ink: np.ndarray) -> list[dict]:
+    """Dòng OCR + hình học và số đo từ nét Hi-SAM của chính dòng (textfix.lines): hướng, cao chữ, màu, nét."""
     import cv2
     from .glyph import measure
     from .ocr import read_lines
     H, W = img.shape[:2]
-    # "dòng" không có chữ cái / chữ số (hàng sao "★★★★★", gạch, chấm) không phải chữ: để lớp phủ tách thành chi tiết I
-    raw = [l for l in read_lines(img) if any(ch.isalnum() for ch in l["text"])]
-    raw = [_vertical(img, q) for l in raw for q in _split_gaps(img, l)]
-    raw_ang = [float(l.get("angle") or 0.0) for l in raw]   # góc OCR đo, trước khi bỏ nhiễu (ghi lại cho debug)
-    angs = [_line_angle(l) for l in raw]
-    for k, l in enumerate(raw):   # góc dựng chốt ở đây: mọi nơi dùng l["angle"] thấy cùng một góc
-        a = angs[k]
-        if TILT_MIN <= abs(a) < TILT_SURE and not any(j != k and abs(b - a) <= TILT_PAIR for j, b in enumerate(angs)):
-            a = 0.0
-        l["angle"] = a
+    # "dòng" không có chữ cái / chữ số (hàng sao "★★★★★", gạch, chấm) không phải chữ: để nguyên điểm ảnh nháp
+    raw = [q for l in read_lines(img) if any(ch.isalnum() for ch in l["text"]) for q in _split_gaps(img, l)]
+    raw_ang = [float(l.get("angle") or 0.0) for l in raw]   # góc OCR đo (ghi lại cho debug)
+    G = orient(img, ink, raw)
     L = []
     for i, l in enumerate(raw, 1):
         ang = float(l["angle"])
@@ -135,7 +151,8 @@ def lines(img: np.ndarray) -> list[dict]:
                   "caps": caps, "stroke": round(float(m["stroke"]), 1) if m else None,
                   "stroke_contrast": round(float(m["contrast"]), 2) if m else None,
                   "effect": {k: v for k, v in (m.get("effect") or {}).items() if k in ("dx", "dy", "color")} if m and m.get("effect") else None,
-                  "angle_ocr": round(raw_ang[i - 1], 1), **({"vertical": True} if l.get("vertical") else {})})
+                  "angle_ocr": round(raw_ang[i - 1], 1), "ink": _ink(G[i - 1]),
+                  **({"vertical": True} if l.get("vertical") else {})})
     return L
 
 
@@ -219,77 +236,6 @@ def _split_gaps(img: np.ndarray, l: dict) -> list[dict]:
         bx = [float(x0 + a), float(y0), float(x0 + b), float(y1)]
         out.append({**l, "text": part, "box": bx, "poly": [[bx[0], bx[1]], [bx[2], bx[1]], [bx[2], bx[3]], [bx[0], bx[3]]]})
     return out or [l]
-
-
-LEAD_GAP = (0.6, 4.0)   # khung OCR thừa bên trái nét chữ đầu tiên một khoảng 0,6-4 cao nét = khung ôm cả icon đứng trước dòng
-
-
-def _trim_lead(L: list, ink: np.ndarray) -> list[str]:
-    """KHUNG DÒNG BẮT ĐẦU TỪ NÉT CHỮ ĐẦU TIÊN khi khung OCR ôm cả icon đứng trước dòng (accept2 q02: OCR lấy luôn chiếc lá).
-    Icon là của nháp, không gỡ (erase.erase_mask), nên chữ mới không được dựng đè lên nó: mép trái khung dời tới nét đầu. Chỉ
-    dời khi Hi-SAM thấy rõ chữ ở dòng đó (>= 3 mảng nét) -- thấy ít thì không biết chữ bắt đầu ở đâu, giữ khung OCR."""
-    import cv2
-    H, W = ink.shape
-    log = []
-    for l in L:
-        if l.get("path") or l.get("orphan") or l.get("vertical") or abs(l.get("angle") or 0) >= 2:
-            continue
-        x0, y0, x1, y1 = (int(round(v)) for v in l["box"])
-        if y1 - y0 < 8 or x1 - x0 < 16:
-            continue
-        sub = ink[max(0, y0):min(H, y1), max(0, x0):min(W, x1)].astype(np.uint8)
-        n, _cc, st, _c = cv2.connectedComponentsWithStats(sub, 8)
-        comps = [st[i] for i in range(1, n) if st[i][4] >= 6 and st[i][3] >= 4]
-        if len(comps) < 3:
-            continue
-        hi = float(np.median([c[3] for c in comps]))
-        first = min(int(c[0]) for c in comps)
-        if LEAD_GAP[0] * hi <= first <= LEAD_GAP[1] * hi:
-            nx = float(max(0, x0) + first - max(1.0, 0.1 * hi))
-            b = l["box"]
-            l["box"] = [nx, b[1], b[2], b[3]]
-            l["ocr_box"] = list(l["box"])
-            l["poly"] = [[nx, b[1]], [b[2], b[1]], [b[2], b[3]], [nx, b[3]]]
-            l["lead_icon"] = True
-            log.append(f"{l['id']}: khung OCR ôm cả thứ đứng trước chữ ({first} px) -> mép trái khung dời tới nét chữ đầu tiên")
-    return log
-
-
-DOT_MAX = 0.5    # chấm tròn đầu dòng: mảng nét đầu tiên của dòng, cạnh <= 0,5 cao dòng, gần vuông (cạnh ngắn >= 0,5 cạnh dài) ...
-DOT_GAP = 0.2    # ... cách mảng nét kế tiếp >= 0,2 cao dòng theo chiều ngang ...
-DOT_MID = (0.2, 0.8)   # ... tâm nằm ở khoảng giữa chiều cao dòng (dấu nháy ở trên, dấu chấm câu ở dưới thì không)
-
-
-def _lead_dots(L: list, ink: np.ndarray) -> list[str]:
-    """CHẤM TRÒN ĐẦU DÒNG LÀ KÝ TỰ CỦA DÒNG (14/10): OCR gộp "•" vào khung dòng và Hi-SAM coi nó là nét chữ, nên nó bị gỡ cùng
-    chữ. Ghi l["dot"] = True: VLM được đặt lại chấm ("bullet": true, fill.layout). Icon, tick, hình nhỏ trước dòng KHÔNG phải nét
-    chữ: không dò, không gỡ, không vẽ lại -- TextFix chỉ sửa chữ (người dùng chốt 14/10)."""
-    import cv2
-    H, W = ink.shape
-    log = []
-    for l in L:
-        if l.get("path") or l.get("orphan") or l.get("vertical") or abs(l.get("angle") or 0) >= 2:
-            continue
-        x0, y0, x1, y1 = (int(round(v)) for v in l["box"])
-        h = y1 - y0
-        if h < 8 or x1 - x0 < 2 * h:
-            continue
-        sub = ink[max(0, y0):min(H, y1), max(0, x0):min(W, x1)].astype(np.uint8)
-        n, _cc, st, _c = cv2.connectedComponentsWithStats(sub, 8)
-        comps = sorted((st[i] for i in range(1, n) if st[i][4] >= 6), key=lambda t: t[0])
-        if len(comps) < 3:
-            continue
-        bx, by, bw, bh = (int(v) for v in comps[0][:4])
-        nxt = min(int(c[0]) for c in comps[1:])
-        mid = (by + bh / 2) / max(1, sub.shape[0])
-        # ... VÀ chữ OCR đọc không mở đầu bằng chữ / số (accept2 r04: " Swittch", "• Ket", ": Pin"). Chỉ theo hình thì nhầm:
-        # h04 dòng "HOI" của tiêu đề có một mẩu nét nhỏ đứng trước -> poster ra "NGÀY • HỘI"
-        o1 = (l.get("ocr") or "")[:1]
-        if max(bw, bh) <= DOT_MAX * h and min(bw, bh) >= 0.5 * max(bw, bh) and nxt - (bx + bw) >= DOT_GAP * h \
-                and DOT_MID[0] <= mid <= DOT_MID[1] and (not o1 or not o1.isalnum()):
-            l["dot"] = True
-            log.append(f"{l['id']}: chấm tròn đầu dòng (ký tự của dòng, gỡ cùng chữ)")
-    return log
 
 
 def _xy_order(boxes: list, texts: list | None = None) -> list[int]:
@@ -382,7 +328,7 @@ def build(draft: np.ndarray, ink: np.ndarray, product: bool = False) -> dict:
          (người dùng chốt 14/10). VLM không nhắc tới thì GIỮ nguyên điểm ảnh nháp (fill.resolve)."""
     H, W = draft.shape[:2]
     ink = np.asarray(ink, bool)
-    L = lines(draft)
+    L = lines(draft, ink)
     A = _lab(draft)
     for l in L:
         # KHUNG DÒNG = KHUNG OCR, nguyên bản (12/10: bỏ hẳn bước nắn khung theo nét mực -- trên nền ảnh chụp nét mực đo thiếu,
@@ -396,10 +342,33 @@ def build(draft: np.ndarray, ink: np.ndarray, product: bool = False) -> dict:
         if geo.RUNS:
             L, glog2 = geo.runs(L)
     L, olog = _orphans(L, draft, ink, masks)
-    mlog = _lead_dots(L, ink) + _trim_lead(L, ink)
-    L, glog = _renumber(L, [], [], glog + glog2 + olog + mlog)
+    L, glog = _renumber(L, [], [], glog + glog2 + olog)
+    for l in L:
+        l["shape"] = shape_of(l)
+    _rows(L)
     _typo_notes(L, glog)
     return {"L": L, "size": [W, H], "by": {m["id"]: m for m in L}, "geo_log": glog}
+
+
+def _rows(L: list) -> None:
+    """HÀNG NHIỀU CỠ (lines.rows): các dòng ngang chung đường chân, sát nhau, lệch cỡ ("Giảm" | "30%" | "tất") -> l["row"] = "R#"."""
+    from .lines import rows
+    ink = [l.get("ink") or {} for l in L]
+    R = rows([l["box"] for l in L], [k.get("h_cap") or 0.0 for k in ink],
+             [k.get("base") if l["shape"] == "straight" and k.get("h_cap") else None for l, k in zip(L, ink)])
+    for l, r in zip(L, R):
+        l.pop("row", None)
+        if r is not None:
+            l["row"] = f"R{r + 1}"
+
+
+def shape_of(l: dict) -> str:
+    """Kiểu đường của một dòng: curve (có đường chân) / vertical / tilt / straight."""
+    if l.get("path"):
+        return "curve"
+    if l.get("vertical"):
+        return "vertical"
+    return "tilt" if abs(l.get("angle") or 0) >= 2 else "straight"
 
 
 GEO_NAME = {"arc": "cung tròn", "wave": "lượn sóng", "grow": "to dần / nhỏ dần"}
@@ -424,22 +393,21 @@ def _typo_notes(L: list, logs: list[str]) -> None:
         if l.get("vertical"):
             bw, bh = l["box"][2] - l["box"][0], l["box"][3] - l["box"][1]
             notes.append({"kind": "chữ dọc", "how": f"khung OCR cao gấp {bh / max(1.0, bw):.1f} lần rộng; đọc lại theo {l['angle']:+.0f}° ra {l.get('ocr')!r}"})
-        a, ao = float(l.get("angle") or 0.0), l.get("angle_ocr")
+        a, ao, ia = float(l.get("angle") or 0.0), l.get("angle_ocr"), (l.get("ink") or {}).get("ink_angle")
+        src = f"nét đo {ia:+.1f}°" if ia is not None else "nét không đủ mảnh để đo hướng"
         if not l.get("vertical") and not l.get("path") and abs(a) >= 2:
-            rule = "từ 10° trở lên là nghiêng thật" if abs(a) >= TILT_SURE else \
-                "4-10°: giữ vì có dòng khác nghiêng cùng góc (lệch <= 2,5°) và dòng đủ dài"
-            notes.append({"kind": f"nghiêng {a:+.0f}°", "how": f"OCR đo {ao if ao is not None else a:+.1f}°; {rule}"})
-        elif ao is not None and abs(ao) >= 2 and abs(a) < 2 and not l.get("vertical") and not l.get("path"):
-            why = "dưới 4° là nhiễu đo của OCR" if abs(ao) < TILT_MIN else "4-10° ở dòng ngắn / không có dòng nào nghiêng cùng góc"
-            notes.append({"kind": "dựng thẳng", "how": f"OCR đo {ao:+.1f}°, {why}"})
+            how = f"{src}, OCR đo {ao:+.1f}°: cùng thấy nghiêng" if ao is not None else "vùng chữ của bộ dò nghiêng (dòng OCR sót)"
+            notes.append({"kind": f"nghiêng {a:+.0f}°", "how": how})
+        elif ao is not None and abs(ao) >= 2 and not l.get("vertical") and not l.get("path"):
+            notes.append({"kind": "dựng thẳng", "how": f"OCR đo {ao:+.1f}° nhưng {src}: hai nguồn không cùng thấy nghiêng"})
         if l.get("missed") and not l.get("orphan"):
             notes.append({"kind": "dòng OCR sót", "how": "; ".join(x for x in lg if "OCR sót" in x)[:300] or "vùng chữ của bộ dò không có dòng OCR, bộ đọc đọc ra chữ"})
         if l.get("orphan"):
             notes.append({"kind": "cụm nét OCR không đọc", "how": "; ".join(x for x in lg if "cụm nét" in x)[:300] or "nét Hi-SAM ngoài mọi dòng OCR"})
-        if l.get("dot"):
-            notes.append({"kind": "chấm đầu dòng", "how": "mảng nét đầu dòng nhỏ, tròn, cách chữ; OCR đọc ký tự đầu không phải chữ -> Hi-SAM gỡ chấm cùng chữ, VLM được viết lại"})
+        if (l.get("ink") or {}).get("ornament"):
+            notes.append({"kind": "trang trí đầu dòng", "how": "mảnh nét đầu dòng nhỏ, giữa chiều cao, cách chữ (lines.lead): không thuộc chữ, giữ nguyên điểm ảnh nháp"})
         if l.get("lead_icon"):
-            notes.append({"kind": "khung dời khỏi icon", "how": "; ".join(x for x in lg if "khung OCR ôm" in x)[:300]})
+            notes.append({"kind": "khung dời khỏi icon", "how": "khung bộ dò ôm cả thứ đứng trước chữ -> mép trái dời tới nét chữ đầu tiên"})
         if l.get("printed"):
             notes.append({"kind": "chữ in trên sản phẩm", "how": "chữ OCR khớp chữ đọc được trên ảnh sản phẩm khách tải"})
         if notes:
@@ -655,7 +623,7 @@ def mark_printed(M: dict, product_ocr: list | None) -> list[str]:
 
 def public(M: dict) -> dict:
     """Ô để ghi JSON."""
-    return {"L": [{k: m[k] for k in ("id", "box", "ocr_box", "ocr", "size", "color", "angle", "curve", "runs", "geo", "path", "scale", "missed", "orphan", "printed", "dot", "lead_icon", "vertical", "angle_ocr", "sag", "merged", "typo", "poly") if k in m}
+    return {"L": [{k: m[k] for k in ("id", "box", "ocr_box", "ocr", "size", "color", "angle", "curve", "runs", "geo", "path", "scale", "missed", "orphan", "printed", "lead_icon", "vertical", "shape", "row", "angle_ocr", "ink", "sag", "merged", "typo", "poly") if k in m}
                   for m in M["L"]]}
 
 
@@ -762,7 +730,7 @@ PRODUCT_NOTE = ("The client uploaded a photo of their product and the image mode
 
 
 def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, system: str, desc: str, base: np.ndarray,
-         product: bool = False, meta: dict | None = None) -> dict:
+         product: bool = False, meta: dict | None = None, fresh: bool = False) -> dict:
     """Một lời gọi VLM: lời dặn (system), PROMPT của FLUX, câu khách, bảng mô tả dòng (desc), ba ảnh DRAFT / SLOTS / BASE.
     meta: nhận số token / thời gian (llm.json_call). -> câu trả lời JSON (fill.parse đọc)."""
     mk = marked_image(draft, M)
@@ -772,7 +740,7 @@ def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, syste
     user = (f"PROMPT given to the image model:\n{prompt}\n\nClient texts (exact words):\n{_texts(texts)}\n\nPoster size: {W}x{H}px.\n\n"
             + (PRODUCT_NOTE + "\n\n" if product else "") + desc)
     args = (system, [user, *imgs]) + ((meta,) if meta is not None else ())
-    return _obj(call(*args))
+    return _obj(call(*args, fresh=True) if fresh else call(*args))
 
 CLIENT_LIKE = 0.6   # chữ OCR của ô giống câu khách >= 0.6 (bỏ dấu, chữ thường) = chữ poster chứa câu khách
 

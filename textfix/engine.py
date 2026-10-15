@@ -106,7 +106,8 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     """TRẠM THIẾT KẾ (chặng B, 14/10): dòng (OCR + nét chữ) -> gỡ mọi dòng (LaMa, MỘT lần) -> VLM GHÉP câu khách <-> dòng + kiểu
     theo vai -> code chép nguyên văn, cỡ / lề / tập theo nháp (fill) -> trả điểm ảnh nháp cho dòng giữ -> dựng -> kiểm -> sửa
     bằng code. d = draw(...)."""
-    from . import erase, fill, lonly, render, slots
+    from . import erase, fill, render, slots
+    from .compose import fate, vlm as cvlm
     draft, ink, T = d["draft"], d["ink"], dict(d["timing"])
     texts = B["texts"]
     t0 = time.time()
@@ -116,7 +117,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     if printed:
         slots._typo_notes(M0["L"], M0.get("geo_log") or [])   # ghi lại phần "chữ khó" cho dòng in trên sản phẩm
     geo_log = list(M0.get("geo_log") or [])
-    M = lonly.view(M0)
+    M = cvlm.view(M0)
     T["dong"] = time.time() - t0
     t0 = time.time()
     progress("gỡ chữ (LaMa)")
@@ -127,8 +128,8 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     def base_of(U_, log_=None):
         return erase.settle(draft, clean, ink, M, {"ops": U_}, log_)
 
-    def ask():
-        return fill.parse(lonly.plan(draft, M, B["prompt_en"], texts, vlm, product=product, base=clean))
+    def ask(fresh=False):
+        return cvlm.ask(draft, M, B["prompt_en"], texts, vlm, product=product, base=clean, fresh=fresh)
     t0 = time.time()
     progress("VLM ghép câu")
     A = ask()
@@ -138,22 +139,20 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     empty = bool(M["L"] and texts) and not wrote(A)
     if empty:
         progress("VLM trả ghép rỗng, gọi lại")
-        A = ask()
+        A = ask(fresh=True)
     llog = []
-    # CÂU TRẢ LỜI CỤT (mix1 p02: 1 lệnh cho 10 dòng): gọi lại một lần, lấy bản phủ nhiều dòng hơn
-    n0 = len(fill.covered(A, M))
     if empty:
         llog.append("VLM trả ghép rỗng -> gọi lại: " + ("được" if wrote(A) else "VẪN RỖNG"))
-    elif M["L"] and n0 < lonly.COVER_MIN * len(M["L"]):
-        progress("VLM bỏ sót nhiều dòng, gọi lại")
-        again = ask()
-        n1 = len(fill.covered(again, M))
-        llog.append(f"VLM chỉ ghép {n0} / {len(M['L'])} dòng -> gọi lại: {n1} dòng")
-        if n1 > n0:
-            A = again
+    # DÒNG VLM BỎ SÓT (không nhắc tới): hỏi lại RIÊNG các dòng đó một lần; vẫn không có thì compose.fate giữ nguyên
+    left = fate.omitted(A, M)
+    if left and not (empty and not wrote(A)):
+        progress(f"VLM bỏ sót {len(left)} dòng, hỏi lại")
+        A2 = cvlm.reask(draft, M, B["prompt_en"], texts, vlm, left, product=product, base=clean)
+        A["assign"] += A2["assign"]
+        llog.append(f"VLM bỏ sót {left} -> hỏi lại: có {sorted(fate.mentioned(A2))}")
     if A.get("dropped"):
         llog.append(f"bỏ mục ghép sai khuôn: {A['dropped']}")
-    U, rlog0, miss_i = fill.resolve(A, M, texts, product=product)
+    U, rlog0, miss_i = fill.resolve(A, M, texts)
     U, llay = fill.layout(U, M, ink, A["styles"], A["accent"], texts)
     log = geo_log + llog + rlog0 + llay
     if product:
@@ -193,7 +192,8 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     rinfo = [{"id": r["id"], "unit": r.get("unit"), "fs": round(float(r.get("fs") or r.get("size") or 0), 1),
               "shrink": round(float(r.get("shrink") or 1), 2), "sx": r.get("sx", 1), "angle": round(float(r.get("angle") or 0), 1),
               "path": bool(r.get("path"))} for r in res or []]
-    plan = {"style": A["styles"], "assign": A["assign"], "accent": A["accent"], "ops": fill.public(U), "render": rinfo,
+    plan = {"style": A["styles"], "assign": A["assign"], "accent": A["accent"], "ops": fill.public(U), "fates": fate.table(U, M),
+            "render": rinfo,
             "missing": missing, "notes": A.get("notes"), "errors": errs, "log": log, "slots": slots.public(M), "slots_mode": "L",
             "errors_first": errs_first,
             "erase": {"mask_pct": round(100 * float(mask.mean()), 2), "ink_pct": round(100 * float(ink.mean()), 2),

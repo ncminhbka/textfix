@@ -1,0 +1,81 @@
+{
+ "key": "accept2_20261014_040159_3384_v0",
+ "src": "accept2/runs/run_20261014_040159_3384/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    146,
+    82,
+    874,
+    174
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Cung ly dong nan nva'",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    388,
+    437,
+    668,
+    574
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "object",
+   "ocr": "SAPPORO",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    435,
+    520,
+    646,
+    610
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "object",
+   "ocr": "MIUMBEER",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    262,
+    823,
+    760,
+    879
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Mua 1 thulig eng 4 lon",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    260,
+    935,
+    779,
+    973
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dai ly Honng Gia - 09003 555 777",
+   "eval": true
+  }
+ ]
+}

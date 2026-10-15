@@ -108,13 +108,45 @@ Người dùng chốt: không định vị vùng sản phẩm; chữ FLUX vẽ t
 riêng rồi GIỮ; CHO NỚI chữ vào nền trống cùng màu, không vượt vỏ / dòng khác.
 - [ ] Chặng 0: lượt máy chủ dev2 + mix1 với bước 1-2 mới (nháp mới + mốc); bộ đáp án chia dòng `bench/lines_gt` (Claude gán);
   `scripts/lines_bench.py` (chỉ số dòng + dựng lại bằng câu trả lời VLM đã lưu, đổi id theo chồng lấn nét).
-- [ ] Chặng 1: `textfix/lines/` (vùng DBNet + nét Hi-SAM, tách hàng / mục, đường chân thẳng / tròn / bậc 3, số đo từ nét, đọc
-  dòng đã nắn, đánh số khối) thay `slots` đo dòng + `glyph` + `geo` + `_split_gaps` / `TILT_*` / `_vertical` / `_trim_lead` /
-  `_lead_dots` / `_stacked` / `fill.TALL`. Qua chặng: F1 dòng >= OCR hiện tại, giảm gộp / tách / góc.
-- [ ] Chặng 2: `erase` dùng đúng mảnh nét của dòng + xuất quầng làm hiệu ứng.
-- [ ] Chặng 3: `compose/vlm.py` (lời dặn ba số phận, hỏi lại dòng bỏ sót, `fresh=True`) + `compose/fate.py` (một bảng số phận).
+- [~] Chặng 1 -- ĐỔI HƯỚNG 15/10 (người dùng chọn "lai"): chia dòng thuần bằng nét (vùng DBNet + mảnh Hi-SAM, tách hàng / mục)
+  đạt F1 0,92 < 0,969 của OCR; mỗi luật thêm để gỡ một nhóm ca lại hỏng nhóm khác (chữ dọc bao bì / tiêu đề xếp chồng / cụm
+  cùng hàng) -> dừng. Thiết kế lại: GIỮ cách OCR chia vùng dòng (`read_lines`, `_split_gaps`, dòng sót / vòm của `_geo_lines`,
+  `_orphans`); mọi đại lượng HÌNH HỌC và SỐ ĐO lấy từ mảnh nét của chính dòng (`textfix/lines/`: ink, group, angle, measure);
+  gỡ dần từng luật vá chia dòng, mỗi lần có số đo. Bản thuần nét cất ngoài repo.
+  - [x] Hướng dòng hai nguồn (`lines.angle.orient`): nghiêng khi nét VÀ OCR cùng thấy >= 2 độ cùng chiều, góc theo nét; góc nét
+    = trục chính + nắn thẳng theo MÉP CHỮ (đạo hàm hình chiếu: chân thò g / y không kéo lệch, "200g" / "Đặt ngay" 5 -> 0 độ);
+    nét không đủ mảnh ("-50") -> OCR; dọc khi nét dốc >= 60 độ và khung cao hơn rộng (đọc hai chiều chọn chiều). Bỏ
+    `TILT_MIN / SURE / PAIR / LONG`, `_line_angle`. Đòi hai nguồn lệch <= 5 / 8 độ thì tệ hơn (bỏ).
+  - [x] Số đo từ nét kèm mỗi dòng (`l["ink"]`): h_cap, h_x, đường chân, màu lõi nét, độ dày, tương phản, số mảnh trang trí;
+    bên dùng chuyển ở chặng 4 (cỡ theo font + câu khách, màu một nguồn) rồi bỏ `glyph`.
+  - [x] Đầu dòng theo mảnh nét (`lines.lead`): mảnh đầu nhỏ, giữa chiều cao, cách chữ = trang trí (không thuộc chữ); khung bắt đầu
+    ở nét chữ đầu khi thừa >= 0,6 cao chữ. Thay `_trim_lead`. `_lead_dots` + cờ `dot` + `bullet` của VLM gỡ ở chặng 2-3 (cần gỡ
+    chữ theo mảnh nét để chấm ở lại là điểm ảnh nháp).
+  - [x] Chữ nhiều cỡ (`lines.runs`): `segments` trong một dòng (từ lệch cỡ >= 1,6 lần; hoa / thường từng đoạn), `row` giữa các
+    dòng (chung đường chân, sát nhau, lệch cỡ >= 1,6: d03 "Giảm | 30% | tất"). Chặng 4 rải câu theo đoạn / hàng, bỏ đoán `accent`.
+  - [x] Bench: `lines_bench.py --source build` (chạy lại toàn bộ `slots.build`, đệm OCR ra đĩa), `--kind poster`; kiểu đường
+    `bench/lines_gt` gán lại mù. Số (OCR chạy lại trên nháp JPG, cùng điều kiện với mã cũ ở HEAD):
+    chữ poster F1 0,968 -> 0,966, tách 6 -> 6, gộp 9 -> 8, sai kiểu 8 -> 5; mọi chữ sai kiểu 19 -> 13. Hai dòng dư đều là mảnh
+    cung trên vành con dấu (bánh pía, con dấu cà phê), số dòng khớp không đổi.
+  - Giới hạn đã biết: từ 3 chữ có chân ("gẽl") cả hai nguồn cùng lệch; chữ vòng con dấu.
+  - Giữ (đo, chưa thay được bằng nét): `_split_gaps`, `_stacked`, nhánh bảng của `_xy_order` (đo lại ở chặng 3 với VLM thật).
+- [~] Chặng 2: `erase` dùng đúng mảnh nét của dòng.
+  - [x] Bước 1 (nét): mảnh nét SỞ HỮU (`lines.ink.own`, cùng luật bước đo dòng: mỗi mảnh một dòng) + nét không ai sở hữu trong lõi
+    dòng; bỏ `WHOLE`. Mảnh trang trí đầu dòng (`lines.lead`) và mảnh của dòng giữ không bao giờ vào mặt nạ.
+  - [x] Gỡ `_lead_dots`, cờ `dot`, `bullet` của VLM + mục 6 lời dặn: chấm đầu dòng ở lại là điểm ảnh nháp.
+  - [ ] Số đo `erase_bench` (accept2 + mix1c, 65 nháp): mốc / bản mới -- đang chạy.
+  - [ ] Xuất quầng theo dòng làm hiệu ứng: làm ở chặng 4 (nơi dùng).
+- [~] Chặng 3: VLM + số phận dòng (`textfix/compose/`; `lonly.py` -> `compose/vlm.py`).
+  - [x] `compose/fate.py`: MỘT bảng số phận (`plan.json` "fates": text / keep / skip + lý do). Luật: VLM ghép câu -> text; chữ in
+    trên sản phẩm -> keep (trừ khi ghép câu); VLM keep / skip -> theo VLM (TIN VLM khi xoá, bỏ giới hạn "chỉ xoá cụm nét lạ");
+    VLM có nhắc mà không còn chữ -> skip; VLM không nhắc, hỏi lại vẫn không -> keep.
+  - [x] `compose/vlm.reask`: hỏi lại RIÊNG các dòng bỏ sót (`fresh=True`), thay gọi lại cả bài khi phủ < 60% (`COVER_MIN`);
+    gọi lại khi ghép rỗng cũng `fresh=True` (sửa A1: bộ đệm trả lại đúng câu cũ).
+  - [x] Lời dặn: bỏ 3b ("cụm từ lấy từ câu khách khác" -> lặp chữ), bỏ "màu phổ biến nhất", mục 4 định nghĩa ba số phận.
+  - [x] `tests/test_fate.py` (VLM giả). [ ] Kiểm thật: lượt máy chủ (máy cá nhân không có khoá VLM).
 - [ ] Chặng 4: `compose/assign.py` + `layout.py` (cỡ theo font thật + câu khách, nới chỗ, sàn tập, màu một nguồn, hiệu ứng / font
   đối chiếu số đo).
+  + câu chia vào các đoạn (`runs`) / hàng theo sức chứa, mỗi đoạn cỡ + hoa / thường của nó, chung đường chân; bỏ `split` của VLM.
 - [ ] Chặng 5: render gọn (một cách dựng theo path, bỏ `OUTLINE_*`, gỡ mã chết).
 - [ ] Chặng 6: UI / plan.json / replay / tài liệu; lượt máy chủ dev2 + mix1; `final2` một lần.
 

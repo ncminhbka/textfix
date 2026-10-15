@@ -1,0 +1,123 @@
+{
+ "key": "dev2_20261014_095226_ebe5_v0",
+ "src": "dev2/runs/run_20261014_095226_ebe5/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    158,
+    82,
+    744,
+    164
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "MUA 1 TANG 1",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    244,
+    175,
+    659,
+    224
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Teng 1 ly comh size",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    77,
+    369,
+    235,
+    413
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Ta suua",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    61,
+    462,
+    261,
+    516
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "tral cmgo",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    59,
+    595,
+    278,
+    622
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "20/10 - 22/10/2026",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    349,
+    937,
+    568,
+    988
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Ta Sua Mij",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    379,
+    986,
+    538,
+    1015
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "0905 112 2333",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    372,
+    1037,
+    538,
+    1073
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dét lich ngay",
+   "eval": true
+  }
+ ]
+}

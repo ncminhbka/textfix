@@ -1,0 +1,109 @@
+{
+ "key": "dev2_20261014_095225_dffc_v0",
+ "src": "dev2/runs/run_20261014_095225_dffc/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    89,
+    82,
+    519,
+    251
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Giam",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    80,
+    237,
+    574,
+    450
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "40%",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    668,
+    177,
+    871,
+    276
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "Diont",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    682,
+    240,
+    851,
+    346
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "nre",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    691,
+    315,
+    880,
+    415
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "phgt",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    112,
+    536,
+    783,
+    611
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Uu dai ahmpc dhnang",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    633,
+    833,
+    888,
+    890
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Xem aih",
+   "eval": true
+  }
+ ]
+}

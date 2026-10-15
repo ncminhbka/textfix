@@ -1,0 +1,109 @@
+{
+ "key": "dev2_20261014_095226_7e3a_v0",
+ "src": "dev2/runs/run_20261014_095226_7e3a/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    196,
+    60,
+    827,
+    149
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "BIA LANH CUOI TUAN",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    293,
+    172,
+    723,
+    218
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Ma 1 thung cinc 6 lon",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    398,
+    549,
+    638,
+    618
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "SAPPORO",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    401,
+    626,
+    634,
+    653
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "PREMIUM BEER",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    306,
+    874,
+    722,
+    913
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dai ley bia Huing Thinh",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    422,
+    921,
+    624,
+    948
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "0283999000",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    418,
+    960,
+    617,
+    991
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Gé qusan hom vay",
+   "eval": true
+  }
+ ]
+}

@@ -1,0 +1,179 @@
+{
+ "key": "mix1_20261014_084124_f4fd_v0",
+ "src": "mix1/runs/run_20261014_084124_f4fd/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    135,
+    76,
+    789,
+    172
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tring ta ca buc ang",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    261,
+    176,
+    619,
+    231
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Sio tty Nah Miny",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    88,
+    345,
+    238,
+    378
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": " Pha nhaih",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    88,
+    418,
+    212,
+    454
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "@ Vi dum",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    89,
+    488,
+    269,
+    532
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "@ Hi thuy thig",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    84,
+    534,
+    251,
+    578
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "tai supeng",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    340,
+    543,
+    360,
+    583
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "junk",
+   "ocr": "1.59",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    402,
+    528,
+    430,
+    612
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "NESC",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    388,
+    632,
+    458,
+    691
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "junk",
+   "ocr": "",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    513,
+    650,
+    560,
+    825
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "NESCAFE",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    653,
+    381,
+    832,
+    415
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "145.000d",
+   "eval": true
+  },
+  {
+   "id": "L12",
+   "box": [
+    300,
+    1014,
+    595,
+    1056
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Gé quan hom zay",
+   "eval": true
+  }
+ ]
+}

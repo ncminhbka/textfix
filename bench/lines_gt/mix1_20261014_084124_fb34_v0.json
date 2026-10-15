@@ -1,0 +1,165 @@
+{
+ "key": "mix1_20261014_084124_fb34_v0",
+ "src": "mix1/runs/run_20261014_084124_fb34/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    269,
+    103,
+    640,
+    194
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tuon dung",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    729,
+    85,
+    833,
+    156
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "Uu dai",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    172,
+    227,
+    722,
+    275
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Nhan vén ban hang siitis",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    135,
+    417,
+    529,
+    464
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Sap ah harg ung ké",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    137,
+    525,
+    377,
+    568
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Turvin kaict",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    133,
+    628,
+    417,
+    683
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Lam ca 8 ting",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    137,
+    745,
+    517,
+    791
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Kong én kinrcimén",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    713,
+    340,
+    817,
+    401
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "Uu dai",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    125,
+    925,
+    781,
+    971
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Nop ho s tai qua coi 09908 88 777",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    384,
+    984,
+    539,
+    1015
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "15/12/2026",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    335,
+    1054,
+    573,
+    1080
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Siu tst Mini Phuc An",
+   "eval": true
+  }
+ ]
+}

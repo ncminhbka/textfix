@@ -1,0 +1,81 @@
+{
+ "key": "dev2_20261014_095226_d5af_v0",
+ "src": "dev2/runs/run_20261014_095226_d5af/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    69,
+    68,
+    809,
+    355
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "poster",
+   "ocr": "Ca Phe Quan",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    238,
+    897,
+    640,
+    936
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Chaan do uu'ng tranin thaicn",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    713,
+    893,
+    814,
+    954
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Lien",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    703,
+    941,
+    834,
+    997
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "chace",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    714,
+    986,
+    824,
+    1047
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "ngay",
+   "eval": true
+  }
+ ]
+}

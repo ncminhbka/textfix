@@ -1,0 +1,207 @@
+{
+ "key": "accept2_20261014_040159_0b90_v0",
+ "src": "accept2/runs/run_20261014_040159_0b90/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    59,
+    65,
+    543,
+    133
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "May loc nuc ReO",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    59,
+    143,
+    334,
+    206
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Nay noin",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    382,
+    145,
+    548,
+    197
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "10 loi",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    59,
+    221,
+    474,
+    263
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Nuic sciah duing ngay tai voi",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    62,
+    518,
+    315,
+    548
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dicont noé bhact",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    128,
+    587,
+    250,
+    624
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "10 chp lic",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    130,
+    646,
+    289,
+    676
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Voi nonc Inih",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    134,
+    700,
+    321,
+    738
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tiet su'ng eéng",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    130,
+    784,
+    336,
+    823
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Bao vhing 3 yam",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    59,
+    1039,
+    329,
+    1074
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dien mya Xanh Tuui",
+   "eval": true
+  },
+  {
+   "id": "L12",
+   "box": [
+    61,
+    1073,
+    186,
+    1100
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "1800 6677",
+   "eval": true
+  },
+  {
+   "id": "L13",
+   "box": [
+    655,
+    476,
+    666,
+    494
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "593",
+   "eval": true
+  },
+  {
+   "id": "L14",
+   "box": [
+    633,
+    911,
+    841,
+    951
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "5.490.000d",
+   "eval": true
+  },
+  {
+   "id": "L15",
+   "box": [
+    626,
+    1048,
+    816,
+    1086
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Lieni chié rgay",
+   "eval": true
+  }
+ ]
+}

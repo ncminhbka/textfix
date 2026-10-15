@@ -1,0 +1,221 @@
+{
+ "key": "dev2_20261014_095226_873e_v1",
+ "src": "dev2/runs/run_20261014_095226_873e/v1",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L5",
+   "box": [
+    96,
+    720,
+    244,
+    751
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Hob 4 caa",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    81,
+    760,
+    261,
+    792
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "cini 120.000d",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    506,
+    614,
+    653,
+    648
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "object",
+   "ocr": "ISOT RAU",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    530,
+    640,
+    632,
+    679
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "AU",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    500,
+    665,
+    680,
+    722
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "object",
+   "ocr": "TAN HUEVIEN",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    713,
+    696,
+    725,
+    710
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    501,
+    758,
+    598,
+    799
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "object",
+   "ocr": "AU",
+   "eval": true
+  },
+  {
+   "id": "L12",
+   "box": [
+    623,
+    736,
+    699,
+    786
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "object",
+   "ocr": "",
+   "eval": true
+  },
+  {
+   "id": "L13",
+   "box": [
+    64,
+    1041,
+    240,
+    1073
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Gao ton quiac",
+   "eval": true
+  },
+  {
+   "id": "G1",
+   "rows": 1,
+   "ocr": null,
+   "box": [
+    88,
+    285,
+    212,
+    346
+   ],
+   "shape": "straight",
+   "kind": "poster",
+   "eval": true
+  },
+  {
+   "id": "G2",
+   "rows": 1,
+   "ocr": null,
+   "box": [
+    90,
+    356,
+    196,
+    414
+   ],
+   "shape": "straight",
+   "kind": "poster",
+   "eval": true
+  },
+  {
+   "id": "G3",
+   "rows": 1,
+   "ocr": null,
+   "box": [
+    86,
+    422,
+    222,
+    482
+   ],
+   "shape": "straight",
+   "kind": "poster",
+   "eval": true
+  },
+  {
+   "id": "G4",
+   "rows": 1,
+   "ocr": null,
+   "box": [
+    90,
+    484,
+    162,
+    522
+   ],
+   "shape": "straight",
+   "kind": "poster",
+   "eval": true
+  },
+  {
+   "id": "G5",
+   "rows": 1,
+   "ocr": null,
+   "box": [
+    86,
+    524,
+    234,
+    582
+   ],
+   "shape": "straight",
+   "kind": "poster",
+   "eval": true
+  },
+  {
+   "id": "G6",
+   "rows": 1,
+   "ocr": null,
+   "box": [
+    88,
+    586,
+    210,
+    650
+   ],
+   "shape": "straight",
+   "kind": "poster",
+   "eval": true
+  }
+ ]
+}

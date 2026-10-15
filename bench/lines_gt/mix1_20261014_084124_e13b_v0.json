@@ -1,0 +1,109 @@
+{
+ "key": "mix1_20261014_084124_e13b_v0",
+ "src": "mix1/runs/run_20261014_084124_e13b/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    190,
+    49,
+    657,
+    132
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "4 BUOC DAT",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    120,
+    128,
+    777,
+    204
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "BANH SINH NHAT",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    288,
+    253,
+    603,
+    286
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tién Banh Hat Dé",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    84,
+    378,
+    375,
+    424
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Chon mapé banh",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    81,
+    502,
+    481,
+    542
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "4 Nhan kiic ciy nylo chuc",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    82,
+    633,
+    104,
+    664
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "junk",
+   "ocr": "4",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    81,
+    684,
+    399,
+    724
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Nhyen khung tat coc",
+   "eval": true
+  }
+ ]
+}

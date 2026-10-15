@@ -1,0 +1,123 @@
+{
+ "key": "accept2_20261014_040159_4db0_v0",
+ "src": "accept2/runs/run_20261014_040159_4db0/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    271,
+    57,
+    623,
+    121
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "COMBO X",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    209,
+    128,
+    696,
+    210
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "BEM BONG DA",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    194,
+    630,
+    276,
+    704
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "dimor",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    162,
+    673,
+    224,
+    732
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "Ehot",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    376,
+    410,
+    534,
+    750
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "eo.mg",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    197,
+    819,
+    695,
+    890
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "2 lon ci 18.000d",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    278,
+    979,
+    634,
+    1042
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Quan Ong Tu",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    331,
+    1050,
+    565,
+    1086
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "0918 333 444",
+   "eval": true
+  }
+ ]
+}

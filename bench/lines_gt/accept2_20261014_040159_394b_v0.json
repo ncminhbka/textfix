@@ -1,0 +1,151 @@
+{
+ "key": "accept2_20261014_040159_394b_v0",
+ "src": "accept2/runs/run_20261014_040159_394b/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    146,
+    61,
+    904,
+    125
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "KHAI TRONG PHONGG",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    248,
+    134,
+    807,
+    196
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "KHM PAM THU Y",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    347,
+    217,
+    700,
+    273
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Thi y Bou Chan",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    608,
+    415,
+    918,
+    464
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "22/12/2026",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    556,
+    509,
+    950,
+    552
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Mién bé kham top qiat",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    666,
+    560,
+    850,
+    610
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "gutan din",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    438,
+    823,
+    597,
+    852
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Diont noé phnc",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    404,
+    863,
+    618,
+    896
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "0986 111 222",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    354,
+    903,
+    689,
+    932
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "64 Nhng Van Cu, Long Bién, Ha N",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    415,
+    949,
+    630,
+    976
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "thuybonchan.vn",
+   "eval": true
+  }
+ ]
+}

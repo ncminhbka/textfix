@@ -1,0 +1,95 @@
+{
+ "key": "accept2_20261014_040159_70ae_v0",
+ "src": "accept2/runs/run_20261014_040159_70ae/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    255,
+    73,
+    765,
+    140
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Buin bo Hue",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    294,
+    149,
+    718,
+    213
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "chainn vi",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    291,
+    217,
+    720,
+    272
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "chan boavii",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    277,
+    284,
+    741,
+    325
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Noc duan ham 12 tingh",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    233,
+    749,
+    790,
+    896
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "45.000d",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    369,
+    951,
+    648,
+    978
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Quan O Huung1 - 22 Ba Triy",
+   "eval": true
+  }
+ ]
+}

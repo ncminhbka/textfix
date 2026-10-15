@@ -1,0 +1,221 @@
+{
+ "key": "dev2_20261014_095226_3413_v0",
+ "src": "dev2/runs/run_20261014_095226_3413/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    249,
+    55,
+    776,
+    132
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "QUY TRiCH SPA",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    385,
+    128,
+    608,
+    191
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "8 BUO",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    336,
+    274,
+    347,
+    302
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "1",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    403,
+    261,
+    596,
+    321
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tay trang",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    333,
+    388,
+    353,
+    414
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "4",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    406,
+    376,
+    636,
+    427
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tay da chét",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    335,
+    497,
+    354,
+    526
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "2",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    402,
+    489,
+    573,
+    539
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Xong hoir",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    335,
+    608,
+    354,
+    636
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "3",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    402,
+    600,
+    614,
+    648
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Day mat na",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    332,
+    717,
+    353,
+    743
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "4",
+   "eval": true
+  },
+  {
+   "id": "L12",
+   "box": [
+    398,
+    707,
+    678,
+    763
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Thoa kem dung",
+   "eval": true
+  },
+  {
+   "id": "L13",
+   "box": [
+    458,
+    813,
+    583,
+    844
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Lién chac ngay",
+   "eval": true
+  },
+  {
+   "id": "L14",
+   "box": [
+    359,
+    866,
+    655,
+    926
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Lavender Spa",
+   "eval": true
+  },
+  {
+   "id": "L15",
+   "box": [
+    406,
+    932,
+    618,
+    962
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "0901 234 567",
+   "eval": true
+  }
+ ]
+}

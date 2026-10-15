@@ -1,0 +1,109 @@
+{
+ "key": "accept2_20261014_040159_dc0d_v0",
+ "src": "accept2/runs/run_20261014_040159_dc0d/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    83,
+    123,
+    496,
+    197
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dién Ihah",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    87,
+    217,
+    495,
+    293
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Bach Kha",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    89,
+    322,
+    580,
+    361
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dich veu sa diecn hang tat nhu",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    105,
+    623,
+    590,
+    686
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "\"Geu la tuo ngyay, su",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    120,
+    694,
+    648,
+    752
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "sa nhanh, bo gu nou",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    116,
+    756,
+    395,
+    825
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "nor mo dhag",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    112,
+    838,
+    318,
+    878
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Chu Tü, Go Vap",
+   "eval": true
+  }
+ ]
+}

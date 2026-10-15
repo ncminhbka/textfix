@@ -1,0 +1,179 @@
+{
+ "key": "mix1_20261014_084124_1b1c_v0",
+ "src": "mix1/runs/run_20261014_084124_1b1c/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    142,
+    64,
+    785,
+    196
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "poster",
+   "ocr": "",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    289,
+    184,
+    605,
+    226
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Glam 30% + freeship",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    98,
+    316,
+    273,
+    360
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "toan bu",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    101,
+    369,
+    358,
+    424
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "my hiphinp",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    101,
+    428,
+    292,
+    469
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "cham da",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    98,
+    480,
+    322,
+    524
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "co noc da",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    101,
+    674,
+    192,
+    710
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "10/12",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    101,
+    769,
+    192,
+    805
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "17/12",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    96,
+    959,
+    446,
+    1000
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "My thim La Xahh",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    97,
+    1015,
+    287,
+    1042
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "0966010203",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    337,
+    1015,
+    576,
+    1042
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "102 Ciul ip, Ha No",
+   "eval": true
+  },
+  {
+   "id": "L12",
+   "box": [
+    387,
+    1054,
+    506,
+    1081
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "laxanh.vn",
+   "eval": true
+  }
+ ]
+}

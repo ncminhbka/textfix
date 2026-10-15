@@ -1,0 +1,123 @@
+{
+ "key": "dev2_20261014_095225_eee8_v0",
+ "src": "dev2/runs/run_20261014_095225_eee8/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    165,
+    89,
+    745,
+    145
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "WEAREHIRING",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    292,
+    168,
+    597,
+    232
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Nhi hang Sen",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    195,
+    410,
+    698,
+    449
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Thu mang, Phuc uvé, Bep paui",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    138,
+    629,
+    722,
+    659
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Lang 6-9 miui + thanb, an ca minm, xoy can fa",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    100,
+    670,
+    218,
+    701
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "linhayhao",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    108,
+    949,
+    219,
+    972
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "25/11/2026",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    352,
+    1011,
+    847,
+    1039
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Guri CV. tuyerdung@nhahanngsem-vn or no rrict dat ta qian",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    345,
+    1071,
+    549,
+    1097
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "nhahangsen.vn/tuen-ding",
+   "eval": true
+  }
+ ]
+}

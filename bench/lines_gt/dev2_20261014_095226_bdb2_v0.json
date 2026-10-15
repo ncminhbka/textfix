@@ -1,0 +1,95 @@
+{
+ "key": "dev2_20261014_095226_bdb2_v0",
+ "src": "dev2/runs/run_20261014_095226_bdb2/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    195,
+    75,
+    829,
+    144
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Noi com den té 1.8l",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    460,
+    271,
+    500,
+    285
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    748,
+    229,
+    931,
+    295
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "-36%",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    170,
+    783,
+    456,
+    832
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "2.490.000d",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    490,
+    786,
+    871,
+    866
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "1.590.000p",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    432,
+    918,
+    608,
+    964
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Mua ngay",
+   "eval": true
+  }
+ ]
+}

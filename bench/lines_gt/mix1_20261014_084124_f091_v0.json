@@ -1,0 +1,95 @@
+{
+ "key": "mix1_20261014_084124_f091_v0",
+ "src": "mix1/runs/run_20261014_084124_f091/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    111,
+    69,
+    791,
+    249
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "poster",
+   "ocr": "fuont inL",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    93,
+    216,
+    793,
+    435
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "poster",
+   "ocr": "Kem",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    665,
+    504,
+    800,
+    555
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Mu 1",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    651,
+    552,
+    810,
+    623
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "targ 1",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    304,
+    919,
+    589,
+    961
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Thu Binsi 12/12",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    306,
+    1031,
+    587,
+    1061
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "5 Phan Chu Trinh, Da Nnce",
+   "eval": true
+  }
+ ]
+}

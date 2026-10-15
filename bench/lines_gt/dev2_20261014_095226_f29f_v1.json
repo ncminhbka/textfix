@@ -1,0 +1,67 @@
+{
+ "key": "dev2_20261014_095226_f29f_v1",
+ "src": "dev2/runs/run_20261014_095226_f29f/v1",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    201,
+    67,
+    824,
+    119
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "MERRY CHRISTMAS",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    268,
+    165,
+    762,
+    215
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "SAN QUA GIAiNG SINH",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    247,
+    811,
+    790,
+    847
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Giam dto 50% dra 20 - 25/12",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    326,
+    939,
+    696,
+    981
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Vincom Lé Thant Tong",
+   "eval": true
+  }
+ ]
+}

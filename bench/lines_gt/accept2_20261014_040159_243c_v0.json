@@ -1,0 +1,81 @@
+{
+ "key": "accept2_20261014_040159_243c_v0",
+ "src": "accept2/runs/run_20261014_040159_243c/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    152,
+    163,
+    771,
+    308
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Thiu ging ton ven",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    244,
+    310,
+    646,
+    378
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "An Nhian Spa",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    233,
+    614,
+    660,
+    680
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Massaje da hong",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    239,
+    695,
+    672,
+    750
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "90 pnn- 3900000d",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    332,
+    960,
+    591,
+    996
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "0912 678 345",
+   "eval": true
+  }
+ ]
+}

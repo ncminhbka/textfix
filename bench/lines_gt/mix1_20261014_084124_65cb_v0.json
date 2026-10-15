@@ -1,0 +1,81 @@
+{
+ "key": "mix1_20261014_084124_65cb_v0",
+ "src": "mix1/runs/run_20261014_084124_65cb/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    370,
+    135,
+    652,
+    290
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "poster",
+   "ocr": "ANG",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    380,
+    288,
+    645,
+    412
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "poster",
+   "ocr": "100% MC",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    163,
+    534,
+    874,
+    634
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Ca Pe Buon Ho",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    255,
+    687,
+    780,
+    762
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dem vi cao ngan",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    266,
+    836,
+    768,
+    926
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "95.000 d/250g",
+   "eval": true
+  }
+ ]
+}

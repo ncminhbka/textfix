@@ -1,0 +1,123 @@
+{
+ "key": "accept2_20261014_040159_a2f9_v0",
+ "src": "accept2/runs/run_20261014_040159_a2f9/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    184,
+    46,
+    833,
+    112
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "CACH DON TRA HANG",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    442,
+    163,
+    578,
+    214
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "Shop Gay",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    444,
+    198,
+    583,
+    248
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "Bav Nnho",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    421,
+    386,
+    695,
+    422
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Chup anh saan pliume l66",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    420,
+    619,
+    678,
+    649
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dong poc camg dao don",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    420,
+    836,
+    659,
+    865
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Nhen hang naj niig 3 daiy",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    452,
+    951,
+    580,
+    986
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Lien chée ngay",
+   "eval": true
+  },
+  {
+   "id": "G1",
+   "rows": 1,
+   "ocr": null,
+   "box": [
+    468,
+    248,
+    562,
+    266
+   ],
+   "shape": "straight",
+   "kind": "junk",
+   "eval": true
+  }
+ ]
+}

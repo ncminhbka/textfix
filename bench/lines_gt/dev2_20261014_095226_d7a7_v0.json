@@ -1,0 +1,109 @@
+{
+ "key": "dev2_20261014_095226_d7a7_v0",
+ "src": "dev2/runs/run_20261014_095226_d7a7/v0",
+ "size": [
+  1344,
+  768
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    65,
+    63,
+    381,
+    123
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "TechViet",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    60,
+    137,
+    275,
+    171
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Co mi ney chn",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    564,
+    205,
+    1264,
+    322
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Lap thigh vien",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    763,
+    363,
+    1108,
+    469
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Python",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    874,
+    558,
+    1198,
+    616
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Ung tuan ngay",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    1170,
+    689,
+    1270,
+    709
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "15/12/2026",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    1079,
+    706,
+    1310,
+    732
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "joobs@techviet.io",
+   "eval": true
+  }
+ ]
+}

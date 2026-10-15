@@ -1,0 +1,151 @@
+{
+ "key": "accept2_20261014_040159_2d4d_v0",
+ "src": "accept2/runs/run_20261014_040159_2d4d/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    222,
+    81,
+    667,
+    134
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "CLB Boj Ca Heo",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    279,
+    156,
+    618,
+    192
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Lop bai cho trac ém",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    156,
+    445,
+    702,
+    505
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Con nhig sé moct ma",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    131,
+    518,
+    776,
+    577
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "sai s bu da tut bagu 10 met",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    128,
+    591,
+    689,
+    650
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "mét, thay wg kien nian",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    130,
+    672,
+    431,
+    714
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Mé bé Gia Bao",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    615,
+    712,
+    760,
+    750
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "An ttan",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    592,
+    787,
+    772,
+    829
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Liop lit bé",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    577,
+    865,
+    784,
+    907
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Ho may am",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    327,
+    1019,
+    576,
+    1062
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Lién tncé ngay",
+   "eval": true
+  }
+ ]
+}

@@ -1,0 +1,165 @@
+{
+ "key": "dev2_20261014_095226_f157_v1",
+ "src": "dev2/runs/run_20261014_095226_f157/v1",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    235,
+    95,
+    800,
+    165
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Ca phe hoai h tan",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    383,
+    170,
+    622,
+    232
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Classic",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    430,
+    433,
+    456,
+    511
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "LASST",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    447,
+    403,
+    490,
+    555
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "NESCAFE",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    529,
+    490,
+    603,
+    670
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "BUSSEN",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    200,
+    804,
+    328,
+    846
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dam vi",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    423,
+    804,
+    579,
+    846
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Thom lau",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    683,
+    804,
+    817,
+    846
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tién vei",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    354,
+    881,
+    668,
+    945
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "189.00d",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    460,
+    961,
+    567,
+    1000
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Mua ngy",
+   "eval": true
+  },
+  {
+   "id": "G1",
+   "rows": 1,
+   "ocr": null,
+   "box": [
+    393,
+    408,
+    418,
+    452
+   ],
+   "shape": "vertical",
+   "kind": "object",
+   "eval": true
+  }
+ ]
+}

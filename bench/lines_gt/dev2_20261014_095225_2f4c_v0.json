@@ -1,0 +1,151 @@
+{
+ "key": "dev2_20261014_095225_2f4c_v0",
+ "src": "dev2/runs/run_20261014_095225_2f4c/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    33,
+    30,
+    199,
+    64
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Nha khoa",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    38,
+    67,
+    199,
+    100
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Smile Care",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    683,
+    35,
+    868,
+    58
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Phan bhinol kach ham",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    322,
+    526,
+    588,
+    566
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Nu cee titiién",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    112,
+    588,
+    782,
+    639
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "sau 6 alu 6h thdh nieing ran",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    187,
+    725,
+    708,
+    774
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "\"Bac sy tu van voc ki hiu, niong",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    203,
+    771,
+    694,
+    819
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "koaog dan dou min nng thdng",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    288,
+    883,
+    607,
+    918
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Chi Mai Anh, 26 tou",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    171,
+    988,
+    722,
+    1028
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Giam 3 truni chi pet liac nng than 11",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    373,
+    1063,
+    534,
+    1093
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "19008899",
+   "eval": true
+  }
+ ]
+}

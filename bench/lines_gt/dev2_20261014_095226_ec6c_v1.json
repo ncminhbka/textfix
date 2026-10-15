@@ -1,0 +1,95 @@
+{
+ "key": "dev2_20261014_095226_ec6c_v1",
+ "src": "dev2/runs/run_20261014_095226_ec6c/v1",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    587,
+    76,
+    914,
+    169
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "COMBO",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    566,
+    178,
+    957,
+    279
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "GIA DIAN",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    634,
+    363,
+    899,
+    414
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Giam 25%",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    630,
+    594,
+    903,
+    629
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Conbo lau 4 goin",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    622,
+    846,
+    907,
+    892
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Lau Nam Njon",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    620,
+    907,
+    924,
+    944
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "0236 388 9999",
+   "eval": true
+  }
+ ]
+}

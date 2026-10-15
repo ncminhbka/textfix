@@ -30,7 +30,8 @@ ap.add_argument("--only", default="")
 ap.add_argument("--recheck", action="store_true")
 ap.add_argument("--sheet", action="store_true")
 a = ap.parse_args()
-from textfix import erase, hisam, lonly, ocr, slots   # noqa: E402
+from textfix import erase, hisam, ocr, slots   # noqa: E402
+from textfix.compose import vlm as cvlm   # noqa: E402
 
 os.makedirs(a.out, exist_ok=True)
 only = {x for x in a.only.split(",") if x}
@@ -59,9 +60,8 @@ for spec in a.sets:
         for l in L:
             if l.get("ocr_box"):
                 l["box"] = list(l["ocr_box"])
-            if not l.get("path"):
-                l["angle"] = slots._line_angle(l)
-        M = lonly.view({"L": L, "S": [], "I": [], "size": [W, H], "by": {}})
+        slots.reorient(D, ink, L)
+        M = cvlm.view({"L": L, "S": [], "I": [], "size": [W, H], "by": {}})
         keep = {"ops": [o | {"marks": o.get("slots") or o.get("marks") or []} for o in P["ops"] if o.get("kind") == "keep"]}
         kept = erase.kept_of(keep)
         log = []

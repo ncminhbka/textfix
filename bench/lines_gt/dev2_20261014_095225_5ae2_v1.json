@@ -1,0 +1,137 @@
+{
+ "key": "dev2_20261014_095225_5ae2_v1",
+ "src": "dev2/runs/run_20261014_095225_5ae2/v1",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    76,
+    51,
+    834,
+    211
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "SIEU SALE",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    207,
+    187,
+    677,
+    415
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "11.11",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    319,
+    393,
+    576,
+    458
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Giam do 55%",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    797,
+    478,
+    854,
+    905
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "poster",
+   "ocr": "Toend koni dn'n Zunien",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    230,
+    938,
+    667,
+    980
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "09/11 - 127/11/2026",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    270,
+    1014,
+    639,
+    1054
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dlecn may Phuc An",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    184,
+    1059,
+    300,
+    1082
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "18100 6789",
+   "eval": true
+  },
+  {
+   "id": "L8a",
+   "box": [
+    318,
+    1060,
+    610,
+    1086
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "8 L= Van Sy, Quart 3, TP.HDM phu(can.vin",
+   "eval": true
+  },
+  {
+   "id": "L8b",
+   "box": [
+    614,
+    1060,
+    726,
+    1086
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "8 L= Van Sy, Quart 3, TP.HDM phu(can.vin",
+   "eval": true
+  }
+ ]
+}

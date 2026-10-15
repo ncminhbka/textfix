@@ -1,0 +1,165 @@
+{
+ "key": "accept2_20261014_040159_5f35_v0",
+ "src": "accept2/runs/run_20261014_040159_5f35/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    209,
+    71,
+    684,
+    170
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Mong xinh",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    257,
+    168,
+    650,
+    271
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "dong Tét",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    151,
+    309,
+    284,
+    351
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Son gel",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    388,
+    311,
+    525,
+    349
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dap bit",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    615,
+    310,
+    745,
+    347
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Vin tain",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    143,
+    397,
+    297,
+    421
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Cham sciclda",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    150,
+    426,
+    281,
+    450
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Da toimda",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    386,
+    397,
+    533,
+    437
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Gdi duag",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    618,
+    393,
+    753,
+    434
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Goi tunn",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    262,
+    896,
+    635,
+    926
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Gam 20% khh di 2 vorén",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    293,
+    1059,
+    598,
+    1079
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Nail MocMien-0933456123",
+   "eval": true
+  }
+ ]
+}

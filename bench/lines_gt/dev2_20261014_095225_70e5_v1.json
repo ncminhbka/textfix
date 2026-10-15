@@ -1,0 +1,207 @@
+{
+ "key": "dev2_20261014_095225_70e5_v1",
+ "src": "dev2/runs/run_20261014_095225_70e5/v1",
+ "size": [
+  768,
+  1344
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    136,
+    116,
+    654,
+    156
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "DOY TRA HANG DEE DANC",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    249,
+    171,
+    527,
+    206
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tiéen tii & Nah churing",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    156,
+    312,
+    166,
+    337
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "1",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    246,
+    302,
+    651,
+    345
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Chup aigh stam diup lbog",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    247,
+    442,
+    641,
+    478
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Nhan tin fanpaxge kmam",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    247,
+    480,
+    378,
+    517
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "man don",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    156,
+    613,
+    170,
+    635
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "3",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    247,
+    602,
+    675,
+    645
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Nen hang xaa bu cuc gain",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    155,
+    735,
+    170,
+    759
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "5",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    248,
+    726,
+    552,
+    768
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Gun hang nu du ra",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    154,
+    861,
+    171,
+    885
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "2",
+   "eval": true
+  },
+  {
+   "id": "L12",
+   "box": [
+    248,
+    852,
+    638,
+    892
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Nen hairg ma sau 3 dany",
+   "eval": true
+  },
+  {
+   "id": "L13",
+   "box": [
+    286,
+    1178,
+    491,
+    1220
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Moc Store",
+   "eval": true
+  },
+  {
+   "id": "L14",
+   "box": [
+    277,
+    1230,
+    495,
+    1260
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "fib.com/mocstore",
+   "eval": true
+  }
+ ]
+}

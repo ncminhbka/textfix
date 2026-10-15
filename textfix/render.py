@@ -479,7 +479,7 @@ def _el(u: dict, e: dict, k: int, force: list, size: float | None = None, sx: fl
 
 
 def render_units(page, plate: np.ndarray, U: list[dict], M: dict, floor: float | None = None) -> tuple[np.ndarray, list, list]:
-    """Dựng các đơn vị chữ (fill.layout) lên NỀN (lonly.settle) -> (ảnh, kết quả từng phần tử {id, size, shrink, over, ink, ...}, log).
+    """Dựng các đơn vị chữ (fill.layout) lên NỀN (erase.settle) -> (ảnh, kết quả từng phần tử {id, size, shrink, over, ink, ...}, log).
     Một dòng / một khối: nén ngang <= CONDENSE rồi co cỡ (RENDER_JS). TẬP: một mức nén + một cỡ cho mọi mục theo mục chật nhất."""
     from PIL import Image
     from .fonts import faces_for

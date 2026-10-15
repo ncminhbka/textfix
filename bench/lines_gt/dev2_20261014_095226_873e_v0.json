@@ -1,0 +1,123 @@
+{
+ "key": "dev2_20261014_095226_873e_v0",
+ "src": "dev2/runs/run_20261014_095226_873e/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    189,
+    46,
+    697,
+    135
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "QUA Tet dAm",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    242,
+    129,
+    689,
+    203
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "VII MIEN TAY",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    380,
+    535,
+    493,
+    584
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "EAU",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    350,
+    568,
+    547,
+    626
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "object",
+   "ocr": "TAN HUEVIEN",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    340,
+    655,
+    538,
+    708
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "object",
+   "ocr": "AUBIE",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    83,
+    981,
+    361,
+    1028
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Hog 4 4 gg chi",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    106,
+    1032,
+    342,
+    1068
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "cn 120.000 d",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    558,
+    1034,
+    841,
+    1070
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Gao tonn quano",
+   "eval": true
+  }
+ ]
+}

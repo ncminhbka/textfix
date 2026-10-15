@@ -1,7 +1,7 @@
 """ĐIỀN CHỮ (chặng B, 14/10): VLM ghép câu khách <-> dòng nháp, code chép NGUYÊN VĂN và dựng theo nháp.
 
   A = parse(vlm_json)                       # {"assign": [...], "styles": {...}, "accent": [...], "missing": [...]}
-  U, log, missing = resolve(A, M, texts, product)   # đơn vị: một câu (hoặc vài câu một dòng) + các dòng nháp của nó
+  U, log, missing = resolve(A, M, texts)   # đơn vị: một câu (hoặc vài câu một dòng) + các dòng nháp của nó
   U, log2 = layout(U, M, ink, A["styles"], A["accent"], texts)   # khung nét, cỡ, màu, lề, tập cùng vai, phần tử dựng
   render.render_units(page, base, U, M)     # dựng
 
@@ -63,17 +63,12 @@ def parse(raw) -> dict:
         out.append({"id": f"u{i + 1}", "kind": a.get("kind") if a.get("kind") in ("keep", "skip") else "text", "marks": ln,
                     "clients": [k for k in (S._tid(c) for c in cl) if k is not None], "split": sp,
                     "text_vlm": str(a.get("text") or "").strip(), "role_vlm": str(a.get("role") or "").strip() or None,
-                    "bullet": bool(a.get("bullet")), "why": str(a.get("why") or "")[:160]})
+                    "why": str(a.get("why") or "")[:160]})
     st = P.get("styles") if isinstance(P.get("styles"), dict) else {}
     return {"assign": out, "styles": {str(k): v for k, v in st.items() if isinstance(v, dict)},
             "accent": [x for x in P.get("accent") or [] if isinstance(x, dict) and str(x.get("text") or "").strip()],
             "missing": [k for k in (S._tid(x) for x in P.get("missing") or []) if k is not None],
             "notes": P.get("notes"), **({"dropped": bad} if bad else {})}
-
-
-def covered(A: dict, M: dict) -> set:
-    """Các dòng đã được ghép (viết câu / chữ lấp / giữ)."""
-    return {m for u in A.get("assign") or [] if u["kind"] == "keep" or u["clients"] or u["text_vlm"] for m in u["marks"] if m in M["by"]}
 
 
 def from_ops(P: dict, texts: list[dict]) -> dict:
@@ -90,12 +85,11 @@ def from_ops(P: dict, texts: list[dict]) -> dict:
         mk = [m for m in (o.get("slots") or o.get("marks") or []) if isinstance(m, str)]
         if o.get("kind") in ("keep", "skip") or not o.get("html"):
             A.append({"id": f"u{i + 1}", "kind": "keep" if o.get("kind") == "keep" else "skip", "marks": mk, "clients": [], "split": None,
-                      "text_vlm": "", "role_vlm": None, "bullet": False, "why": o.get("why") or "", "_op": o})
+                      "text_vlm": "", "role_vlm": None, "why": o.get("why") or "", "_op": o})
             continue
         k = S._tid(o.get("client"))
         A.append({"id": f"u{i + 1}", "kind": "text", "marks": mk, "clients": [k] if k is not None and k < len(texts) else [],
-                  "split": None, "text_vlm": plain(o["html"]), "role_vlm": None, "bullet": bool(re.match(r"\s*(<[^>]+>\s*)*[•·●]", o["html"])),
-                  "why": o.get("why") or "", "_op": o})
+                  "split": None, "text_vlm": plain(o["html"]), "role_vlm": None, "why": o.get("why") or "", "_op": o})
         used |= set(A[-1]["clients"])
     for u in A:
         fv = S._flat(u["text_vlm"])
@@ -157,8 +151,8 @@ def from_ops(P: dict, texts: list[dict]) -> dict:
 
 
 # ---------------------------------------------------------------------------------------------------- ghép
-def resolve(A: dict, M: dict, texts: list[dict], product: bool = False) -> tuple[list[dict], list[str], list[int]]:
-    """Đơn vị dựng từ phần ghép của VLM. -> (đơn vị, nhật ký, câu khách không có trên poster)."""
+def resolve(A: dict, M: dict, texts: list[dict]) -> tuple[list[dict], list[str], list[int]]:
+    """Đơn vị dựng từ phần ghép của VLM; số phận dòng theo compose.fate. -> (đơn vị, nhật ký, câu khách không có trên poster)."""
     S = _s()
     by, log = M["by"], []
     from difflib import SequenceMatcher
@@ -257,25 +251,12 @@ def resolve(A: dict, M: dict, texts: list[dict], product: bool = False) -> tuple
             if bad:
                 log.append(f"{u['id']}: chữ lấp {u['text_vlm']!r} có số không có trong câu khách {bad} -> bỏ")
                 u["text_vlm"] = ""
-    # DÒNG CHƯA AI GHÉP (VLM bỏ sót / ghi text rỗng): cụm nét lạ, chữ trên sản phẩm, poster có ảnh sản phẩm -> giữ (logo Coca-Cola
-    # đọc thành "eo.mg", 14/10 q03); còn lại -> xoá trống (chữ giun). KHÔNG đem câu khách còn thiếu ép vào (14/10: FLUX vẽ thiếu
-    # câu thì chịu; ghép lỏng theo chữ OCR đặt "Tiết kiệm điện" -- một ưu điểm -- vào dòng tên máy dưới tiêu đề, m01).
-    # VLM chỉ được XOÁ cụm nét lạ (orphan): dòng chữ thường VLM ghi skip cũng là dòng chưa ai ghép (không bỏ dòng nào nháp đã vẽ)
-    empty = [u for u in U if u["kind"] == "text" and not u["clients"] and not u["text_vlm"]]
-    U = [u for u in U if u not in empty]
-    for u in U:
-        if u["kind"] == "skip" and not u.get("vlm_out"):
-            u["marks"] = [m for m in u["marks"] if by[m].get("orphan")]
-    U = [u for u in U if u["marks"]]
-    have = {m for u in U for m in u["marks"]}
-    for l in (l for l in M["L"] if l["id"] not in have):
-        base = {"id": f"g_{l['id']}", "marks": [l["id"]], "clients": [], "split": None, "text_vlm": "", "role_vlm": None, "bullet": False}
-        if l.get("orphan") or l.get("printed") or product:
-            U.append({**base, "kind": "keep", "why": "chưa ai ghép: cụm nét lạ / chữ sản phẩm -> giữ"})
-            log.append(f"{l['id']}: chưa ai ghép ({l.get('ocr')!r}) -> giữ nguyên")
-        else:
-            U.append({**base, "kind": "skip", "why": "chưa ai ghép"})
-            log.append(f"{l['id']}: chưa ai ghép ({l.get('ocr')!r}) -> xoá trống")
+    # đơn vị "text" không còn chữ (câu đã có chỗ khác, chữ lấp bị bỏ): dòng của nó về luật 4 của compose.fate (skip)
+    U = [u for u in U if not (u["kind"] == "text" and not u["clients"] and not u["text_vlm"])]
+    from .compose import fate
+    extra, flog = fate.leftovers(U, M, fate.mentioned(A))
+    U += extra
+    log += flog
     log += order(U, M, texts)
     log += _markers(U, M, texts)
     missing =[j for j in range(len(texts)) if not used[j] and texts[j].get("source") != "ai"]
@@ -310,7 +291,7 @@ def _markers(U: list[dict], M: dict, texts: list[dict]) -> list[str]:
         n = 1 + ordered.index(k) if k in ordered else i + 1
         u["marks"] = [x for x in u["marks"] if x != m]
         U.append({"id": f"n_{m}", "kind": "text", "marks": [m], "clients": [], "split": None, "text_vlm": str(n),
-                  "role_vlm": "step_no", "bullet": False, "why": "số thứ tự trước hàng"})
+                  "role_vlm": "step_no", "why": "số thứ tự trước hàng"})
         out.append(f"{m}: số FLUX vẽ trước hàng {r['id']} -> viết lại '{n}'")
     U[:] = [u for u in U if u["marks"]]
     return out
@@ -641,7 +622,6 @@ def layout(U: list[dict], M: dict, ink: np.ndarray, styles: dict, accent: list, 
         u["accent"] = [a for a in accent if any(str(a.get("text")) in t for t in u["text"])]
     # PHẦN TỬ DỰNG
     for u in T:
-        lead = "• " if u.get("bullet") and u["Ls"][0].get("dot") else ""
         if u["mode"] == "bent":
             g = op_geom({"kind": "text", "marks": u["marks"]}, M)
             if g is None:
@@ -687,8 +667,6 @@ def layout(U: list[dict], M: dict, ink: np.ndarray, styles: dict, accent: list, 
             u["els"] = [{"id": u["id"], "box": u["box"], "angle": 0.0, "path": None, "lines": [" ".join(u["text"]) if len(u["text"]) == 1
                          else " ".join(u["text"])], "size": u["size"], "multi": False}]
         for e in u["els"]:
-            if lead and e is u["els"][0]:
-                e["lines"][0] = lead + e["lines"][0]
             e["html"] = "<br>".join(_markup(x, u, texts) for x in e["lines"])
         u.pop("meas", None)
     return U, log

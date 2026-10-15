@@ -1,0 +1,109 @@
+{
+ "key": "accept2_20261014_040159_ac10_v0",
+ "src": "accept2/runs/run_20261014_040159_ac10/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    42,
+    349,
+    86,
+    643
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "poster",
+   "ocr": "Deenngy Tmng Cing",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    276,
+    64,
+    731,
+    143
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "NGAY HOI",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    285,
+    150,
+    731,
+    227
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "SIEU SALE",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    170,
+    258,
+    869,
+    314
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "hang kian san thiimp gaa unng",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    945,
+    454,
+    995,
+    615
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "poster",
+   "ocr": "c//s12",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    445,
+    887,
+    584,
+    938
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "31/12",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    360,
+    944,
+    671,
+    982
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dien may Theng Cong",
+   "eval": true
+  }
+ ]
+}

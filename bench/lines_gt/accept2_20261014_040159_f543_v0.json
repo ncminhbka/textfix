@@ -1,0 +1,123 @@
+{
+ "key": "accept2_20261014_040159_f543_v0",
+ "src": "accept2/runs/run_20261014_040159_f543/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    195,
+    55,
+    734,
+    202
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "SALE HE",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    57,
+    194,
+    227,
+    323
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "30%",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    665,
+    281,
+    812,
+    397
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "-50",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    77,
+    638,
+    245,
+    750
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "Dong",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    116,
+    696,
+    258,
+    806
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "99K",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    181,
+    887,
+    725,
+    961
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "poster",
+   "ocr": "",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    202,
+    1044,
+    699,
+    1091
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Shop Bé Yéo - 01 - 10/06",
+   "eval": true
+  },
+  {
+   "id": "G1",
+   "rows": 1,
+   "ocr": null,
+   "box": [
+    128,
+    708,
+    172,
+    742
+   ],
+   "shape": "tilt",
+   "kind": "poster",
+   "eval": true
+  }
+ ]
+}

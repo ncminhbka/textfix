@@ -1,0 +1,165 @@
+{
+ "key": "mix1_20261014_084124_b75e_v0",
+ "src": "mix1/runs/run_20261014_084124_b75e/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    52,
+    73,
+    590,
+    132
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Hit thuen tring laah,",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    51,
+    141,
+    578,
+    206
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "sum ngon gca dem",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    55,
+    215,
+    410,
+    267
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "airPue rimén",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    57,
+    293,
+    380,
+    326
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "AirPure Mimi 3660",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    528,
+    342,
+    787,
+    370
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "V Loc buii miin PM2.5",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    528,
+    388,
+    808,
+    416
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Q Khé miin than kay atcii",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    530,
+    430,
+    702,
+    460
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": " Chay én 22BB",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    331,
+    610,
+    391,
+    642
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "AiPure",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    70,
+    921,
+    244,
+    965
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Giam 15%",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    72,
+    978,
+    246,
+    1019
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "do  30/111",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    571,
+    1052,
+    848,
+    1088
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Hotine 1900 6868",
+   "eval": true
+  }
+ ]
+}

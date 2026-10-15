@@ -1,0 +1,95 @@
+{
+ "key": "dev2_20261014_095226_7bd0_v0",
+ "src": "dev2/runs/run_20261014_095226_7bd0/v0",
+ "size": [
+  1344,
+  768
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    1001,
+    62,
+    1260,
+    113
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Khai thiuong",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    293,
+    259,
+    1057,
+    382
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tinénh Nau Gao",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    464,
+    458,
+    867,
+    516
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Chao dong day dui",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    88,
+    646,
+    446,
+    681
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "12 Tnan Pui, Da Nana",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    555,
+    657,
+    800,
+    695
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Gle quan hom nay",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    996,
+    637,
+    1262,
+    680
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "01/11/2026",
+   "eval": true
+  }
+ ]
+}

@@ -1,0 +1,263 @@
+{
+ "key": "dev2_20261014_095225_2c86_v1",
+ "src": "dev2/runs/run_20261014_095225_2c86/v1",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    70,
+    87,
+    344,
+    158
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dau gio",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    74,
+    157,
+    344,
+    214
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "pauchni",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    70,
+    216,
+    380,
+    282
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "hhu toany",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    70,
+    281,
+    185,
+    331
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "han",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    75,
+    356,
+    414,
+    393
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Phurc hnri toc kho",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    74,
+    405,
+    369,
+    454
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "xoi sau 7 nang",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    114,
+    483,
+    375,
+    528
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": " Hung hoa niéh",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    111,
+    542,
+    298,
+    581
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "x Chai 650ml",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    76,
+    758,
+    410,
+    788
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Nha Thuoc Minn Chau",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    72,
+    864,
+    407,
+    924
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "159.000 d",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    421,
+    821,
+    451,
+    951
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "poster",
+   "ocr": "NntI Chau",
+   "eval": true
+  },
+  {
+   "id": "L12",
+   "box": [
+    704,
+    293,
+    772,
+    313
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "MEVFAOK",
+   "eval": true
+  },
+  {
+   "id": "L13",
+   "box": [
+    664,
+    320,
+    818,
+    386
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "Dove",
+   "eval": true
+  },
+  {
+   "id": "L14",
+   "box": [
+    670,
+    698,
+    757,
+    719
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "INTENSE",
+   "eval": true
+  },
+  {
+   "id": "L15",
+   "box": [
+    668,
+    714,
+    747,
+    737
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "REPAR",
+   "eval": true
+  },
+  {
+   "id": "L16",
+   "box": [
+    670,
+    740,
+    766,
+    762
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "NCUReING",
+   "eval": true
+  },
+  {
+   "id": "L17",
+   "box": [
+    670,
+    781,
+    796,
+    801
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "For Damaged Hair",
+   "eval": true
+  },
+  {
+   "id": "L18",
+   "box": [
+    672,
+    808,
+    716,
+    824
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "ntos",
+   "eval": true
+  }
+ ]
+}

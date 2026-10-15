@@ -1,0 +1,194 @@
+{
+ "key": "mix1_20261014_084124_afe5_v0",
+ "src": "mix1/runs/run_20261014_084124_afe5/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    179,
+    58,
+    705,
+    136
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Qua que ditim vi,",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    183,
+    145,
+    694,
+    225
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Te aim sum vay",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    209,
+    251,
+    639,
+    284
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Banh pia sau rriury rtung muin",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    701,
+    301,
+    794,
+    332
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Mua 5",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    704,
+    329,
+    815,
+    374
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "h hong",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    676,
+    357,
+    746,
+    393
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "teng.",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    688,
+    381,
+    793,
+    426
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "1 hop",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    467,
+    650,
+    552,
+    712
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "object",
+   "ocr": "AU ST",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    382,
+    680,
+    484,
+    721
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "BAU",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    351,
+    705,
+    535,
+    764
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "object",
+   "ocr": "TANHUEVIEN",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    555,
+    734,
+    576,
+    750
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "",
+   "eval": false
+  },
+  {
+   "id": "L12",
+   "box": [
+    395,
+    791,
+    524,
+    834
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "object",
+   "ocr": "AUBIE",
+   "eval": true
+  },
+  {
+   "id": "L13",
+   "box": [
+    231,
+    1071,
+    651,
+    1097
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dac stan Mién Tay - 099 456 789",
+   "eval": true
+  }
+ ],
+ "note": "huy hiệu L4-L7 mơ hồ"
+}

@@ -1,0 +1,165 @@
+{
+ "key": "dev2_20261014_095225_fd49_v0",
+ "src": "dev2/runs/run_20261014_095225_fd49/v0",
+ "size": [
+  768,
+  1344
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    109,
+    63,
+    663,
+    129
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "CA PHE DAM NI Vi",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    203,
+    143,
+    569,
+    198
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "MON SANG",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    268,
+    522,
+    312,
+    631
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": " 15g",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    315,
+    556,
+    338,
+    682
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "CLASSI",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    337,
+    551,
+    380,
+    722
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "NESCAFE.",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    418,
+    673,
+    480,
+    862
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "NESCAFE",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    163,
+    1001,
+    595,
+    1040
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Ca phe hoa tan Classic",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    135,
+    1046,
+    631,
+    1090
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Thom dim, pha nhané 30 giay",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    120,
+    1163,
+    643,
+    1229
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Chi 89,000d/hu",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    276,
+    1240,
+    491,
+    1273
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tap thao Ba Sau",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    308,
+    1278,
+    465,
+    1302
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "09005111222",
+   "eval": true
+  }
+ ]
+}

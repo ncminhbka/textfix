@@ -1,0 +1,165 @@
+{
+ "key": "dev2_20261014_095225_5ae2_v0",
+ "src": "dev2/runs/run_20261014_095225_5ae2/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    194,
+    63,
+    713,
+    156
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "SIEU SALE 11.11",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    280,
+    211,
+    614,
+    268
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Giam to 55%",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    86,
+    428,
+    295,
+    468
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Ton bu ni",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    94,
+    495,
+    265,
+    536
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "chién len",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    86,
+    540,
+    263,
+    593
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "kiong dai",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    436,
+    488,
+    468,
+    506
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "830",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    316,
+    920,
+    593,
+    953
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "09/11 -12/11/2026",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    308,
+    1025,
+    596,
+    1064
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Den may Phuc An",
+   "eval": true
+  },
+  {
+   "id": "L9a",
+   "box": [
+    212,
+    1068,
+    330,
+    1094
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "18000 6789 88 LVini Sy, Quen 3, TP.HM phucan.vn",
+   "eval": true
+  },
+  {
+   "id": "L9b",
+   "box": [
+    335,
+    1068,
+    608,
+    1094
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "18000 6789 88 LVini Sy, Quen 3, TP.HM phucan.vn",
+   "eval": true
+  },
+  {
+   "id": "L9c",
+   "box": [
+    612,
+    1068,
+    684,
+    1094
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "18000 6789 88 LVini Sy, Quen 3, TP.HM phucan.vn",
+   "eval": true
+  }
+ ]
+}

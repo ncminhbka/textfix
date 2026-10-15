@@ -1,0 +1,123 @@
+{
+ "key": "dev2_20261014_095226_b48d_v1",
+ "src": "dev2/runs/run_20261014_095226_b48d/v1",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    466,
+    92,
+    811,
+    174
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "SUMMER",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    520,
+    181,
+    777,
+    268
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "VIBES",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    508,
+    389,
+    800,
+    445
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "GIAM 30%",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    509,
+    457,
+    784,
+    520
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "TCAN BOU",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    509,
+    526,
+    658,
+    590
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "KING",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    526,
+    642,
+    793,
+    705
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Kina ram",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    529,
+    839,
+    776,
+    875
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Mat King Sao Mai",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    370,
+    1053,
+    570,
+    1085
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Mat King Sao Mai",
+   "eval": true
+  }
+ ]
+}

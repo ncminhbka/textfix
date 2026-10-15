@@ -1,0 +1,165 @@
+{
+ "key": "accept2_20261014_040159_c678_v0",
+ "src": "accept2/runs/run_20261014_040159_c678/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    109,
+    104,
+    909,
+    206
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tra O Long Ba Loc",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    256,
+    216,
+    766,
+    275
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Thom diu, hau wom",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    673,
+    440,
+    699,
+    468
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "junk",
+   "ocr": "",
+   "eval": false
+  },
+  {
+   "id": "L4",
+   "box": [
+    716,
+    428,
+    800,
+    488
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "poster",
+   "ocr": "TAY",
+   "eval": false
+  },
+  {
+   "id": "L5",
+   "box": [
+    646,
+    529,
+    732,
+    664
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "junk",
+   "ocr": "",
+   "eval": false
+  },
+  {
+   "id": "L6",
+   "box": [
+    861,
+    415,
+    872,
+    436
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "junk",
+   "ocr": "",
+   "eval": false
+  },
+  {
+   "id": "L7",
+   "box": [
+    824,
+    448,
+    882,
+    503
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "poster",
+   "ocr": "10",
+   "eval": false
+  },
+  {
+   "id": "L8",
+   "box": [
+    871,
+    522,
+    892,
+    541
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "junk",
+   "ocr": "",
+   "eval": false
+  },
+  {
+   "id": "L9",
+   "box": [
+    897,
+    580,
+    926,
+    604
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "junk",
+   "ocr": "%",
+   "eval": false
+  },
+  {
+   "id": "L10",
+   "box": [
+    73,
+    880,
+    332,
+    923
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "160.000 d/",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    64,
+    923,
+    196,
+    987
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "200g",
+   "eval": true
+  }
+ ]
+}

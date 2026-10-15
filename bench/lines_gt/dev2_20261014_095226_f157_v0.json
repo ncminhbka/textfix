@@ -1,0 +1,165 @@
+{
+ "key": "dev2_20261014_095226_f157_v0",
+ "src": "dev2/runs/run_20261014_095226_f157/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    71,
+    82,
+    638,
+    168
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Ca ché hoa tan",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    74,
+    180,
+    380,
+    260
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Classsic",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    78,
+    334,
+    320,
+    402
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dam vi",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    78,
+    419,
+    387,
+    499
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Thom ltag",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    80,
+    519,
+    308,
+    580
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tién tei",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    86,
+    783,
+    407,
+    858
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "189,000 d",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    189,
+    901,
+    311,
+    939
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Mua ngay",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    544,
+    461,
+    566,
+    511
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "1.5g",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    611,
+    437,
+    657,
+    628
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "NESCAFE.",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    578,
+    489,
+    618,
+    602
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "TASSI",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    691,
+    570,
+    774,
+    794
+   ],
+   "rows": 1,
+   "shape": "vertical",
+   "kind": "object",
+   "ocr": "NESCAFE",
+   "eval": true
+  }
+ ]
+}

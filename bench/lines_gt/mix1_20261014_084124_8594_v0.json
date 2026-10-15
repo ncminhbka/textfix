@@ -1,0 +1,25 @@
+{
+ "key": "mix1_20261014_084124_8594_v0",
+ "src": "mix1/runs/run_20261014_084124_8594/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    224,
+    107,
+    793,
+    193
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Hoa Ca Mer",
+   "eval": true
+  }
+ ]
+}

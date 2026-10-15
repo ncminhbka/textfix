@@ -1,0 +1,207 @@
+{
+ "key": "accept2_20261014_040159_b0f9_v0",
+ "src": "accept2/runs/run_20261014_040159_b0f9/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    126,
+    72,
+    766,
+    148
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dau goi ntung cam",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    192,
+    158,
+    702,
+    204
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Toc mém muét stout nay dai",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    439,
+    376,
+    499,
+    393
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "QEWIN",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    409,
+    399,
+    528,
+    451
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "Dove",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    416,
+    685,
+    486,
+    704
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "INTENSE",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    416,
+    699,
+    477,
+    719
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "REPAIR",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    418,
+    719,
+    492,
+    736
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "NOVAISUOIG",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    417,
+    746,
+    514,
+    772
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "For Dsmsigrd HEitr",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    107,
+    859,
+    321,
+    886
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Koonk suttuaote",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    103,
+    898,
+    297,
+    956
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Hang diujneh",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    105,
+    958,
+    330,
+    998
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dung haing day",
+   "eval": true
+  },
+  {
+   "id": "L12",
+   "box": [
+    401,
+    1011,
+    500,
+    1047
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Det ngay",
+   "eval": true
+  },
+  {
+   "id": "L13",
+   "box": [
+    330,
+    1066,
+    573,
+    1093
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Cia thung Mée and Be",
+   "eval": true
+  },
+  {
+   "id": "L14",
+   "box": [
+    628,
+    955,
+    825,
+    992
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "135.0000 d",
+   "eval": true
+  }
+ ]
+}

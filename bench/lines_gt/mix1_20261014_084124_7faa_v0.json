@@ -1,0 +1,109 @@
+{
+ "key": "mix1_20261014_084124_7faa_v0",
+ "src": "mix1/runs/run_20261014_084124_7faa/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    51,
+    24,
+    526,
+    259
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "FLASH",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    45,
+    156,
+    537,
+    419
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "SALE",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    738,
+    21,
+    983,
+    228
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "CHI 3 NGAY",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    265,
+    475,
+    748,
+    536
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Giam 50% toan",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    210,
+    553,
+    811,
+    613
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "pbust puhn kenen",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    258,
+    625,
+    745,
+    691
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "dleéen tlen thoo",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    203,
+    931,
+    839,
+    970
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Phu kién Tao Xhen - 18 - 20/12",
+   "eval": true
+  }
+ ]
+}

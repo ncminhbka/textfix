@@ -1,0 +1,95 @@
+{
+ "key": "accept2_20261014_040159_833b_v0",
+ "src": "accept2/runs/run_20261014_040159_833b/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    258,
+    79,
+    742,
+    206
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "poster",
+   "ocr": "",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    197,
+    180,
+    848,
+    345
+   ],
+   "rows": 1,
+   "shape": "curve",
+   "kind": "poster",
+   "ocr": "",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    347,
+    650,
+    679,
+    701
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Kahi truing 18/12",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    435,
+    756,
+    596,
+    822
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Mua 2",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    432,
+    815,
+    600,
+    896
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "tingil",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    344,
+    947,
+    684,
+    984
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "9 Ly Tu Trong, Can Tho",
+   "eval": true
+  }
+ ]
+}

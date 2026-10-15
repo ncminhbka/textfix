@@ -1,0 +1,109 @@
+{
+ "key": "dev2_20261014_095226_ebe5_v1",
+ "src": "dev2/runs/run_20261014_095226_ebe5/v1",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    246,
+    88,
+    835,
+    159
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "MUAA 1 TANG 1",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    490,
+    188,
+    819,
+    231
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Téng 1 ly comn size",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    528,
+    417,
+    811,
+    454
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tra suia tran chago",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    528,
+    595,
+    812,
+    622
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "20/10 - 22/10/2026",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    544,
+    887,
+    797,
+    940
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tra Sia My",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    613,
+    946,
+    765,
+    970
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "0905 112 233",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    595,
+    1010,
+    778,
+    1048
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Deét lich ngay",
+   "eval": true
+  }
+ ]
+}

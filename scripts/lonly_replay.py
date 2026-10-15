@@ -18,7 +18,8 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, ".")
-from textfix import erase, fill, hisam, lonly, render, slots   # noqa: E402
+from textfix import erase, fill, hisam, render, slots   # noqa: E402
+from textfix.compose import vlm as cvlm   # noqa: E402
 from textfix.browser import Browser   # noqa: E402
 from textfix.glyph import measure   # noqa: E402
 
@@ -58,21 +59,16 @@ with Browser() as B:
                 if l.get("ocr_box"):
                     l["box"] = list(l["ocr_box"])
                 l.pop("mark", None)
-                if not l.get("path"):   # góc dựng theo luật hiện hành (plan lưu góc OCR thô): nhiễu về 0, dòng viết dọc về ±90
-                    v = slots._vertical(D, {**l, "text": l.get("ocr") or ""})
-                    if v.get("vertical"):
-                        l.update(angle=v["angle"], poly=v["poly"], ocr=v["text"], size=0.8 * min(l["box"][2] - l["box"][0], l["box"][3] - l["box"][1]),
-                                 vertical=True)
-                    else:
-                        l["angle"] = slots._line_angle(l)
+            slots.reorient(D, ink, L)
+            for l in L:
+                if l.get("vertical"):   # cỡ lưu trong plan đo theo dòng ngang
+                    l["size"] = 0.8 * min(l["box"][2] - l["box"][0], l["box"][3] - l["box"][1])
                 if not l.get("path") and abs(l.get("angle") or 0) < 2 and not l.get("stroke"):
                     g = measure(D, l["box"], l.get("ocr") or "", [o["box"] for o in L if o is not l])
                     if g:
                         l["stroke"] = float(g["stroke"])
-            M = lonly.view({"L": L, "size": [W, H]})
-            for l in M["L"]:
-                l.pop("dot", None)
-            glog = slots._lead_dots(M["L"], ink) + slots._trim_lead(M["L"], ink)
+            M = cvlm.view({"L": L, "size": [W, H]})
+            glog = []
             prod = bool((cases.get(cid) or {}).get("image"))
             cpath = f"{a.out}/cache/{setn.replace('/', '_')}_{cid}_clean.png"
             if os.path.exists(cpath):
@@ -83,7 +79,7 @@ with Browser() as B:
             # plan chặng B: câu trả lời VLM đã ở khuôn ghép; plan cũ: rút từ lệnh html
             A = {"assign": P["assign"], "styles": P.get("style") or {}, "accent": P.get("accent") or []} if P.get("assign") \
                 else fill.from_ops(P, T)
-            U, rlog, miss = fill.resolve(A, M, T, product=prod)
+            U, rlog, miss = fill.resolve(A, M, T)
             U, llog = fill.layout(U, M, ink, A["styles"], A["accent"], T)
             elog = []
             base, mask = erase.settle(D, clean, ink, M, {"ops": U}, elog)

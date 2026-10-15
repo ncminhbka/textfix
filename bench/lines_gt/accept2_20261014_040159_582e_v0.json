@@ -1,0 +1,109 @@
+{
+ "key": "accept2_20261014_040159_582e_v0",
+ "src": "accept2/runs/run_20261014_040159_582e/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    129,
+    33,
+    901,
+    180
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "GIAL BONG DA",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    213,
+    174,
+    810,
+    291
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "MUA XUIN",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    231,
+    318,
+    793,
+    358
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "16 duu- Khti tranh 05/01",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    691,
+    448,
+    893,
+    523
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "Tong ge",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    691,
+    498,
+    892,
+    570
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "giu theg",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    694,
+    555,
+    903,
+    618
+   ],
+   "rows": 1,
+   "shape": "tilt",
+   "kind": "poster",
+   "ocr": "20 mhun",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    317,
+    929,
+    708,
+    968
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dang kni:0977 000 888",
+   "eval": true
+  }
+ ]
+}

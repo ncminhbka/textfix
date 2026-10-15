@@ -1,0 +1,137 @@
+{
+ "key": "dev2_20261014_095225_c08d_v1",
+ "src": "dev2/runs/run_20261014_095225_c08d/v1",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    118,
+    99,
+    769,
+    179
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "KHAI TRUONG",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    97,
+    204,
+    787,
+    285
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "CHI NHANH 2",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    330,
+    314,
+    579,
+    367
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Gan Coffee",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    307,
+    529,
+    620,
+    592
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dongga19K",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    186,
+    598,
+    731,
+    663
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "19Ktomo bu do cuing",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    368,
+    667,
+    539,
+    732
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "vunng",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    271,
+    743,
+    635,
+    776
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "ChuNunti,16/11/2026",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    40,
+    996,
+    399,
+    1038
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "25 Nying Hue, TP, Hue",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    516,
+    1002,
+    872,
+    1032
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Dét ban guu0977456789",
+   "eval": true
+  }
+ ]
+}

@@ -1,0 +1,221 @@
+{
+ "key": "dev2_20261014_095225_0d01_v1",
+ "src": "dev2/runs/run_20261014_095225_0d01/v1",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    520,
+    131,
+    792,
+    182
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Tu bin na",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    514,
+    192,
+    838,
+    251
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "tingh Annh",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    507,
+    256,
+    839,
+    320
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "sau 3 mang",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    514,
+    368,
+    835,
+    395
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Lothinie366buapvar",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    517,
+    405,
+    831,
+    446
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "gao rvienbbnnni, Ilop",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    561,
+    450,
+    796,
+    487
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "toimai8 kcam,",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    524,
+    495,
+    823,
+    532
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "camn't düi rra ban ng",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    582,
+    538,
+    760,
+    575
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "bii van dimg",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    570,
+    615,
+    776,
+    641
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Hac ttut mién ly 2 biu",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    491,
+    700,
+    849,
+    726
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Lu thitiie 36buui vo chivin",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    531,
+    740,
+    829,
+    768
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "biocre mai 8 hch niml,",
+   "eval": true
+  },
+  {
+   "id": "L12",
+   "box": [
+    500,
+    776,
+    849,
+    813
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "cam rait mimrainianai mg",
+   "eval": true
+  },
+  {
+   "id": "L13",
+   "box": [
+    561,
+    820,
+    788,
+    850
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Roin dat mic tao",
+   "eval": true
+  },
+  {
+   "id": "L14",
+   "box": [
+    47,
+    1047,
+    332,
+    1084
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Suinirse English",
+   "eval": true
+  },
+  {
+   "id": "L15",
+   "box": [
+    662,
+    1053,
+    848,
+    1080
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "0938 222 1111",
+   "eval": true
+  }
+ ]
+}

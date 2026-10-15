@@ -33,18 +33,18 @@ def flags(plan: dict) -> list[str]:
         out.append(f"mã chặn {len(guard)} chữ lấp / chỗ cắt câu sai của VLM")
     if any("VẪN RỖNG" in l for l in log):
         out.append("VLM trả kế hoạch rỗng")
-    # ---- đường chỉ dòng chữ (lonly): những lần MÃ phải làm thay VLM, và bước gỡ chữ rơi về đường dự phòng
-    blank = sum("xoá trống" in l for l in log)
+    # ---- đường chỉ dòng chữ (compose): những lần MÃ phải làm thay VLM, và bước gỡ chữ rơi về đường dự phòng
+    blank = sum("không còn chữ cho dòng" in l for l in log)
     if blank:
         out.append(f"{blank} dòng nháp xoá trống (không còn câu nào để viết)")
-    fill = sum("chưa ai ghép" in l and "-> câu khách" in l for l in log)
-    if fill >= 2:
-        out.append(f"mã tự ghép {fill} dòng VLM bỏ sót")
+    kept = sum("hỏi lại vẫn không có" in l for l in log)
+    if kept:
+        out.append(f"{kept} dòng VLM bỏ sót cả khi hỏi lại -> giữ nguyên")
     own = sum("-> dòng lấp" in l for l in log)
     if own:
         out.append(f"{own} dòng ghép trùng câu đã có -> thành dòng lấp")
-    if any("gọi lại" in l and "dòng" in l for l in log):
-        out.append("VLM viết thiếu dòng, đã gọi lại")
+    if any("-> hỏi lại:" in l for l in log):
+        out.append("VLM bỏ sót dòng, đã hỏi lại")
     er = plan.get("erase") or {}
     if er.get("orphans"):
         out.append(f"{len(er['orphans'])} cụm nét OCR không đọc (VLM quyết giữ / xoá)")

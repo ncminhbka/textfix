@@ -1,0 +1,123 @@
+{
+ "key": "dev2_20261014_095226_66ff_v0",
+ "src": "dev2/runs/run_20261014_095226_66ff/v0",
+ "size": [
+  896,
+  1120
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    159,
+    42,
+    752,
+    122
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "NAP TIfEN SIEN",
+   "eval": true
+  },
+  {
+   "id": "L3",
+   "box": [
+    161,
+    130,
+    739,
+    189
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "SUEU9 dUIn NHANH",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    424,
+    264,
+    476,
+    285
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "object",
+   "ocr": "Hionog",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    134,
+    757,
+    393,
+    797
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Quét mam QR",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    175,
+    811,
+    336,
+    863
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "tai quay",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    513,
+    756,
+    769,
+    800
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Nhip su tién",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    542,
+    829,
+    762,
+    872
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "xoc cnmn",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    46,
+    1028,
+    266,
+    1084
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "ViXhen",
+   "eval": true
+  }
+ ]
+}

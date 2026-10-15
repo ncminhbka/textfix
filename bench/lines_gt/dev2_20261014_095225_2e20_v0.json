@@ -1,0 +1,151 @@
+{
+ "key": "dev2_20261014_095225_2e20_v0",
+ "src": "dev2/runs/run_20261014_095225_2e20/v0",
+ "size": [
+  1024,
+  1024
+ ],
+ "status": "done",
+ "lines": [
+  {
+   "id": "L1",
+   "box": [
+    226,
+    54,
+    806,
+    123
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "HOC VIEN NOI GA?",
+   "eval": true
+  },
+  {
+   "id": "L2",
+   "box": [
+    260,
+    151,
+    774,
+    197
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Khoa Yoga trié lian con shoc",
+   "eval": true
+  },
+  {
+   "id": "L4",
+   "box": [
+    220,
+    468,
+    810,
+    505
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Sau 2 chang tét, nhin ka hit haul dau dlng hung",
+   "eval": true
+  },
+  {
+   "id": "L5",
+   "box": [
+    220,
+    507,
+    797,
+    541
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "vhi kloo vanhm, vio gronngo gep dhgh ti tre",
+   "eval": true
+  },
+  {
+   "id": "L6",
+   "box": [
+    221,
+    545,
+    788,
+    574
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "théo vaetéu vnan nun narn tan ihan déu tan nai",
+   "eval": true
+  },
+  {
+   "id": "L7",
+   "box": [
+    220,
+    578,
+    525,
+    613
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "nan, lis au ddlong vrui!",
+   "eval": true
+  },
+  {
+   "id": "L8",
+   "box": [
+    407,
+    636,
+    635,
+    670
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Anh Tun, 34 tou",
+   "eval": true
+  },
+  {
+   "id": "L9",
+   "box": [
+    223,
+    794,
+    444,
+    827
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Liop nion 10 non",
+   "eval": true
+  },
+  {
+   "id": "L10",
+   "box": [
+    540,
+    798,
+    825,
+    825
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Glacviar chong hhj tuuc tite",
+   "eval": true
+  },
+  {
+   "id": "L11",
+   "box": [
+    324,
+    929,
+    694,
+    981
+   ],
+   "rows": 1,
+   "shape": "straight",
+   "kind": "poster",
+   "ocr": "Teng 1 turn tap thm",
+   "eval": true
+  }
+ ]
+}
