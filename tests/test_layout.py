@@ -35,3 +35,10 @@ def test_room_grows_into_free_background_only():
 def test_color_needs_two_sources(glyph, ink, vlm, want):
     from textfix.fill import pick_color
     assert pick_color(glyph, ink, vlm)[0] == want
+
+
+def test_row_of_mixed_sizes_reads_left_to_right():
+    from textfix.fill import _reading
+    giam, big = [100, 120, 180, 160], [190, 60, 420, 165]   # "Giảm" nhỏ | "50%" to, cùng hàng: mép trên của chữ to cao hơn
+    under = [100, 200, 420, 240]
+    assert _reading([big, under, giam]) == [2, 0, 1]

@@ -73,3 +73,16 @@ def test_reask_asks_fresh_and_keeps_only_asked_lines(monkeypatch):
     A = vlm.reask(img, M, "prompt", TEXTS, call, ["L2"], base=img)
     assert [u["marks"] for u in A["assign"]] == [["L2"]] and A["assign"][0]["kind"] == "keep"
     assert calls[0][1] is True and "LEFT OUT LINES L2" in calls[0][0]
+
+
+def test_line_without_words_is_asked_again_before_wiping():
+    # pill thừa: VLM ghép câu T0 vào cả L1 lẫn L2; L2 không còn chữ -> hỏi lại (REFILL), VLM đưa chữ lấp -> viết, không xoá trống
+    M = page(line(1, 100, ocr="Khai truong"), line(2, 300, ocr="Khoi trung"))
+    A = fill.parse({"assign": [entry(["L1"], client="T0"), entry(["L2"], client="T0")], "styles": {}})
+    U, _, _ = fill.resolve(A, M, TEXTS)
+    empty = fate.no_words(U)
+    assert empty and empty[0] in ("L1", "L2")
+    fate.merge(A, fill.parse({"assign": [entry(empty, text="Ưu đãi hấp dẫn")]}), empty)
+    U, _, _ = fill.resolve(A, M, TEXTS)
+    t = fate.table(U, M)
+    assert t["L1"]["fate"] == "text" and t["L2"]["fate"] == "text"

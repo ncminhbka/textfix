@@ -153,6 +153,14 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     if A.get("dropped"):
         llog.append(f"bỏ mục ghép sai khuôn: {A['dropped']}")
     U, rlog0, miss_i = fill.resolve(A, M, texts)
+    # DÒNG CHỮ POSTER KHÔNG CÒN CHỮ (câu VLM ghép đã có chỗ khác): xin câu cùng vai còn thiếu / chữ lấp trước khi gỡ trống
+    empty_l = fate.no_words(U)
+    if empty_l:
+        progress(f"{len(empty_l)} dòng không còn chữ, hỏi lại")
+        A2 = cvlm.reask(draft, M, B["prompt_en"], texts, vlm, empty_l, product=product, base=clean, ask=cvlm.REFILL)
+        fate.merge(A, A2, empty_l)
+        llog.append(f"dòng không còn chữ {empty_l} -> hỏi lại xin chữ: {[(u['marks'], u['kind'], u['clients'] or u['text_vlm']) for u in A2['assign']]}")
+        U, rlog0, miss_i = fill.resolve(A, M, texts)
     U, llay = fill.layout(U, M, ink, A["styles"], A["accent"], texts, base=clean)
     log = geo_log + llog + rlog0 + llay
     if product:

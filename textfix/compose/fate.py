@@ -5,8 +5,9 @@ Luật, theo thứ tự (người dùng chốt 15/10):
   1. VLM ghép câu khách / chữ lấp vào dòng -> text (đơn vị do bước ghép, fill.resolve, quyết);
   2. chữ in trên sản phẩm khách tải (slots.mark_printed) -> keep, trừ khi VLM ghép câu khách (fill.resolve);
   3. VLM nói keep / skip -> theo VLM: TIN VLM khi nó xoá;
-  4. VLM CÓ nhắc dòng mà không còn chữ cho nó (câu đã có chỗ khác, chữ lấp mang số bịa) -> skip: chữ giun của dòng thừa không
-     được ở lại;
+  4. VLM CÓ nhắc dòng mà không còn chữ cho nó (câu đã có chỗ khác, chữ lấp mang số bịa) -> hỏi lại xin câu cùng vai còn thiếu /
+     chữ lấp (compose.vlm.REFILL: dòng giun trên pill / cùng cấp không xoá trống nếu còn chữ để viết); vẫn không -> skip: chữ giun
+     của dòng thừa không được ở lại;
   5. VLM KHÔNG nhắc dòng, kể cả khi hỏi lại riêng (compose.vlm.reask) -> keep: không biết dòng là gì thì không xoá.
 """
 
@@ -37,12 +38,25 @@ def leftovers(U: list[dict], M: dict, seen: set) -> tuple[list[dict], list[str]]
             out.append({**base, "kind": "keep", "why": why})
         elif l["id"] in seen:
             why = "VLM có nhắc nhưng không còn chữ cho dòng (câu đã có chỗ khác / chữ lấp bị bỏ)"
-            out.append({**base, "kind": "skip", "why": why})
+            out.append({**base, "kind": "skip", "why": why, "no_words": True})
         else:
             why = "VLM bỏ sót, hỏi lại vẫn không có"
             out.append({**base, "kind": "keep", "why": why})
         log.append(f"{l['id']} ({l.get('ocr')!r}): {why} -> {out[-1]['kind']}")
     return out, log
+
+
+def no_words(U: list[dict]) -> list[str]:
+    """Các dòng luật 4 sắp gỡ trống -> hỏi lại xin chữ (compose.vlm.REFILL)."""
+    return [m for u in U if u.get("no_words") for m in u["marks"]]
+
+
+def merge(A: dict, A2: dict, lines: list[str]) -> None:
+    """Câu trả lời hỏi lại riêng `lines` thay phần của các dòng đó trong câu trả lời đầu."""
+    drop = set(lines)
+    for u in A["assign"]:
+        u["marks"] = [m for m in u["marks"] if m not in drop]
+    A["assign"] = [u for u in A["assign"] if u["marks"]] + A2["assign"]
 
 
 def table(U: list[dict], M: dict) -> dict:

@@ -50,10 +50,7 @@ repeated row of a list gets a client text OF THE SAME ROLE that has no line yet 
 (b) "client": null with "text": a short phrase of the same kind as the rows around it (another benefit beside benefits) that \
 is true of that business, no fact, no number, no promise, never words of another client text. Steps, name / price rows, dates and contacts are never invented. Give a filled line the "role" it plays (the role \
 of the row it repeats).
-4. EVERY LINE GETS ONE KIND. "text": poster lettering -- titles, offers, buttons, list rows, captions, also an extra line on \
-a pill or beside its peers -- it gets a client text or a filler as above. "keep": lettering that belongs to an object in the \
-picture -- product, package, label, sign, screen, seal, logo -- even when garbled: its pixels stay as drawn. "skip": only \
-junk standing alone, neither poster lettering nor on an object: it is wiped. Unsure between "keep" and "skip": "keep".
+4. EVERY LINE GETS ONE KIND. "text": poster lettering -- titles, offers, buttons, badges, stickers, list rows, captions, also an extra line on a pill or beside its peers, and ANY line that says one of the client texts wherever it is drawn (on a sign a character holds, a board, a banner, a ribbon, a badge): it gets a client text or a filler as above. "keep": only the own lettering of a depicted product or object -- brand and label on a package, logo, screen interface, seal -- even when garbled: its pixels stay as drawn; never the poster's message. "skip": only junk standing alone, neither poster lettering nor on an object: it is wiped. Unsure between "keep" and "skip": "keep".
 5. Client texts the model drew no line for go in "missing". Never cram them into another line.
 6. Bullets, ticks, icons, numbers and pictures before a line stay on the BASE as drawn: never mention them.
 
@@ -92,14 +89,19 @@ def ask(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, produc
 
 REASK = ("YOUR PREVIOUS ANSWER LEFT OUT LINES {ids}. Every other line is done. Answer with \"assign\" entries for exactly these "
          "lines -- each gets a kind (text / keep / skip) as in rule 4; \"styles\", \"accent\" and \"missing\" may stay empty.")
+REFILL = ("LINES {ids} ARE POSTER LETTERING WITH NO WORDS LEFT: the client text you gave them is already set on another line. "
+          "Answer with \"assign\" entries for exactly these lines: \"client\": a client text of the same role that has no line yet, "
+          "else \"client\": null with \"text\": a short filler of the same kind as the lettering around it (rule 3b); \"skip\" only "
+          "when nothing fits. \"styles\", \"accent\" and \"missing\" may stay empty.")
 
 
 def reask(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, lines: list[str], product: bool = False,
-          base: np.ndarray | None = None) -> dict:
-    """Hỏi lại RIÊNG các dòng câu trả lời đầu bỏ sót (người dùng chốt 15/10: bỏ sót -> hỏi lại; vẫn không -> giữ). -> câu trả lời
-    đã đọc, chỉ còn mục chạm các dòng đó."""
+          base: np.ndarray | None = None, ask: str = REASK) -> dict:
+    """Hỏi lại RIÊNG một số dòng (fresh): REASK -- dòng câu trả lời đầu bỏ sót (người dùng chốt 15/10: bỏ sót -> hỏi lại; vẫn
+    không -> giữ); REFILL -- dòng chữ poster không còn chữ (câu VLM ghép đã có chỗ khác): xin câu cùng vai còn thiếu / chữ lấp
+    trước khi gỡ trống. -> câu trả lời đã đọc, chỉ còn mục chạm các dòng đó."""
     from .. import fill, slots
-    desc = f"{describe(M)}\n\n{REASK.format(ids=', '.join(lines))}"
+    desc = describe(M) + "\n\n" + ask.format(ids=", ".join(lines))
     A = fill.parse(slots.plan(draft, M, prompt, texts, call, slots._system(SYSTEM), desc, base, product=product, fresh=True))
     want = set(lines)
     A["assign"] = [{**u, "marks": [m for m in u["marks"] if m in want]} for u in A["assign"] if want & set(u["marks"])]

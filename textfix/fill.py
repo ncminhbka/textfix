@@ -584,7 +584,9 @@ def layout(U: list[dict], M: dict, ink: np.ndarray, styles: dict, accent: list, 
     med = float(np.median([l["size"] for l in M["L"]])) if M.get("L") else 0.0
     T = [u for u in U if u["kind"] == "text"]
     for u in T:
-        u["Ls"] = sorted((by[m] for m in u["marks"]), key=lambda l: (l["box"][1], l["box"][0]))
+        # THỨ TỰ ĐỌC: hàng trên xuống, trong hàng trái sang (sắp theo mép trên thì "50%" to đứng trước "Giảm" nhỏ cùng hàng: d07)
+        Ls = [by[m] for m in u["marks"]]
+        u["Ls"] = [Ls[i] for i in _reading([l["box"] for l in Ls])]
         u["role"] = texts[u["clients"][0]]["role"] if u["clients"] else (u.get("role_vlm") or "fill")
         u["text"] = [texts[k]["text"] for k in u["clients"]] or [u["text_vlm"]]
         u["size"] = float(np.median([l["size"] for l in u["Ls"]]))
