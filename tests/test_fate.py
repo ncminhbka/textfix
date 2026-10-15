@@ -86,3 +86,15 @@ def test_line_without_words_is_asked_again_before_wiping():
     U, _, _ = fill.resolve(A, M, TEXTS)
     t = fate.table(U, M)
     assert t["L1"]["fate"] == "text" and t["L2"]["fate"] == "text"
+
+
+def test_empty_split_line_beside_its_row_stays():
+    # final2 g18: "Giảm" | "50%" cùng hàng, VLM dồn cả câu vào ô "50%" và để trống ô "Giảm"; "mow" là mẩu OCR trùng trong dòng dưới
+    M = page({**line(1, 820), "box": [209, 832, 387, 922], "ocr": "Giam"}, {**line(2, 820), "box": [385, 822, 563, 922], "ocr": "5%"},
+             {**line(3, 920), "box": [215, 921, 554, 977], "ocr": "moi dich vu"}, {**line(4, 935), "box": [223, 935, 324, 970], "ocr": "mow"})
+    texts = [{"text": "Giảm 50% mọi dịch vụ", "role": "offer"}]
+    A = fill.parse({"assign": [{"lines": ["L1", "L2", "L3", "L4"], "client": "T0", "kind": "text",
+                                "split": ["", "Giảm 50%", "mọi dịch vụ", ""]}]})
+    U, _, _ = fill.resolve(A, M, texts)
+    t = fate.table(U, M)
+    assert t["L1"]["fate"] == "text" and t["L4"]["fate"] == "skip"

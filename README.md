@@ -34,6 +34,8 @@ python scripts/dev_batch.py bench/accept2.json   # chạy một tập qua máy c
 
 Chạy trên máy chủ bằng ô notebook (`%run scripts/...`): kết quả tự gói thành zip < 24 MB và tự tải về ([docs/SERVER.md](docs/SERVER.md)).
 
+API cho người gọi (6 loại form, mã lỗi, debug từng bước): [docs/API.md](docs/API.md).
+
 ## Cấu trúc
 
 | Đường dẫn | Việc |
@@ -51,7 +53,7 @@ Chạy trên máy chủ bằng ô notebook (`%run scripts/...`): kết quả t�
 | `textfix/ocr.py`, `glyph.py`, `geo.py` | OCR dòng, đo nét (cỡ, màu), chữ cong |
 | `textfix/fonts.py` | Bộ font OFL đủ dấu tiếng Việt |
 | `textfix/ship.py` | Gói kết quả máy chủ thành zip < 24 MB, tự tải về trình duyệt (JupyterLab) |
-| `server/` | Máy chủ FastAPI + giao diện form |
+| `server/` | Máy chủ FastAPI ([docs/API.md](docs/API.md)) + giao diện demo (form như app, xem debug từng bước). Test: `pytest tests/test_api.py` |
 | `scripts/dev_batch.py`, `batch_report.py` | Chạy một tập qua máy chủ, báo cáo + một zip |
 | `scripts/replay.py`, `erase_bench.py`, `lines_bench.py` | Máy cá nhân: dựng lại poster / đo bước gỡ chữ / đo bước đo dòng (`bench/lines_gt`) trên nháp đã lưu |
 | `flux2/` | Mã suy luận FLUX.2 của Black Forest Labs (Apache-2.0), nguyên trạng |

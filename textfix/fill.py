@@ -199,12 +199,25 @@ def resolve(A: dict, M: dict, texts: list[dict]) -> tuple[list[dict], list[str],
     # SPLIT trong MỘT đơn vị: chỉ dùng mảnh rỗng (VLM nói dòng đó không thuộc câu -- 14/10 mix1 m01: dòng thứ ba là tên máy FLUX
     # tự vẽ) -> dòng rời đơn vị, xoá trống (VLM đã nhìn dòng và nói không có chữ khách nào ở đó). Ngắt câu vào các dòng là việc
     # của code (bề rộng nét, layout); split chỉ còn cho chữ cong và phải nối lại đúng câu khách.
+    # ... TRỪ dòng để trống đứng CÙNG HÀNG, ngay cạnh một dòng có chữ của đơn vị, không chồng lên nó (final2 g18: VLM dồn "Giảm 50%"
+    # vào ô "50%", để trống ô "Giảm" bên cạnh -> chữ co còn 0,32): đó là một phần của hàng, giữ lại, code ngắt câu theo sức chứa.
+    # Dòng để trống CHỒNG lên dòng khác (OCR đọc trùng một mẩu) vẫn rời đơn vị.
     for u in list(U):
         if u["split"] and len(u["split"]) == len(u["marks"]) and any(not p.strip() for p in u["split"]):
-            out = [m for m, p in zip(u["marks"], u["split"]) if not p.strip()]
-            u["marks"], u["split"] = [m for m, p in zip(u["marks"], u["split"]) if p.strip()], [p for p in u["split"] if p.strip()]
-            U.append({**u, "id": u["id"] + "x", "kind": "skip", "marks": out, "clients": [], "split": None, "text_vlm": "", "vlm_out": True})
-            log.append(f"{u['id']}: split để trống dòng {out} -> dòng đó rời đơn vị, xoá trống")
+            full = [m for m, p in zip(u["marks"], u["split"]) if p.strip()]
+            empty = [m for m, p in zip(u["marks"], u["split"]) if not p.strip()]
+            stay = [m for m in empty if any(_beside(by[m]["box"], by[f]["box"]) for f in full)
+                    and not any(_cover_min(by[m]["box"], by[o]["box"]) > 0.5 for o in u["marks"] if o != m)]
+            out = [m for m in empty if m not in stay]
+            if stay:
+                u["split"], u["split_ok"] = None, False
+                log.append(f"{u['id']}: split để trống dòng {stay} cùng hàng cạnh dòng có chữ -> giữ trong đơn vị, code ngắt câu")
+            else:
+                u["split"] = [p for p in u["split"] if p.strip()]
+            u["marks"] = [m for m in u["marks"] if m not in out]
+            if out:
+                U.append({**u, "id": u["id"] + "x", "kind": "skip", "marks": out, "clients": [], "split": None, "text_vlm": "", "vlm_out": True})
+                log.append(f"{u['id']}: split để trống dòng {out} -> dòng đó rời đơn vị, xoá trống")
         if u["split"] and not u.get("split_ok") and (len(u["clients"]) != 1
                                                    or S._flat("".join(u["split"])) != S._flat(texts[u["clients"][0]]["text"])):
             u["split"] = None
@@ -261,6 +274,19 @@ def resolve(A: dict, M: dict, texts: list[dict]) -> tuple[list[dict], list[str],
     log += _markers(U, M, texts)
     missing =[j for j in range(len(texts)) if not used[j] and texts[j].get("source") != "ai"]
     return U, log, missing
+
+
+def _beside(a: list, b: list) -> bool:
+    """Hai khung cùng hàng (chồng dọc >= nửa khung thấp hơn) và sát nhau (khe ngang <= 1 cao khung cao hơn)."""
+    h = max(a[3] - a[1], b[3] - b[1])
+    return (min(a[3], b[3]) - max(a[1], b[1]) >= 0.5 * min(a[3] - a[1], b[3] - b[1])
+            and max(a[0] - b[2], b[0] - a[2]) <= h)
+
+
+def _cover_min(a: list, b: list) -> float:
+    """Diện tích giao / diện tích khung nhỏ hơn."""
+    w, h = min(a[2], b[2]) - max(a[0], b[0]), min(a[3], b[3]) - max(a[1], b[1])
+    return max(0.0, w) * max(0.0, h) / max(1e-6, min((a[2] - a[0]) * (a[3] - a[1]), (b[2] - b[0]) * (b[3] - b[1])))
 
 
 def _markers(U: list[dict], M: dict, texts: list[dict]) -> list[str]:

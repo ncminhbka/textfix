@@ -44,7 +44,7 @@ import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -72,17 +72,40 @@ CATEGORY_FIELDS = {
     "promo": ["title", "discount", "applied_product", "date_start", "date_end"],
     "product_intro": ["title", "product_name", "product_desc", "highlights", "price"],
     "opening": ["title", "opening_date", "opening_promo", "booking_contact"],
-    "feedback": ["title", "feedback_target", "feedback_quote", "customer_name", "feedback_highlights", "special_offer"],
+    "feedback": ["title", "feedback_target", "feedback_quote", "feedback_highlights", "special_offer"],
     "recruitment": ["title", "job_position", "job_desc", "apply_deadline", "apply_method"],
     "guide": ["title"],
 }
 REQUIRED = {"promo": ["discount"], "product_intro": ["product_name", "product_desc"], "opening": ["opening_date"],
             "feedback": ["feedback_target", "feedback_quote"], "recruitment": ["job_position", "apply_deadline", "apply_method"],
-            "guide": ["guide_steps"]}
+            "guide": []}   # như form của app: hướng dẫn không trường nào bắt buộc (không bước nào: LLM viết theo tiêu đề / prompt)
+MAX_IMAGES = 4
+RATIOS = ["1:1", "4:5", "9:16", "16:9"]   # 4 tỉ lệ của app (bộ vẽ có thêm 3:4, 2:3, 4:3 -- flux.SIZES -- app không dùng)
+
+
+class ApiError(Exception):
+    """Lỗi trả cho người gọi API: mã cố định (docs/API.md), bước hỏng, thông điệp."""
+
+    def __init__(self, code: str, stage: str, message: str = ""):
+        super().__init__(message or code)
+        self.code, self.stage, self.message = code, stage, message or code
+
+    def as_dict(self) -> dict:
+        return {"code": self.code, "stage": self.stage, "message": self.message}
+
+
+def failure(code: str, stage: str, e: BaseException | None = None) -> dict:
+    return {"code": code, "stage": stage, "message": f"{type(e).__name__}: {e}" if e else code}
+
+
+# bước thiết kế (engine.design báo qua progress) -> mã lỗi khi hỏng ở bước đó
+DESIGN_STAGES = (("đo dòng", "lines_failed"), ("gỡ chữ", "erase_failed"), ("VLM", "vlm_failed"),
+                 ("dòng không còn chữ", "vlm_failed"), ("dựng", "render_failed"))
 COMMON = ["store_name", "phone", "address", "website_link"]
 
 
 class GenerateRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")   # khoá lạ không làm hỏng yêu cầu: báo lại trong "ignored_fields"
     category: str = "promo"
     # thông tin chung theo loại
     title: Optional[str] = ""
@@ -99,7 +122,6 @@ class GenerateRequest(BaseModel):
     booking_contact: Optional[str] = ""
     feedback_target: Optional[str] = ""
     feedback_quote: Optional[str] = ""
-    customer_name: Optional[str] = ""
     feedback_highlights: Optional[str] = ""
     special_offer: Optional[str] = ""
     job_position: Optional[str] = ""
@@ -140,10 +162,29 @@ def missing_fields(req: GenerateRequest, form: dict) -> list[str]:
     """Trường bắt buộc -- chỉ khi KHÔNG có prompt (có prompt thì prompt quyết)."""
     if (req.prompt or "").strip():
         return []
-    cat = form["category"]
-    if cat == "guide":
-        return [] if any(k.startswith("step_") for k in form) else ["guide_steps"]
-    return [k for k in REQUIRED.get(cat, []) if k not in form]
+    return [k for k in REQUIRED.get(form["category"], []) if k not in form]
+
+
+def ignored_fields(req: GenerateRequest) -> list[str]:
+    """Trường có giá trị nhưng không thuộc loại form đang chọn, và khoá lạ: bỏ qua, báo lại cho người gọi."""
+    own = set(CATEGORY_FIELDS.get(req.category, [])) | set(COMMON) | ({"guide_steps"} if req.category == "guide" else set())
+    content = {k for fs in CATEGORY_FIELDS.values() for k in fs} | {"guide_steps"}
+    return [k for k in sorted(content - own) if getattr(req, k, None)] + sorted((req.model_extra or {}).keys())
+
+
+def validate(req: GenerateRequest) -> None:
+    """Đầu vào sai -> 422 với mã cố định (người gọi sửa được; không tự đoán thay)."""
+    if req.category not in CATEGORY_FIELDS:
+        raise HTTPException(422, {"code": "invalid_category", "value": req.category, "allowed": sorted(CATEGORY_FIELDS)})
+    if req.aspect_ratio not in RATIOS:
+        raise HTTPException(422, {"code": "invalid_aspect_ratio", "value": req.aspect_ratio, "allowed": RATIOS})
+    if not 1 <= int(req.num_images or 0) <= MAX_IMAGES:
+        raise HTTPException(422, {"code": "invalid_num_images", "value": req.num_images, "allowed": [1, MAX_IMAGES]})
+    if req.image_base64:
+        try:
+            decode_image(req.image_base64)
+        except Exception as e:
+            raise HTTPException(422, {"code": "invalid_image", "message": f"{type(e).__name__}: {e}"})
 
 
 def decode_image(b64: str | None) -> np.ndarray | None:
@@ -299,10 +340,15 @@ def design_one(job: dict, v: dict, d: dict, Bv: dict, product: bool, vd: Path, u
                  slots_url=f"{url}/slots.jpg", plan_url=f"{url}/plan.json", hisam_url=f"{url}/hisam.jpg", ink_url=f"{url}/ink.jpg", clean_url=f"{url}/clean.jpg", base_url=f"{url}/base.jpg", timing=timing, missing=P["missing"],
                  errors=len(P["errors"]), ops=sum(o.get("kind") not in ("skip", "keep") for o in P["ops"]),
                  **({"poster_first_url": f"{url}/poster_first.png"} if first else {}))
+        if any(e.get("type") == "empty_plan" for e in P["errors"]):   # D1: VLM không ghép được gì (đã gọi lại) -> lỗi, không trả nháp
+            v.update(status="error", error={"code": "vlm_empty_plan", "stage": "VLM ghép câu",
+                                            "message": "VLM không ghép câu khách nào vào dòng nào (đã gọi lại)"})
         log.info("%s v%d xong (gpu %s) %s", job["run_id"], v["index"], v.get("gpu"), timing)
     except Exception as e:
         log.error("%s v%d lỗi thiết kế: %s", job["run_id"], v["index"], traceback.format_exc())
-        v.update(status="error", stage="", error=f"{type(e).__name__}: {e}")
+        st = v.get("stage") or ""
+        code = next((c for k, c in DESIGN_STAGES if k in st), "design_failed")
+        v.update(status="error", stage="", error=failure(code, st, e))
 
 
 def image_one(job: dict, v: dict, d: dict, Bv: dict, vd: Path, url: str, t_llm: float) -> None:
@@ -317,7 +363,7 @@ def image_one(job: dict, v: dict, d: dict, Bv: dict, vd: Path, url: str, t_llm: 
         log.info("%s v%d xong (ảnh thường, gpu %s) %s", job["run_id"], v["index"], v.get("gpu"), timing)
     except Exception as e:
         log.error("%s v%d lỗi lưu ảnh: %s", job["run_id"], v["index"], traceback.format_exc())
-        v.update(status="error", stage="", error=f"{type(e).__name__}: {e}")
+        v.update(status="error", stage="", error=failure("internal_error", "lưu ảnh", e))
 
 
 def run_job(job: dict, req: GenerateRequest) -> dict:
@@ -340,8 +386,11 @@ def run_job(job: dict, req: GenerateRequest) -> dict:
     n = max(1, min(4, int(req.num_images or 1)))
     job["progress"] = "LLM viết prompt" + (f" + {n - 1} hướng thiết kế" if n > 1 else "")
     t0 = time.time()
-    B = make_brief(STATE["llm"], prompt, form if len(form) > 1 else None, design_hint, product is not None, n_variants=n - 1,
-                   aspect=req.aspect_ratio)
+    try:
+        B = make_brief(STATE["llm"], prompt, form if len(form) > 1 else None, design_hint, product is not None, n_variants=n - 1,
+                       aspect=req.aspect_ratio)
+    except Exception as e:
+        raise ApiError("llm_failed", "LLM viết prompt", f"{type(e).__name__}: {e}") from e
     t_llm = round(time.time() - t0, 1)
     (rd / "brief.json").write_text(json.dumps(B, ensure_ascii=False, indent=1), encoding="utf-8")
     plain = B.get("mode") == "image"   # không chữ khách: chỉ FLUX vẽ
@@ -350,6 +399,7 @@ def run_job(job: dict, req: GenerateRequest) -> dict:
     directions = [{"name": "chính", "prompt_en": B["prompt_en"]}] + B.get("variants", [])
     posters = []
     job["result"] = {"status": "running", "run_id": run_id, "mode": B.get("mode", "poster"), "width": W, "height": H, "posters": posters,
+                     "ignored_fields": ignored_fields(req), "debug_zip_url": f"api/runs/{run_id}/zip",
                      "brief": {"prompt_en": B["prompt_en"], "texts": B["texts"], "variants": B.get("variants", []), "log": B["log"]}}
     futs = []
     for i in range(n):
@@ -366,7 +416,7 @@ def run_job(job: dict, req: GenerateRequest) -> dict:
         def drawn(f, v=v, Bv=Bv, vd=vd, i=i):
             if f.exception() is not None:
                 log.error("%s v%d lỗi vẽ: %s", run_id, i, f.exception())
-                v.update(status="error", stage="", error=f"{type(f.exception()).__name__}: {f.exception()}")
+                v.update(status="error", stage="", error=failure("draw_failed", "FLUX vẽ nháp", f.exception()))
                 return
             if plain:
                 futs.append(DESIGN.submit(image_one, job, v, f.result(), Bv, vd, f"outputs/{run_id}/v{i}", t_llm))
@@ -385,7 +435,8 @@ def run_job(job: dict, req: GenerateRequest) -> dict:
         time.sleep(0.3)
     ok = [p for p in posters if p["status"] == "done"]
     if not ok:
-        raise RuntimeError(posters[0].get("error") or "mọi phiên bản đều lỗi")
+        e = posters[0].get("error") or failure("internal_error", "", None)
+        raise ApiError(e["code"], e["stage"], e["message"])
     prune()
     job["result"].update(status="success", elapsed_seconds=round(time.time() - t_all, 1), final_poster_url=ok[0]["poster_url"])
     return job["result"]
@@ -398,12 +449,13 @@ def prune() -> None:
 
 
 def new_job(req: GenerateRequest) -> dict:
+    validate(req)
     form = form_of(req)
     miss = missing_fields(req, form)
     if miss:
-        raise HTTPException(422, {"error": "missing_required_fields", "category": form["category"], "fields": miss})
+        raise HTTPException(422, {"code": "missing_required_fields", "category": form["category"], "fields": miss})
     if not STATE["flux"] or STATE.get("vlm") is None:
-        raise HTTPException(503, f"model chưa sẵn sàng: {STATE['error'] or 'đang nạp'}")
+        raise HTTPException(503, {"code": "model_not_ready", "message": STATE["error"] or "đang nạp model"})
     jid = uuid.uuid4().hex[:12]
     job = {"id": jid, "run_id": f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{jid[:4]}", "status": "queued",
            "progress": "đang xếp hàng", "created": time.time(), "result": None, "error": None}
@@ -417,9 +469,12 @@ def work(job: dict, req: GenerateRequest) -> None:
     try:
         job["result"] = run_job(job, req)
         job["status"] = "done"
+    except ApiError as e:
+        log.error("job %s lỗi %s: %s", job["id"], e.code, traceback.format_exc())
+        job["status"], job["error"] = "error", e.as_dict()
     except Exception as e:
         log.error("job %s lỗi: %s", job["id"], traceback.format_exc())
-        job["status"], job["error"] = "error", f"{type(e).__name__}: {e}"
+        job["status"], job["error"] = "error", failure("internal_error", job.get("progress") or "", e)
     finally:
         job["progress"] = ""
         if job["id"] in ORDER:

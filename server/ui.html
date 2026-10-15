@@ -190,12 +190,12 @@
 
   <section class="card" id="out">
     <div id="status"><div class="spin" id="spin"></div><span id="msg"></span></div>
-    <div id="result"><div class="empty">Điền form rồi bấm <b>Tạo poster</b>.<br>Mỗi ảnh: LLM → FLUX vẽ nháp → FLUX xoá chữ → đọc nháp → dàn chữ đúng nguyên văn.<br>Chọn nhiều ảnh: mỗi ảnh một hướng thiết kế, ảnh xong trước hiện trước.</div></div>
+    <div id="result"><div class="empty">Điền form rồi bấm <b>Tạo poster</b>.<br>Mỗi ảnh: LLM viết prompt → FLUX vẽ nháp → Hi-SAM tìm nét chữ → đo dòng → gỡ chữ (LaMa) → VLM ghép câu → dựng chữ đúng nguyên văn.<br>Chọn nhiều ảnh: mỗi ảnh một hướng thiết kế, ảnh xong trước hiện trước.</div></div>
   </section>
 </main>
 
 <script>
-// ------------------------------------------------------------------ form theo yeu_cau.txt (dấu * = bắt buộc khi không có prompt)
+// ------------------------------------------------------------------ 6 form của app = thân yêu cầu API (docs/API.md); * = bắt buộc khi không có prompt
 const CATS = {
   promo: { name: "Khuyến mại / quảng cáo", fields: [
     ["discount", "Mức ưu đãi", true, "GIẢM 50%"], ["applied_product", "Sản phẩm áp dụng", false, "Toàn bộ trà trái cây"],
@@ -209,7 +209,6 @@ const CATS = {
   feedback: { name: "Feedback khách hàng", fields: [
     ["feedback_target", "Sản phẩm / dịch vụ nhận feedback", true, "Liệu trình chăm sóc da"],
     ["feedback_quote", "Mô tả ngắn feedback", true, "Nhân viên chu đáo, da mình căng bóng sau buổi đầu tiên!", "area"],
-    ["customer_name", "Tên khách hàng", false, "Chị Lan, Hà Nội"],
     ["feedback_highlights", "Điểm nổi bật", false, "Mỹ phẩm hữu cơ, chuẩn Hàn Quốc"], ["special_offer", "Ưu đãi đặc biệt", false, "Tặng voucher 20%"]] },
   recruitment: { name: "Tuyển dụng", fields: [
     ["job_position", "Vị trí tuyển dụng", true, "Nhân viên pha chế"], ["job_desc", "Mô tả ngắn công việc", false, "Lương 8-12 triệu, ca linh hoạt", "area"],
@@ -230,7 +229,7 @@ const PRESETS = {
       store_name: "Lumière Paris", style_pref: "sang_trong" }],
   opening: [{ label: "Quán cà phê", title: "KHAI TRƯƠNG", opening_date: "Thứ Bảy, 15/10/2026", opening_promo: "Giảm 50% toàn menu 3 ngày đầu",
     booking_contact: "Đặt bàn: 0988 123 456", store_name: "Mây Coffee", address: "123 Hoàng Hoa Thám, Ba Đình, Hà Nội", style_pref: "le_hoi" }],
-  feedback: [{ label: "Spa", title: "KHÁCH HÀNG NÓI GÌ", feedback_target: "Liệu trình chăm sóc da", customer_name: "Chị Lan",
+  feedback: [{ label: "Spa", title: "KHÁCH HÀNG NÓI GÌ", feedback_target: "Liệu trình chăm sóc da",
     feedback_quote: "Nhân viên chu đáo, da mình căng bóng sau buổi đầu tiên!", special_offer: "Tặng voucher 20% cho khách mới",
     store_name: "An Nhiên Spa", style_pref: "am_cung" }],
   recruitment: [{ label: "Pha chế", title: "TUYỂN DỤNG", job_position: "Nhân viên pha chế", job_desc: "Lương 8-12 triệu, ca linh hoạt",
@@ -261,7 +260,7 @@ function renderFields() {
     h += one(f);
   }
   if (half.length) h += half.map(one).join("");
-  if (cat === "guide") h += `<label>Các bước <span class="req">*</span><span class="hint">bước 1 bắt buộc</span></label><div id="steps"></div>
+  if (cat === "guide") h += `<label>Các bước</label><div id="steps"></div>
     <button type="button" class="btn-sm" style="margin-top:8px" onclick="addStep('')">+ Thêm bước</button>`;
   $("fields").innerHTML = h;
   Object.entries(keep).forEach(([k, v]) => { if ($(k)) $(k).value = v; });
@@ -298,6 +297,9 @@ function payload() {
   if (cat === "guide") p.guide_steps = [...document.querySelectorAll(".stepv")].map(i => i.value.trim()).filter(Boolean);
   return p;
 }
+function errText(e) {   // lỗi API: {code, stage, message} (docs/API.md) hoặc chuỗi
+  return !e ? "" : typeof e === "string" ? e : `[${e.code}]${e.stage ? " " + e.stage + ":" : ""} ${e.message || ""}`;
+}
 function status(text, busy, isErr) {
   $("spin").style.display = busy ? "block" : "none";
   $("msg").innerHTML = isErr ? `<span class="err">${esc(text)}</span>` : esc(text);
@@ -311,7 +313,7 @@ async function submitForm(e) {
     const j = await r.json();
     if (!r.ok) {
       const d = j.detail;
-      throw new Error(d && d.fields ? `Thiếu trường bắt buộc: ${d.fields.join(", ")}` + " (hoặc nhập prompt)" : (typeof d === "string" ? d : JSON.stringify(d)));
+      throw new Error(d && d.fields ? `Thiếu trường bắt buộc: ${d.fields.join(", ")}` + " (hoặc nhập prompt)" : errText(d && d.code ? d : JSON.stringify(d)));
     }
     await poll(j.job_id);
   } catch (err) { status(String(err.message || err), false, true); }
@@ -321,7 +323,7 @@ async function poll(id) {
   for (;;) {
     await new Promise(r => setTimeout(r, 1200));
     const r = await fetch(`api/jobs/${id}`), j = await r.json();
-    if (!r.ok) throw new Error(j.detail || "mất job");
+    if (!r.ok) throw new Error(errText(j.detail) || "mất job");
     if (j.result) {   // vẽ lại chỉ khi trạng thái các phiên bản đổi (không nháy ảnh / mất chỗ cuộn mỗi lần hỏi)
       const first = !current || current.run_id !== j.result.run_id, sig = JSON.stringify(j.result.posters.map(p => [p.status, p.stage, p.draft_url]));
       current = j.result;
@@ -330,7 +332,7 @@ async function poll(id) {
     }
     if (j.status === "queued") status(`Đang xếp hàng (trước bạn ${j.position} yêu cầu)…`, true);
     else if (j.status === "running") status(`${j.progress || "Đang chạy"} · ${Math.round(j.elapsed)}s`, true);
-    else if (j.status === "error") throw new Error("Lỗi: " + j.error);
+    else if (j.status === "error") throw new Error("Lỗi: " + errText(j.error));
     else { status(`Xong trong ${j.result.elapsed_seconds}s · ${j.run_id}`, false); show(); return; }
   }
 }
@@ -346,7 +348,7 @@ const TN = { llm: "LLM", ve_nhap: "vẽ nháp", net_chu: "nét chữ (Hi-SAM)", 
 function thumb(p, i) {
   const on = i === picked ? " on" : "", lab = `<div class="vlab">${i + 1}. ${esc(p.direction || "")}</div>`;
   if (p.status === "done") return `<div class="vcard${on}" onclick="picked=${i};show()"><img src="${p.poster_url}">${lab}</div>`;
-  if (p.status === "error") return `<div class="vcard err${on}" onclick="picked=${i};show()" title="${esc(p.error)}"><div class="ph">✕ lỗi</div>${lab}</div>`;
+  if (p.status === "error") return `<div class="vcard err${on}" onclick="picked=${i};show()" title="${esc(errText(p.error))}"><div class="ph">✕ lỗi</div>${lab}</div>`;
   return `<div class="vcard wait${on}" onclick="picked=${i};show()">${p.draft_url && debug ? `<img src="${p.draft_url}" class="dim">` : ""}` +
     `<div class="ph"><div class="spin" style="display:block"></div><span>${esc(p.stage || "")}</span></div>${lab}</div>`;
 }
@@ -360,7 +362,7 @@ function show() {
            ${R.run_id && R.status !== "running" ? `<a class="dl" href="api/runs/${R.run_id}/zip" download title="Mọi tệp debug của lượt này: yêu cầu, brief, nháp, nét chữ, nền đã gỡ, dòng, lệnh, poster, plan.json">Tải debug (zip)</a>` : ""}</span></div>`;
   const avail = VIEWS.filter(([k, , d]) => (!d || debug) && (k === "ocr" ? P.plan_url : P[k + "_url"]));
   if (!avail.find(([k]) => k === view)) view = avail.length ? avail[0][0] : "poster";
-  if (P.status === "error") h += `<p class="err">Ảnh ${picked + 1} lỗi: ${esc(P.error)}</p>`;
+  if (P.status === "error") h += `<p class="err">Ảnh ${picked + 1} lỗi: ${esc(errText(P.error))}</p>`;
   if (avail.length) {
     h += `<div class="views">${avail.map(([k, n]) => `<button class="${k === view ? "on" : ""}" onclick="view='${k}';show()">${n}</button>`).join("")}
           ${view !== "ocr" ? `<a class="dl" href="${P[view + "_url"]}" download>Tải ảnh này</a>` : ""}</div>`;
@@ -373,6 +375,7 @@ function show() {
         Muốn làm poster có chữ, hãy ghi câu cần in trong ngoặc kép, vd. "GIẢM 50%".</p>` : `<h3>Chữ của khách (đúng nguyên văn)</h3><table>${R.brief.texts.map(x =>
         `<tr><td class="role">${esc(x.role)}</td><td>${esc(x.text)}</td></tr>`).join("")}</table>`}
         ${P.missing && P.missing.length ? `<p class="err">Không vẽ: ${P.missing.map(esc).join(" · ")}</p>` : ""}
+        ${R.ignored_fields && R.ignored_fields.length ? `<p class="muted">Trường bỏ qua (không thuộc loại form): ${R.ignored_fields.map(esc).join(", ")}</p>` : ""}
         ${P.errors ? `<p class="err">Lỗi còn lại: ${P.errors}</p>` : ""}
         ${Object.keys(t).length ? `<h3 style="margin-top:12px">Thời gian (giây)</h3><div class="timing">${Object.entries(t).map(([k, v]) =>
           `<span>${TN[k] || k}: <b>${v}</b></span>`).join("")}${P.seed !== undefined ? `<span>seed: ${P.seed}</span>` : ""}${P.gpu !== undefined ? `<span>GPU ${P.gpu}</span>` : ""}</div>` : ""}</div>

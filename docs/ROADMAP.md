@@ -137,7 +137,7 @@ riêng rồi GIỮ; CHO NỚI chữ vào nền trống cùng màu, không vượ
   - [x] `erase_bench` (accept2 + mix1c, 65 nháp): ký tự sót 54 -> 49, poster còn sót 3 -> 3, mặt nạ TB 14,92 -> 14,74%, đổi
     ngoài vùng chữ 0 -> 0. Mặt nạ to hơn ở đúng một nháp (f02: chữ vòm vàng gỡ trọn mảnh + quầng; nền sạch).
   - [ ] Xuất quầng theo dòng làm hiệu ứng: làm ở chặng 4 (nơi dùng).
-- [~] Chặng 3: VLM + số phận dòng (`textfix/compose/`; `lonly.py` -> `compose/vlm.py`).
+- [x] Chặng 3: VLM + số phận dòng (`textfix/compose/`; `lonly.py` -> `compose/vlm.py`).
   - [x] `compose/fate.py`: MỘT bảng số phận (`plan.json` "fates": text / keep / skip + lý do). Luật: VLM ghép câu -> text; chữ in
     trên sản phẩm -> keep (trừ khi ghép câu); VLM keep / skip -> theo VLM (TIN VLM khi xoá, bỏ giới hạn "chỉ xoá cụm nét lạ");
     VLM có nhắc mà không còn chữ -> skip; VLM không nhắc, hỏi lại vẫn không -> keep.
@@ -145,7 +145,7 @@ riêng rồi GIỮ; CHO NỚI chữ vào nền trống cùng màu, không vượ
     gọi lại khi ghép rỗng cũng `fresh=True` (sửa A1: bộ đệm trả lại đúng câu cũ).
   - [x] Lời dặn: bỏ 3b ("cụm từ lấy từ câu khách khác" -> lặp chữ), bỏ "màu phổ biến nhất", mục 4 định nghĩa ba số phận.
   - [x] `tests/test_fate.py` (VLM giả). [ ] Kiểm thật: lượt máy chủ (máy cá nhân không có khoá VLM).
-- [~] Chặng 4: bố cục (đang trong `fill.py`; tách `compose/layout.py` ở chặng 6).
+- [x] Chặng 4: bố cục (đang trong `fill.py`; tách `compose/layout.py` ở chặng 6).
   - [x] Cỡ theo FONT THẬT: `fonts.heights` (cao chữ hoa / thường đo trên hình "H" / "x"; danh mục chênh 0,59-0,86 / 0,30-0,73
     em, hằng chung cũ 0,72 / 0,53); `fill.letter_em` chọn hoa / thường theo CÂU KHÁCH; cỡ = `ink.h_cap` / letter_em.
   - [x] Nới khung vào nền trống (`fill.room`): theo lề, cột cùng màu nền trong khung (ΔE <= 15, >= 97% điểm), không vào vùng dòng
@@ -166,12 +166,17 @@ riêng rồi GIỮ; CHO NỚI chữ vào nền trống cùng màu, không vượ
     Lỗi theo loại: too_small 17 -> 19 (tính so với cỡ khởi điểm, nay to và đúng nháp hơn), tràn 1 -> 3 (v01 hai nhãn trong vòng
     tròn tràn dọc 2 px -- còn sửa; v03 có từ trước), chồng 1 -> 3 (chữ đúng cỡ nháp, dòng phụ sát tiêu đề thư pháp t03, t02).
   - [ ] Hiệu ứng đối chiếu quầng đo được (B2), độ đậm / có chân đối chiếu nét (B1).
-- [~] Chặng 5: render.
+- [x] Chặng 5: render.
   - [x] Tương phản: đúng màu nháp -> giữ màu + quầng ở mọi cỡ; bỏ `OUTLINE_HEAD / OUTLINE_ABS` và nhánh viền tiêu đề.
   - [x] Gỡ `geo.runs / RUNS` (thay bằng `lines.rows`), nhãn bề rộng chữ trong bảng dòng gửi VLM (`slots._look`).
   - [x] Tập: sức chứa theo cả bề cao của khối nhiều dòng (cỡ đúng nháp làm chữ hai dòng trong vòng tròn tràn dọc, v01);
     nén ngang tính ở cỡ chung. `room` chừa khe 0,2 cao dòng khi chạm vật.
-- [ ] Chặng 6: UI / plan.json / replay / tài liệu; lượt máy chủ dev2 + mix1; `final2` một lần.
+- [x] Chặng 6: tài liệu (README, ROADMAP, docs/API.md), UI debug (bảng số phận dòng), `scripts/replay.py`; máy chủ dev2 + mix1
+  (15/10, mã mới: VLM bỏ sót 1 dòng / 104 poster, hỏi lại được; sửa 3 lỗi soát thấy: chữ khách trên biển / huy hiệu bị giữ,
+  pill bị xoá trống, "50% Giảm" sai thứ tự); `final2` (32 ảnh, 32/32 xong, không lỗi chạy, VLM hỏi lại xin chữ 4 lần đều được).
+  Soát 32 poster: đa số đạt. Sửa tổng quát cuối: dòng VLM để trống trong `split` mà đứng cùng hàng cạnh dòng có chữ -> giữ trong
+  đơn vị (g18 "Giảm 50%" co 0,32). Còn (giới hạn đã biết, không vá theo ca): bảng nhiều cột (g08 lịch bơi), VLM coi phần nhỏ của
+  giá là rác (g14 "đ/thùng"), VLM bỏ cột giá của bảng (dev2 d05).
 
 ## Bước 3: gỡ chữ giun (Hi-SAM + LaMa) -- chuẩn hoá 15/10
 
@@ -191,9 +196,9 @@ riêng rồi GIỮ; CHO NỚI chữ vào nền trống cùng màu, không vượ
 - [x] `flux.SIZES` là nguồn DUY NHẤT các tỉ lệ (thêm 3:4); `tests/test_flux.py`: ~1 MP, bội 16, đúng tỉ lệ, khớp `brief.ORIENT`,
   tìm trọng số. Ép bf16 trong `Flux.load` (bỏ `check_dtypes` vá ở server); bỏ tham số chết `neg`; `generate` từ chối cỡ lệch 16.
 - Số đo (dev2 14/10, 73 nháp, 2x A30): vẽ trung vị 2,3 s, max 4,3 s; ~17 GB / card (docs/SERVER.md).
-- [ ] CHỜ NGƯỜI DÙNG: tỉ lệ lạ ở API -> âm thầm vẽ 1:1 (`server.app.run_job`) -- đề xuất trả 422 kèm danh sách tỉ lệ.
-- [ ] Lỗi lúc vẽ (hết VRAM...) -> phiên bản "error", không thử lại (cùng câu hỏi D1).
-- [ ] Không lọc nội dung ảnh (mã BFL có bộ lọc NSFW / bản quyền cho Mistral, không dùng với klein) -- cần khi mở API công khai?
+- [x] Tỉ lệ lạ ở API -> 422 `invalid_aspect_ratio` (4 tỉ lệ của app). Chốt 15/10, docs/API.md.
+- [x] Lỗi lúc vẽ -> phiên bản lỗi mã `draw_failed` (không thử lại). Chốt 15/10 cùng D1.
+- [x] Không lọc nội dung (người dùng chốt 15/10: không cần).
 
 ## Chặng C -- Thi
 
@@ -224,7 +229,8 @@ prompt theo chuẩn BFL (ngoặc kép lồng trong câu tả vật mang chữ) -
   hoa; nay vai "step".
 - [ ] Ngưỡng `texts.USER_COVERAGE` 0,5 / `PRESENT` 0,8 / `SNAP` 0,85 / `evidence.FUZZY` 0,8 chọn theo suy luận -> chỉnh theo số
   đo brief_probe.
-- [ ] CHỜ NGƯỜI DÙNG -- API cho đội test (họ đổ form user vào API khi chốt dự án):
+- [x] API cho đội test (chốt 15/10, docs/API.md, tests/test_api.py): (a) trường ngoài loại form bỏ qua + báo `ignored_fields`;
+  (b) loại lạ -> 422 `invalid_category`; (d) LLM hỏng -> `llm_failed`; (e) bắt buộc như app, ghi trong docs/API.md. Cũ:
   (a) trường không thuộc loại form bị bỏ âm thầm (`server.app.form_of`); (b) `category` lạ âm thầm thành promo; (c) [ĐÃ SỬA 15/10 ở bước 2: `flux.SIZES` thêm 3:4 = 864x1152, test khớp với `ORIENT`]; (d) LLM hỏng hẳn sau 3 lần -> job "error" (= D1);
   (e) thiếu trường bắt buộc khi không có prompt -> chặn, cần ghi trong tài liệu API.
 
@@ -300,10 +306,11 @@ P2 -- nhỏ / hiếm:
 
 ## AUDIT 14/10 khuya: bước vẽ + máy chủ
 
-- [ ] D1. (P0) Một lỗi bất kỳ trong trạm thiết kế (VLM JSON hỏng / quá giờ, Hi-SAM, LaMa, Chromium) -> phiên bản "error", không
+- [x] D1. (P0) Một lỗi bất kỳ trong trạm thiết kế (VLM JSON hỏng / quá giờ, Hi-SAM, LaMa, Chromium) -> phiên bản "error", không
   có poster; yêu cầu MỘT ảnh thì cả job lỗi. Không có đường lui -- cần chọn: thử lại không cache, rồi trả gì (nháp? báo lỗi rõ?).
 - [x] D2. (P0) Brief (LLM) hỏng JSON / quá giờ -> cả job lỗi, không thử lại (cache + `max_retries=1` chỉ cho lỗi mạng).
-  15/10: `llm.json_call` gọi lại tối đa 2 lần; hết lượt vẫn lỗi job (chưa chọn trả gì -- cùng câu hỏi D1).
+  15/10: `llm.json_call` gọi lại tối đa 2 lần; hết lượt vẫn lỗi job. CHỐT 15/10: lỗi có mã theo bước (`llm_failed`,
+  `draw_failed`, `vlm_failed`, `vlm_empty_plan`...), không trả nháp thay poster; ảnh debug vẫn tải được (docs/API.md).
 - [ ] D3. (P1) Cache brief theo nội dung: cùng yêu cầu -> cùng brief mãi mãi (kể cả brief lỗi đã lưu); muốn "thử lại" phải xoá
   ~/.cache/textfix. Khi demo: bấm tạo lại cùng yêu cầu ra y hệt brief.
 - [ ] D4. (P2) Không có bước kiểm FLUX đã vẽ đủ câu / có vẽ sản phẩm khách tải (giới hạn model; chỉ ghi "missing").
