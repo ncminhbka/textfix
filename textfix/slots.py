@@ -24,7 +24,7 @@ LEADER_H = 0.3       # hàng chấm nối: cột có nét cao <= 0.3 cao dòng l
 GAP_MIN = 0.4        # khoảng không nét quanh chỗ OCR chèn dấu cách kép: >= 0.4 cao dòng (khoảng cách từ thường ~0.3)
 ICON_W = 1.6         # khối kẹp giữa hai khoảng không ở chỗ cắt, rộng <= 1.6 cao dòng = icon giữa hai mục
 INK_DE = 25.0        # điểm nét = khác màu nền khung dòng (trung vị viền khung) >= 25 ΔE
-from .color import hex_lab as _hex_lab, lab as _lab  # noqa: E402,F401
+from .color import lab as _lab  # noqa: E402
 
 
 def _png(im) -> bytes:
@@ -336,13 +336,11 @@ def build(draft: np.ndarray, ink: np.ndarray, product: bool = False) -> dict:
         l["ocr_box"] = list(l["box"])
     I: list = []
     from . import geo
-    glog, glog2, masks = [], [], {}
+    glog, masks = [], {}
     if geo.ENABLED:
         L, I, glog, masks = _geo_lines(L, I, draft, A, ink, [])
-        if geo.RUNS:
-            L, glog2 = geo.runs(L)
     L, olog = _orphans(L, draft, ink, masks)
-    L, glog = _renumber(L, [], [], glog + glog2 + olog)
+    L, glog = _renumber(L, [], [], glog + olog)
     for l in L:
         l["shape"] = shape_of(l)
     _rows(L)
@@ -671,13 +669,6 @@ def _look(m: dict) -> str:
         out.append("thick-thin strokes (serif / script)")
     if m.get("caps"):
         out.append("all caps")
-    n = len(m.get("ocr") or "")
-    if n >= 4 and m.get("size") and abs(m.get("angle") or 0) < 2:
-        # ĐỘ RỘNG CHỮ: rộng khung / (số ký tự x cỡ) -- so với độ rộng font ở danh mục (08/10: designer chọn font rộng hơn chữ nháp
-        # -> phải co ~0.66, phần lớn lỗi too_small); OCR sai chữ nhưng số ký tự gần đúng
-        w = (m["box"][2] - m["box"][0]) / (n * m["size"])
-        # (08/10 lượt 4: ghi kèm tên font cùng độ rộng thì VLM đổi sang chữ condensed cả chỗ nháp là chữ thường -- bỏ)
-        out.append(f"letters ~{w:.2f}em wide" + (" (condensed)" if w < 0.45 else " (wide)" if w > 0.62 else ""))
     e = m.get("effect")
     if e:
         if abs(e.get("dx", 0)) + abs(e.get("dy", 0)) >= 1:

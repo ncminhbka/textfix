@@ -3,8 +3,8 @@
 từ lệnh html cũ (fill.from_ops), phần còn lại chạy như trạm thiết kế: fill.resolve -> fill.layout -> nền -> render_units ->
 check_units -> autofix_units. -> ảnh  nháp | poster cũ | đơn vị chữ (màu = tập) | poster mới  + rows.json (số đo).
 
-  python -X utf8 scripts/lonly_replay.py <thư mục ra> accept2h:accept2 mix1c:mix1      # <thư mục trong output>[:<tên manifest>]
-  python -X utf8 scripts/lonly_replay.py <thư mục ra> accept2h:accept2 --only e05,h02
+  python -X utf8 scripts/replay.py <thư mục ra> accept2h:accept2 mix1c:mix1      # <thư mục trong output>[:<tên manifest>]
+  python -X utf8 scripts/replay.py <thư mục ra> accept2h:accept2 --only e05,h02
 Dòng lấy từ plan đã lưu (id khớp với lệnh cũ); độ dày nét (độ đậm mặc định) đo lại như slots.lines. Nền LaMa gỡ mọi dòng: tính
 MỘT lần mỗi poster (sau bước dời khung khỏi icon / chấm đầu dòng), lưu ở <thư mục ra>/cache/ -- LaMa trên CPU ~10 s / poster.
 Mặt nạ nét chữ: <lượt chạy>/v0/ink.png; chưa có thì chạy Hi-SAM tại máy rồi lưu lại."""
@@ -18,6 +18,32 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, ".")
+
+
+def letter_em(font, text, upper):
+    """Thước đo cỡ (độc lập phiên bản mã): cao chữ cao nhất của câu theo HÌNH chữ "H" / "x" của font."""
+    import unicodedata
+    from fontTools.pens.boundsPen import BoundsPen
+    from fontTools.ttLib import TTFont
+    from textfix.fonts import CATALOG, FONTS_DIR
+    if font not in _EM:
+        try:
+            f = TTFont(str(FONTS_DIR / next(iter(CATALOG[font][3].values()))))
+            gs, cm, upm = f.getGlyphSet(), f.getBestCmap(), f["head"].unitsPerEm
+
+            def top(ch):
+                p = BoundsPen(gs)
+                gs[cm[ord(ch)]].draw(p)
+                return p.bounds[3] / upm
+            _EM[font] = (top("H"), top("x"))
+        except Exception:
+            _EM[font] = (0.72, 0.53)
+    base = [unicodedata.normalize("NFD", c)[0] for c in text if c.isalnum()]
+    tall = upper or any(c.isupper() or c.isdigit() or c in "bdfhkltgjpqy" for c in base)
+    return _EM[font][0 if tall else 1]
+
+
+_EM = {}
 from textfix import erase, fill, hisam, render, slots   # noqa: E402
 from textfix.compose import vlm as cvlm   # noqa: E402
 from textfix.browser import Browser   # noqa: E402
@@ -80,7 +106,7 @@ with Browser() as B:
             A = {"assign": P["assign"], "styles": P.get("style") or {}, "accent": P.get("accent") or []} if P.get("assign") \
                 else fill.from_ops(P, T)
             U, rlog, miss = fill.resolve(A, M, T)
-            U, llog = fill.layout(U, M, ink, A["styles"], A["accent"], T)
+            U, llog = fill.layout(U, M, ink, A["styles"], A["accent"], T, base=clean)
             elog = []
             base, mask = erase.settle(D, clean, ink, M, {"ops": U}, elog)
             poster, res, dlog = render.render_units(B.page, base, U, M)
@@ -121,11 +147,23 @@ with Browser() as B:
                     fs.setdefault(u["set"], []).append(round(rr["fs"] * (rr.get("sx") or 1), 1))
             uneven = {k: v for k, v in fs.items() if max(v) / max(0.1, min(v)) > 1.03}
             small = [(rr["id"], round(rr["shrink"], 2)) for rr in res if rr.get("shrink", 1) < 0.6]
-            rows.append({"set": setn, "id": cid, "errors": [e["type"] for e in errs], "sets": sorted(fs), "uneven": uneven,
-                         "small": small, "off": off, "missing": [T[k]["text"] for k in miss], "fill": [u["id"] for u in U if u["kind"] == "text" and not u["clients"]],
+            # CỠ GIỐNG NHÁP: cao chữ dựng (cỡ cuối x cao chữ của font) / cao nét nháp đo được (lines: h_cap) -- 1 là đúng cỡ nháp
+            fit = []
+            for rr in res:
+                u = next((u for u in U if u["id"] == rr["unit"]), None)
+                hs = [(l.get("ink") or {}).get("h_cap") for l in (u or {}).get("Ls") or [] if not (l.get("path") or l.get("vertical"))]
+                if u and hs and all(hs) and rr.get("size"):
+                    em = letter_em(u["font"], " ".join(u["text"]), "text-transform:uppercase" in u.get("css", ""))
+                    fit.append(round(rr["size"] * em / float(np.median(hs)), 3))
+            rows.append({"set": setn, "id": cid, "errors": [e["type"] for e in errs], "errs": errs, "sets": sorted(fs), "uneven": uneven,
+                         "small": small, "fit": fit, "off": off, "missing": [T[k]["text"] for k in miss], "fill": [u["id"] for u in U if u["kind"] == "text" and not u["clients"]],
                          "log": glog + rlog + llog + dlog + flog})
             print(f"{setn} {cid}: tập {len(fs)}, lệch {uneven or '-'}, co<0.6 {small or '-'}, chữ lệch câu {off or '-'}, thiếu {rows[-1]['missing'] or '-'}, "
                   f"lỗi {rows[-1]['errors'] or '-'}", flush=True)
 json.dump(rows, open(f"{a.out}/rows.json", "w", encoding="utf-8"), ensure_ascii=False, indent=0)
 print(f"{len(rows)} poster; tập lệch cỡ: {sum(bool(r['uneven']) for r in rows)}; chữ lệch câu khách: {sum(len(r['off']) for r in rows)}; "
       f"phần tử co < 0,6: {sum(len(r['small']) for r in rows)}; còn lỗi bộ kiểm: {sum(bool(r['errors']) for r in rows)}")
+fits = np.array([x for r in rows for x in r["fit"]])
+if len(fits):
+    print(f"cỡ so với nháp ({len(fits)} phần tử): trung vị {np.median(fits):.2f}, lệch |log| trung vị {np.median(np.abs(np.log(fits))):.3f}, "
+          f"trong +-15%: {np.mean(np.abs(fits - 1) <= 0.15):.0%}, nhỏ hơn 0,8: {np.mean(fits < 0.8):.0%}")

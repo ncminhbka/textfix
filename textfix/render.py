@@ -18,6 +18,7 @@ import numpy as np
 
 OVERLAP = 0.1   # chồng nhau > 10% diện tích phần tử nhỏ hơn = lỗi báo cho vòng sửa
 CONDENSE = 0.85   # chữ dài hơn ô theo chiều ngang: nén ngang (scaleX) tới 0.85 TRƯỚC khi co cỡ -- chữ giữ chiều cao như nháp
+SET_FLOOR = 0.8   # tập cùng vai: mục mà CỠ phải co dưới 0,8 (sau khi đã nén ngang hết mức) rời tập, tự co riêng
 ROT_MIN = 2.0   # độ: dòng model vẽ nghiêng >= 2 độ thì dựng nghiêng đúng góc đó (dưới 2 độ là nhiễu đo của OCR)
 EMOJI = re.compile("[\U0001F000-\U0001FAFF️‍]")   # emoji (không có font emoji trong bộ font)
 def to_data_uri(arr: np.ndarray) -> str:
@@ -465,12 +466,6 @@ def _el(u: dict, e: dict, k: int, force: list, size: float | None = None, sx: fl
         force.append(f"#c>.{cls},#c>.{cls} *{{color:{fix['color']}!important;-webkit-text-fill-color:{fix['color']}!important;"
                      + (f"text-shadow:0 0 .08em {fix['halo']},0 0 .16em {fix['halo']},0 0 .3em {fix['halo']}!important;" if fix.get("halo") else "")
                      + "}")
-    elif fix.get("outline"):   # chữ cỡ TIÊU ĐỀ chìm nền: GIỮ màu chữ, thêm viền + quầng màu tương phản
-        cls = f"fx{k}"
-        c = fix["outline"]
-        ring = ",".join(f"{dx:.3f}em {dy:.3f}em 0 {c}" for dx, dy in
-                        ((.04, 0), (-.04, 0), (0, .04), (0, -.04), (.028, .028), (-.028, .028), (.028, -.028), (-.028, -.028)))
-        force.append(f"#c>.{cls},#c>.{cls} *{{text-shadow:{ring},0 0 .18em {c}!important;}}")
     return {"id": e["id"], "box": (fix.get("boxes") or {}).get(e["id"]) or e["box"], "html": h,
             "style": u["css"] + ";" + JUST[u["align"]] + ";" + ("" if e["path"] else "white-space:nowrap;"),
             "size": size or e["size"], "color": u.get("color") or "#161616", "font": family(u["font"]),
@@ -502,12 +497,29 @@ def render_units(page, plate: np.ndarray, U: list[dict], M: dict, floor: float |
         if not us:
             continue
         nat = {r["id"]: r for r in run([_el(u, e, 0, [], fit="grow") for u in us for e in u["els"]], [])}
-        ratio = min(1.0, min((e["box"][2] - e["box"][0]) / max(1.0, nat[e["id"]]["box"][2] - nat[e["id"]]["box"][0])
-                             for u in us for e in u["els"] if e["id"] in nat))
-        sx = max(CONDENSE, ratio)
+        # sức chứa từng mục: bề NGANG (nén ngang cứu được) và bề CAO của khối nhiều dòng (chỉ co cỡ cứu được -- cỡ đúng nháp làm khối
+        # hai dòng trong vòng tròn cao hơn khung, 15/10 v01)
+        def fit_of(u):
+            rw = min([(e["box"][2] - e["box"][0]) / max(1.0, nat[e["id"]]["box"][2] - nat[e["id"]]["box"][0])
+                      for e in u["els"] if e["id"] in nat] or [1.0])
+            rh = min([(e["box"][3] - e["box"][1]) / max(1.0, nat[e["id"]]["ink"][3] - nat[e["id"]]["ink"][1])
+                      for e in u["els"] if e["id"] in nat and e["multi"]] or [1.0])
+            # (hệ số cỡ: đủ thấp cho bề cao -- 0,98: đo ở cỡ gốc, co xong làm tròn px lệch 1-2 px; phần ngang còn thiếu nén tới
+            # CONDENSE; rw)
+            return min(1.0, 0.98 * rh if rh < 1 else 1.0, rw / CONDENSE), rw
+        fits = {u["id"]: fit_of(u) for u in us}
+        # SÀN CỦA TẬP: mục phải co cỡ dưới SET_FLOOR không kéo cả tập co theo -- nó rời tập, tự co riêng
+        out = [u for u in us if fits[u["id"]][0] < SET_FLOOR]
+        if out and len(out) < len(us):
+            log.append(f"tập '{name}': {[u['id'] for u in out]} phải co cỡ dưới {SET_FLOOR} -> rời tập, tự co riêng")
+            for u in out:
+                u["set"] = None
+            us = [u for u in us if u not in out]
+        kk = min(fits[u["id"]][0] for u in us)
+        sx = max(CONDENSE, min(1.0, min(fits[u["id"]][1] for u in us) / kk))   # nén ngang ở cỡ chung
         for u in us:
-            fitset[u["id"]] = (ratio / sx, sx if sx < 0.999 else None)
-        log.append(f"tập '{name}': mục chật nhất cần {ratio:.2f} -> cả tập nén {sx:.2f}, cỡ x{ratio / sx:.2f}")
+            fitset[u["id"]] = (kk, sx if sx < 0.999 else None)
+        log.append(f"tập '{name}': cả tập nén ngang {sx:.2f}, cỡ x{kk:.2f} (theo mục chật nhất)")
     els, force, k = [], [], 0
     for u in T:
         for e in u["els"]:
@@ -546,19 +558,15 @@ def render_units(page, plate: np.ndarray, U: list[dict], M: dict, floor: float |
                     r["low"], r["px_based"] = q["low"], q.get("px_based", False)
                     break
     pal = list(dict.fromkeys(r["fg"] for r in res if r.get("fg") and not bad(r)))   # màu chữ đọc tốt trên poster
-    fs_med = float(np.median([r["fs"] for r in res if r.get("fs")] or [0]))
     for r in res:
         if bad(r):
-            r["recolor"] = _recolor(r, bg, color0.get(r["id"]), pal, big=bool(r.get("fs") and (r["fs"] >= OUTLINE_HEAD * fs_med or r["fs"] >= OUTLINE_ABS * min(W, H))),
-                                    drawn=drawn.get(r["id"]))
+            r["recolor"] = _recolor(r, bg, color0.get(r["id"]), pal, drawn=drawn.get(r["id"]))
     return img, res, log
 
 
-OUTLINE_HEAD = 1.4   # chữ cỡ >= 1.4 lần cỡ trung vị poster (tiêu đề) chìm nền: giữ màu + viền thay vì đổi màu ...
-OUTLINE_ABS = 0.06   # ... hoặc cỡ >= 6% cạnh ngắn ảnh (poster nhiều chữ to: trung vị cao -- dev3 g12 114 / 95 px)
 CONTRAST_PX = 2.0   # điểm nền mà màu chữ trên đó có tỉ lệ tương phản WCAG < 2 = chữ chìm (chữ thân cần >= 4.5, chữ lớn >= 3)
 CONTRAST_FRAC = 0.25   # > 25% nền sau khối chữ là điểm chìm = lỗi low_contrast (khối chữ không có bóng / viền)
-DRAWN_RGB = 120.0   # màu chữ cách màu đo trên nét nháp <= 120 (khoảng cách RGB) = đúng màu nháp vẽ (fill.DIFF_RGB)
+DRAWN_RGB = 120.0   # màu chữ cách màu đo trên nét nháp <= 120 (khoảng cách RGB) = đúng màu nháp vẽ
 
 
 def _lum(rgb: np.ndarray) -> np.ndarray:
@@ -606,8 +614,7 @@ def _rgb(c: str | None) -> tuple | None:
     return tuple(float(m.group(i)) for i in (1, 2, 3)) if m else None
 
 
-def _recolor(r: dict, bg: np.ndarray, draft_color: str | None, pal: list | None = None, big: bool = False,
-             drawn: str | None = None) -> dict | None:
+def _recolor(r: dict, bg: np.ndarray, draft_color: str | None, pal: list | None = None, drawn: str | None = None) -> dict | None:
     """Chữ chìm nền: màu chữ thay thế, ưu tiên HỢP BẢNG MÀU (08/10 replay: tiêu đề vàng nhạt -> gần đen, đọc được nhưng thô) --
     màu các chữ đọc tốt khác trên poster, rồi màu nháp tối / sáng dần, cuối cùng trắng / gần đen: màu ĐẦU TIÊN có <= 10% nền
     chìm (tương phản WCAG < CONTRAST_PX). Không màu nào đạt: màu ít chìm nhất + quầng màu ngược độ sáng."""
@@ -618,18 +625,13 @@ def _recolor(r: dict, bg: np.ndarray, draft_color: str | None, pal: list | None 
         return None
     lb = _lum(bg[y0:y1, x0:x1].reshape(-1, 3))
     # MÀU NHÁP VẼ (màu chữ gần màu đo trên nét nháp): nháp là chuẩn thẩm mỹ -> giữ màu, chỉ thêm quầng màu ngược độ sáng cho đọc
-    # được (14/10 mix1: chữ trắng trên pill pastel / nền xanh nhạt bị đổi sang xanh đen, khác hẳn nháp -- x04, v06, f02, f05).
-    # Màu khác hẳn màu nháp (VLM tả sai màu) -> chọn màu như dưới.
+    # được, ở MỌI cỡ (14/10 mix1: chữ trắng trên pill pastel bị đổi sang xanh đen -- x04, v06, f02, f05; viền tiêu đề cũ phá chữ
+    # neon). Màu khác hẳn màu nháp -> chọn màu như dưới.
     fg, dc = _rgb(r.get("fg")), _rgb(drawn)
-    if not big and fg and dc and float(np.linalg.norm(np.subtract(fg, dc))) <= DRAWN_RGB:
+    if fg and dc and float(np.linalg.norm(np.subtract(fg, dc))) <= DRAWN_RGB:
         lf = float(_lum(np.array([fg], np.float32))[0])
         return {"color": "#%02x%02x%02x" % tuple(int(round(v)) for v in fg), "frac": None,
                 "halo": "rgba(0,0,0,.55)" if lf > 0.4 else "rgba(255,255,255,.6)"}
-    if big and _rgb(r.get("fg")):
-        # TIÊU ĐỀ: đổi hẳn màu làm mất thiết kế (09/10 dev3 g11: cam viền trắng -> nâu ô liu, g12: trắng -> xám) -> giữ màu chữ,
-        # viền màu ngược độ sáng của chữ (chữ sáng viền tối, chữ tối viền trắng) -- như nháp hay vẽ chữ có viền
-        lf = float(_lum(np.array([_rgb(r["fg"])], np.float32))[0])
-        return {"outline": "#161616" if lf > 0.35 else "#ffffff", "frac": None}
     cands = list(pal or [])   # màu chữ khác của chính poster trước: hợp bảng màu (màu nháp pha đen ra xám đục -- 08/10 h08_s1)
     d = _rgb(draft_color) or _rgb(r.get("fg"))
     if d:
@@ -690,7 +692,6 @@ def check_units(U: list[dict], res: list | None, shrink_min: float | None = 0.7)
     """LỖI KHÁCH QUAN sau khi dựng (không cần mắt): nội dung hai đơn vị chồng nhau, tràn khung dù đã co tới sàn, phải co dưới
     shrink_min (chữ dài so với chỗ nháp vẽ; mục của tập kéo theo không tính), chữ chìm nền."""
     errs = []
-    fixed = {u["id"]: u.get("fix") or {} for u in U}
     res = res or []
     for i, a in enumerate(res):
         for b in res[i + 1:]:
@@ -706,7 +707,7 @@ def check_units(U: list[dict], res: list | None, shrink_min: float | None = 0.7)
             errs.append({"type": "overflow", "ops": [a["id"]], "px": round(a["over"])})
         elif shrink_min and a.get("shrink", 1) < shrink_min and not a.get("evened"):
             errs.append({"type": "too_small", "ops": [a["id"]], "shrink": round(a["shrink"], 2)})
-        if (a.get("low") or 0) > (0.6 if a.get("px_based") else CONTRAST_FRAC) and not fixed.get(a["unit"], {}).get("outline"):
+        if (a.get("low") or 0) > (0.6 if a.get("px_based") else CONTRAST_FRAC):
             errs.append({"type": "low_contrast", "ops": [a["id"]], "frac": a["low"], "color": a.get("fg")})
     return errs
 
@@ -728,7 +729,7 @@ def _trim(A: list, B: list) -> list | None:
 
 def autofix_units(U: list[dict], errs: list[dict], res: list[dict]) -> tuple[list[dict], list[str]]:
     """SỬA LỖI NẶNG BẰNG CODE: chữ và kiểu giữ nguyên, chỉ sửa phần đo được.
-      low_contrast    -- màu tương phản nhất với nền thật ({màu nháp, trắng, gần đen}), nền loang thêm quầng; tiêu đề: viền
+      low_contrast    -- đúng màu nháp: giữ màu + quầng; khác màu nháp: màu tương phản nhất (bảng màu poster, màu nháp đậm / nhạt dần)
       overflow        -- nén ngang sâu hơn (0.75)
       content_overlap -- phần tử thò khỏi khung nhiều hơn (hoặc khung to hơn) cắt khung một phía cho hết giao, co trong khung mới;
                          phần tử xoay / theo đường cong không cắt.
@@ -744,12 +745,8 @@ def autofix_units(U: list[dict], errs: list[dict], res: list[dict]) -> tuple[lis
         t, ids = e["type"], [i for i in e.get("ops") or [] if i in el]
         if t == "low_contrast" and ids and (R.get(ids[0]) or {}).get("recolor"):
             rc = R[ids[0]]["recolor"]
-            if rc.get("outline"):
-                fx(ids[0]).update(outline=rc["outline"])
-                log.append(f"{ids[0]}: chìm nền {e['frac']} -> giữ màu, viền {rc['outline']}")
-            else:
-                fx(ids[0]).update(color=rc["color"], halo=rc["halo"])
-                log.append(f"{ids[0]}: chìm nền {e['frac']} -> màu {rc['color']}" + (" + quầng" if rc["halo"] else ""))
+            fx(ids[0]).update(color=rc["color"], halo=rc["halo"])
+            log.append(f"{ids[0]}: chìm nền {e['frac']} -> màu {rc['color']}" + (" + quầng" if rc["halo"] else ""))
         elif t == "overflow" and ids and not el[ids[0]][0].get("set"):
             fx(ids[0])["condense"] = 0.75
             log.append(f"{ids[0]}: tràn {e['px']}px -> nén ngang tới 0.75")

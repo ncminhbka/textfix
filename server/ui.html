@@ -400,7 +400,7 @@ async function drawOcr() {
     if (!LAYERS[k]) continue;
     for (const m of pl.slots[k] || []) {
       const [x0, y0, x1, y1] = m.box, o = owner[m.id];
-      const tip = `${m.id}` + (m.ocr !== undefined ? ` · OCR: "${m.ocr}"` : "") + (m.size ? ` · ~${Math.round(m.size)}px` : "") + (m.typo ? " · " + m.typo.map(t => t.kind).join(", ") : "") + (m.orphan ? " · NÉT OCR KHÔNG ĐỌC (VLM quyết)" : m.missed ? " · dòng OCR sót" : "") + (m.dot ? " · có chấm đầu dòng" : "") +
+      const tip = `${m.id}` + (m.ocr !== undefined ? ` · OCR: "${m.ocr}"` : "") + (m.size ? ` · ~${Math.round(m.size)}px` : "") + (m.typo ? " · " + m.typo.map(t => t.kind).join(", ") : "") + (m.orphan ? " · NÉT OCR KHÔNG ĐỌC (VLM quyết)" : m.missed ? " · dòng OCR sót" : "") + (((m.ink || {}).ornament || []).length ? " · trang trí đầu dòng giữ nguyên" : "") +
         (o ? ` → ${o.id} ${o.kind}${o.html ? `: ${plainHtml(o.html)}` : ""}` : " → (chưa có lệnh)");
       const tilt = !m.path && m.poly && Math.abs(m.angle || 0) >= 2;
       g += tilt ? `<g><title>${esc(tip)}</title><polygon points="${m.poly.map(q => q[0] + "," + q[1]).join(" ")}" fill="${KCOL[k]}22" stroke="#f08c00"
@@ -420,6 +420,17 @@ async function drawOcr() {
     }
   }
   svg.innerHTML = g;
+}
+function fatesDebug(pl) {   // số phận mỗi dòng (compose/fate.py): viết / giữ / xoá + lý do
+  const F = pl.fates || {};
+  const ids = Object.keys(F);
+  if (!ids.length) return "";
+  const by = {}; (pl.slots.L || []).forEach(m => by[m.id] = m);
+  const col = {text: "#2b8a3e", keep: "#1c7ed6", skip: "#868e96"}, name = {text: "viết", keep: "giữ", skip: "xoá"};
+  const rows = ids.map(id => { const f = F[id], m = by[id] || {};
+    return `<tr><td class="role">${id}</td><td>${esc(m.ocr || "")}</td><td style="color:${col[f.fate] || "#000"};font-weight:700">${name[f.fate] || f.fate}</td>
+      <td class="role">${esc(f.unit || "—")}</td><td class="muted">${esc(f.why || "")}</td></tr>`; }).join("");
+  return `<h3>Số phận dòng</h3><table><tr><th>dòng</th><th>OCR đọc</th><th>số phận</th><th>đơn vị</th><th>vì sao</th></tr>${rows}</table>`;
 }
 function typoDebug(pl) {   // chữ khó: mã nhận ra thế nào -> VLM / mã quyết gì -> dựng thế nào
   const owner = {}, R = {};
@@ -444,8 +455,9 @@ function eraseDebug(P, pl) {   // Hi-SAM + LaMa: số đo, từng dòng được
   const kept = new Set(e.kept || []), orph = e.orphans || [];
   const orows = orph.map(id => { const m = by[id] || {}, o = owner[id] || {};
     return `<tr><td class="role">${id}</td><td>${esc(m.ocr || "(không đọc được)")}</td><td class="role">${esc(o.kind || "giữ (VLM không nhắc)")}</td><td class="muted">${esc(o.why || "")}</td></tr>`; }).join("");
-  const special = (pl.slots.L || []).filter(m => m.dot || m.lead_icon || m.printed).map(m =>
-    `${m.id}${m.dot ? " · chấm đầu dòng (Hi-SAM gỡ cùng chữ: VLM được viết •)" : ""}${m.lead_icon ? " · khung đã dời khỏi icon đứng trước" : ""}${m.printed ? " · chữ in trên sản phẩm" : ""}`);
+  const orn = m => ((m.ink || {}).ornament || []).length;
+  const special = (pl.slots.L || []).filter(m => orn(m) || m.lead_icon || m.printed).map(m =>
+    `${m.id}${orn(m) ? " · trang trí đầu dòng (không gỡ, giữ điểm ảnh nháp)" : ""}${m.lead_icon ? " · khung đã dời khỏi icon đứng trước" : ""}${m.printed ? " · chữ in trên sản phẩm" : ""}`);
   return `<h3>Gỡ chữ: ① Hi-SAM → ② mặt nạ → ③ LaMa → ④ nền dựng</h3>
     <div class="timing"><span>Hi-SAM: <b>${t.net_chu ?? "?"}</b> s</span><span>LaMa: <b>${t.go_chu ?? "?"}</b> s</span>
       <span>nét chữ: <b>${e.ink_pct ?? "?"}</b>% ảnh</span><span>mặt nạ gỡ: <b>${e.mask_pct ?? "?"}</b>% ảnh</span>
@@ -471,6 +483,7 @@ function renderDebug(P, pl) {
   const errs = (pl.errors || []).map(e => `<li>${esc(e.type)} ${esc((e.ops || []).join(","))} ${esc(JSON.stringify(Object.fromEntries(Object.entries(e).filter(([k]) => !["type", "ops"].includes(k)))))}</li>`).join("");
   const errs1 = (pl.errors_first || []).length;
   el.innerHTML = `<h3>OCR nháp → ô → lệnh</h3><table><tr><th>ô</th><th>OCR đọc</th><th>cỡ</th><th>lệnh</th><th>viết</th></tr>${rows}</table>
+    ${fatesDebug(pl)}
     ${typoDebug(pl)}
     ${eraseDebug(P, pl)}
     <h3>Đơn vị chữ (${(pl.ops || []).length}): VLM ghép câu ↔ dòng, code chép nguyên văn · kiểu theo vai</h3><p class="mono">${esc(JSON.stringify(pl.style || {}))}</p>

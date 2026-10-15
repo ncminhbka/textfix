@@ -153,7 +153,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     if A.get("dropped"):
         llog.append(f"bỏ mục ghép sai khuôn: {A['dropped']}")
     U, rlog0, miss_i = fill.resolve(A, M, texts)
-    U, llay = fill.layout(U, M, ink, A["styles"], A["accent"], texts)
+    U, llay = fill.layout(U, M, ink, A["styles"], A["accent"], texts, base=clean)
     log = geo_log + llog + rlog0 + llay
     if product:
         log.insert(0, f"ảnh sản phẩm khách tải: chữ đọc được {d.get('product_ocr') or []} -> dòng nháp là chữ in trên sản phẩm {printed}")

@@ -17,7 +17,6 @@ import os
 import numpy as np
 
 ENABLED = os.environ.get("TEXTFIX_GEO", "on") == "on"   # bật khi B3 (mô tả) + B4 (dựng theo đường chân) xong
-RUNS = os.environ.get("TEXTFIX_GEO_RUNS", "off") == "on"   # gộp "một dòng nhiều cỡ": TẮT -- nhóm này dựng theo ô OCR rời đã ổn
                                                              # (12/10: 7 / 8 nháp g08-g10, g14), gộp lại chỉ thêm rủi ro
 
 NPATH = 16           # số điểm đường chân ghi vào ô
@@ -415,45 +414,6 @@ def circle_of(cen: np.ndarray, h: float) -> dict:
     ang = np.degrees(np.unwrap(np.arctan2(cen[:, 1] - cy, cen[:, 0] - cx)))
     return {"curve": {"cx": round(cx, 1), "cy": round(cy, 1), "r": round(r - h / 2 if up else r + h / 2, 1),
                       "a0": round(float(ang[0]), 1), "a1": round(float(ang[-1]), 1), "up": up}}
-
-
-def runs(L: list[dict]) -> tuple[list[dict], list[str]]:
-    """Gộp các ô liền nhau CÙNG đường chân, cỡ lệch nhiều thành MỘT ô có runs (một dòng nhiều cỡ)."""
-    log = []
-    cand = [l for l in L if l.get("base") is not None and abs(l.get("angle") or 0) < 2 and not l.get("path")]
-    cand.sort(key=lambda l: l["box"][0])
-    groups, used = [], set()
-    for a in cand:
-        if id(a) in used:
-            continue
-        g = [a]
-        while True:
-            last = g[-1]
-            nxt = None
-            for b in cand:
-                if id(b) in used or b in g or b["box"][0] < last["box"][0]:
-                    continue
-                big = max(last["size"], b["size"])
-                if abs(b["base"] - last["base"]) <= RUN_BASE * big and 0 <= b["box"][0] - last["box"][2] <= RUN_GAP * big \
-                        and (nxt is None or b["box"][0] < nxt["box"][0]):
-                    nxt = b
-            if nxt is None:
-                break
-            g.append(nxt)
-        sz = [x["size"] for x in g]
-        if len(g) >= 2 and max(sz) >= RUN_SIZE * min(sz) and max(sz) >= RUN_MIN:
-            groups.append(g)
-            used |= {id(x) for x in g}
-    for g in groups:
-        first = g[0]
-        box = [min(x["box"][0] for x in g), min(x["box"][1] for x in g), max(x["box"][2] for x in g), max(x["box"][3] for x in g)]
-        new = {**first, "box": box, "ocr_box": box, "ocr": " ".join(x["ocr"] for x in g), "size": max(x["size"] for x in g),
-               "runs": [{"text": x["ocr"], "size": round(x["size"], 1), "x0": round(x["box"][0]), "x1": round(x["box"][2])} for x in g],
-               "poly": [[box[0], box[1]], [box[2], box[1]], [box[2], box[3]], [box[0], box[3]]]}
-        gone = {id(x) for x in g[1:]}
-        L = [new if x is first else x for x in L if id(x) not in gone]
-        log.append(f"một dòng nhiều cỡ: {[x['id'] for x in g]} -> {first['id']} {[r['size'] for r in new['runs']]}")
-    return L, log
 
 
 def region_line(mask: np.ndarray, pad: float) -> dict | None:

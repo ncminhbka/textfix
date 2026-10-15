@@ -47,7 +47,7 @@ Mã
 - [ ] Tờ ảnh ghép và trang HTML của `batch_report`: thêm cột nét chữ / nền.
 - [x] `audit.flags`: cờ cho dòng `orphan`, dòng gỡ theo lõi khung, lệnh gộp bị tách.
 - [x] `scripts/erase_bench.py` theo đường mới. *(tuỳ chọn `--recheck` cho số vô lý > 100%: chưa dùng được)*
-- [x] `scripts/lonly_replay.py` theo đường mới (dựng lại tại máy với lệnh VLM đã lưu).
+- [x] `scripts/replay.py` theo đường mới (dựng lại tại máy với lệnh VLM đã lưu).
 - [x] Xoá khỏi `main`: `cleanup.py`, `overlay.py`, `textmask.py`, `flux.erase`, 12 script chỉ đường cũ dùng.
 - [x] Dọn mã trước chặng B (14/10): bỏ khỏi `slots.py` lời dặn cũ `SYSTEM` / `SYSTEM_V1` / `REVIEW` / `JUDGE` (có danh mục icon), `describe`, vòng VLM duyệt (`review`, `judge`, `salvage`, `accept`; nhánh cũ giữ), các luật ô vỏ / ô chi tiết / icon / hàng sao của `validate`; bộ dựng chỉ còn lệnh chữ; M chỉ còn dòng L; bỏ `flux.edit`, `geo.band_arc`, `ship.pack_dir`, `scripts/probe.py`. `slots.py` 2.021 -> ~1.150 dòng. Lời dặn VLM: 0 chữ "icon". Kiểm: 12 poster dựng lại trước / sau giống nhau (11 giống từng điểm ảnh, 1 lệch một dòng chấm, nhìn như nhau); chạy trọn trạm thiết kế với VLM giả; dựng UI.
 - [x] Bỏ bộ icon: `textfix/icons.py`, `assets/icons/` (1.544 SVG), `scripts/fetch_icons.py`, phần `<i-icon>` / `<i-stars>` của `render.expand`, mục đếm icon trong `check_server.py`. Bộ dựng gỡ thẻ icon / sao / svg khỏi chữ và ghi log thay vì vẽ.
@@ -82,7 +82,7 @@ khai; không cắt câu khách, chữ dài thì co; nháp thiếu câu thì ch�
 - [x] Hình theo nháp: khung = nét Hi-SAM, cỡ = trung vị cỡ đo, màu theo dòng, lề theo mép nét, ngắt dòng theo tỉ lệ ký tự OCR; dòng khác cỡ / mẩu cùng hàng.
 - [x] Tập cùng vai (cỡ nháp đôi một lệch <= 1,25): một cỡ, một màu, một lề, một mức nén theo mục chật nhất (`render.render_units`).
 - [x] Bỏ: html VLM, `_guard`, `validate`, `marks_rule`, `split_far`, `fix_ops`, nhóm / cân cỡ / căn lề của render, `_pack_lists`, `_list_order`.
-- [x] UI debug: đơn vị chữ (màu = tập), bảng câu ↔ dòng, cỡ / co từng phần tử; `scripts/lonly_replay.py` dựng lại plan cũ qua `fill.from_ops`.
+- [x] UI debug: đơn vị chữ (màu = tập), bảng câu ↔ dòng, cỡ / co từng phần tử; `scripts/replay.py` dựng lại plan cũ qua `fill.from_ops`.
 - [x] Dựng lại tại máy 30 accept2 + 35 mix1c (lệnh VLM cũ qua `fill.from_ops`): 0 tập lệch cỡ, chữ đúng nguyên văn; câu thiếu đều đã thiếu trong lệnh cũ.
 - [x] VLM không nhận chữ OCR (người dùng 14/10); số bước đặt lại theo thứ tự khách; `engine.design` chạy trơn với VLM giả.
 - [x] Sau mix1 / dev2 (14/10 tối): ngắt dòng theo bề rộng nét + font thật, không ép câu thiếu, giữ màu nháp, brief không làm mất
@@ -130,11 +130,12 @@ riêng rồi GIỮ; CHO NỚI chữ vào nền trống cùng màu, không vượ
     cung trên vành con dấu (bánh pía, con dấu cà phê), số dòng khớp không đổi.
   - Giới hạn đã biết: từ 3 chữ có chân ("gẽl") cả hai nguồn cùng lệch; chữ vòng con dấu.
   - Giữ (đo, chưa thay được bằng nét): `_split_gaps`, `_stacked`, nhánh bảng của `_xy_order` (đo lại ở chặng 3 với VLM thật).
-- [~] Chặng 2: `erase` dùng đúng mảnh nét của dòng.
+- [x] Chặng 2: `erase` dùng đúng mảnh nét của dòng.
   - [x] Bước 1 (nét): mảnh nét SỞ HỮU (`lines.ink.own`, cùng luật bước đo dòng: mỗi mảnh một dòng) + nét không ai sở hữu trong lõi
     dòng; bỏ `WHOLE`. Mảnh trang trí đầu dòng (`lines.lead`) và mảnh của dòng giữ không bao giờ vào mặt nạ.
   - [x] Gỡ `_lead_dots`, cờ `dot`, `bullet` của VLM + mục 6 lời dặn: chấm đầu dòng ở lại là điểm ảnh nháp.
-  - [ ] Số đo `erase_bench` (accept2 + mix1c, 65 nháp): mốc / bản mới -- đang chạy.
+  - [x] `erase_bench` (accept2 + mix1c, 65 nháp): ký tự sót 54 -> 49, poster còn sót 3 -> 3, mặt nạ TB 14,92 -> 14,74%, đổi
+    ngoài vùng chữ 0 -> 0. Mặt nạ to hơn ở đúng một nháp (f02: chữ vòm vàng gỡ trọn mảnh + quầng; nền sạch).
   - [ ] Xuất quầng theo dòng làm hiệu ứng: làm ở chặng 4 (nơi dùng).
 - [~] Chặng 3: VLM + số phận dòng (`textfix/compose/`; `lonly.py` -> `compose/vlm.py`).
   - [x] `compose/fate.py`: MỘT bảng số phận (`plan.json` "fates": text / keep / skip + lý do). Luật: VLM ghép câu -> text; chữ in
@@ -144,10 +145,32 @@ riêng rồi GIỮ; CHO NỚI chữ vào nền trống cùng màu, không vượ
     gọi lại khi ghép rỗng cũng `fresh=True` (sửa A1: bộ đệm trả lại đúng câu cũ).
   - [x] Lời dặn: bỏ 3b ("cụm từ lấy từ câu khách khác" -> lặp chữ), bỏ "màu phổ biến nhất", mục 4 định nghĩa ba số phận.
   - [x] `tests/test_fate.py` (VLM giả). [ ] Kiểm thật: lượt máy chủ (máy cá nhân không có khoá VLM).
-- [ ] Chặng 4: `compose/assign.py` + `layout.py` (cỡ theo font thật + câu khách, nới chỗ, sàn tập, màu một nguồn, hiệu ứng / font
-  đối chiếu số đo).
-  + câu chia vào các đoạn (`runs`) / hàng theo sức chứa, mỗi đoạn cỡ + hoa / thường của nó, chung đường chân; bỏ `split` của VLM.
-- [ ] Chặng 5: render gọn (một cách dựng theo path, bỏ `OUTLINE_*`, gỡ mã chết).
+- [~] Chặng 4: bố cục (đang trong `fill.py`; tách `compose/layout.py` ở chặng 6).
+  - [x] Cỡ theo FONT THẬT: `fonts.heights` (cao chữ hoa / thường đo trên hình "H" / "x"; danh mục chênh 0,59-0,86 / 0,30-0,73
+    em, hằng chung cũ 0,72 / 0,53); `fill.letter_em` chọn hoa / thường theo CÂU KHÁCH; cỡ = `ink.h_cap` / letter_em.
+  - [x] Nới khung vào nền trống (`fill.room`): theo lề, cột cùng màu nền trong khung (ΔE <= 15, >= 97% điểm), không vào vùng dòng
+    khác, trần 1,25.
+  - [x] Sàn tập (`render.SET_FLOOR` 0,8): mục phải co cỡ dưới 0,8 rời tập, tự co riêng (sửa A5).
+  - [x] Hàng nhiều cỡ: `_rows` không gộp dòng cùng hàng lệch cỡ >= 1,4 (d03 "Giảm" | "30%" | "tất" mỗi dòng cỡ của nó);
+    `accent` của VLM bỏ "scale" (chỉ màu).
+  - [x] Màu: hai trong ba nguồn đồng ý (`fill.pick_color`: đo khung / lõi nét / VLM theo vai); soát 14 dòng ba nguồn lệch: VLM sai
+    6, lõi nét 7, đo khung 3, bỏ phiếu 1. Bỏ `DIFF_RGB` + màu VLM ghi đè.
+  - [x] Dựng lại (`scripts/replay.py`, accept2h + mix1c, 65 nháp, câu trả lời VLM đã lưu; mốc = mã chặng 1-3):
+    | | mốc | chặng 4-5 |
+    |---|---|---|
+    | cỡ chữ dựng / chữ nháp, trung vị | 0,86 | 0,95 |
+    | trong +-15% cỡ nháp | 53% | 79% |
+    | nhỏ hơn 0,8 cỡ nháp | 30% | 14% |
+    | phần tử co < 0,6 | 13 | 13 |
+    | poster còn lỗi bộ kiểm | 15 | 15 |
+    Lỗi theo loại: too_small 17 -> 19 (tính so với cỡ khởi điểm, nay to và đúng nháp hơn), tràn 1 -> 3 (v01 hai nhãn trong vòng
+    tròn tràn dọc 2 px -- còn sửa; v03 có từ trước), chồng 1 -> 3 (chữ đúng cỡ nháp, dòng phụ sát tiêu đề thư pháp t03, t02).
+  - [ ] Hiệu ứng đối chiếu quầng đo được (B2), độ đậm / có chân đối chiếu nét (B1).
+- [~] Chặng 5: render.
+  - [x] Tương phản: đúng màu nháp -> giữ màu + quầng ở mọi cỡ; bỏ `OUTLINE_HEAD / OUTLINE_ABS` và nhánh viền tiêu đề.
+  - [x] Gỡ `geo.runs / RUNS` (thay bằng `lines.rows`), nhãn bề rộng chữ trong bảng dòng gửi VLM (`slots._look`).
+  - [x] Tập: sức chứa theo cả bề cao của khối nhiều dòng (cỡ đúng nháp làm chữ hai dòng trong vòng tròn tràn dọc, v01);
+    nén ngang tính ở cỡ chung. `room` chừa khe 0,2 cao dòng khi chạm vật.
 - [ ] Chặng 6: UI / plan.json / replay / tài liệu; lượt máy chủ dev2 + mix1; `final2` một lần.
 
 ## Bước 3: gỡ chữ giun (Hi-SAM + LaMa) -- chuẩn hoá 15/10
@@ -246,26 +269,31 @@ P0 -- có thể làm hỏng cả poster khi demo:
   thần TextFix ("đứng trên pill hoặc cùng cấp chữ khác mà xoá thì khoảng trống rất xấu"). Hướng: hỏi lại VLM riêng các dòng đó.
 - [ ] A4. Chữ lấp VLM viết cho dòng thừa chỉ chặn SỐ (`fill.resolve`), không chặn lời hứa / ưu đãi ("Miễn phí", "Giảm giá"), tên,
   độ dài -- brief có `AI_BAN_WORDS` / `AI_MAX_CHARS` nhưng chặng B không dùng. Ví dụ chữ lấp vô nghĩa: dev2 f05 "Ngân hàng".
-- [ ] A5. Chữ co tới sàn 12 px (1,2% cạnh ngắn) vẫn xuất: `too_small` không phải lỗi nặng, vòng sửa không đụng (dev2 d26v0 tập liên
+- [x] A5. Chữ co tới sàn 12 px (1,2% cạnh ngắn) vẫn xuất: `too_small` không phải lỗi nặng, vòng sửa không đụng (dev2 d26v0 tập liên
   hệ co 0,13; d14v1 0,22). Chính sách "không cắt chữ" -> cần đường khác: thêm dòng khi khung đủ cao / nới khung trong vùng trống.
+  -> 15/10 chặng 4: sàn tập `render.SET_FLOOR` (mục phải co cỡ dưới 0,8 rời tập) + nới khung vào nền trống (`fill.room`).
 - [ ] A6. Chữ trên sản phẩm khách tải bị VLM viết đè (dev2 d13) -- xem mục "CHỮ TRÊN SẢN PHẨM" ở chặng B.
 
 P1 -- xấu thấy rõ, gặp thường:
 - [ ] B1. KIỂU CHỮ VLM tả sai (~8 / 35 poster mix1: font hẹp / đậm hơn nháp, serif thành không chân). Một nguồn: `slots._look` đo
   "letters ~0.40em wide (condensed)" từ SỐ KÝ TỰ OCR của chữ giun (chữ giun hẹp hơn chữ thật ~11%) -> nhãn "condensed" đẩy VLM
   chọn font hẹp. Code không đối chiếu lớp font VLM chọn (serif / sans) với độ tương phản nét đo được (`stroke_contrast`).
+  -> 15/10: bỏ nhãn bề rộng khỏi bảng dòng. Còn: đối chiếu serif / sans với tương phản nét (chờ lượt máy chủ mới).
 - [ ] B2. HIỆU ỨNG CSS VLM tả (viền / bóng / quầng) không đối chiếu với quầng đo được trên nháp (`l["effect"]`): dev2 d06 neon
   thành chữ mảnh, d38 viền tối.
-- [ ] B3. `render.OUTLINE_HEAD / OUTLINE_ABS`: tiêu đề chìm nền -> thêm viền đen, phá hiệu ứng (d06). Nên theo luật chung "đúng
+- [x] B3. `render.OUTLINE_HEAD / OUTLINE_ABS`: tiêu đề chìm nền -> thêm viền đen, phá hiệu ứng (d06). Nên theo luật chung "đúng
   màu nháp thì giữ màu + quầng".
+  -> 15/10 chặng 5: bỏ `OUTLINE_*`; đúng màu nháp -> giữ màu + quầng ở mọi cỡ.
 - [ ] B4. Lời dặn VLM THỪA so với code: mục 2 bắt VLM chia "split" nhưng code đã bỏ split trong một đơn vị (ngắt theo bề rộng
   nét), chỉ còn dùng mảnh rỗng + câu ghi nhiều mục. Mục 3(b) "lấy cụm từ câu khách khác" sinh lặp nội dung (mix1 m03 tiêu đề hai
   lần). Màu: lời dặn "màu phổ biến nhất" nhưng code đổi sang màu đo từng dòng khi lệch > 120 -- hai nguồn sự thật.
+  -> 15/10 chặng 3-4: bỏ 3(b) và "màu phổ biến nhất"; màu = hai trong ba nguồn (`fill.pick_color`). Còn: `split` mục 2.
 - [ ] B5. Chồng lấn giữa hai đơn vị còn lại sau vòng sửa (dev2 d37v0, d14v1); tràn khung còn sau nén 0,75 (mix1 v03): chữ thò khỏi
   pill.
 
 P2 -- nhỏ / hiếm:
-- [ ] C1. `accent` (từ nhấn to / khác màu) không kiểm tỉ lệ, có thể phóng quá khung.
+- [x] C1. `accent` (từ nhấn to / khác màu) không kiểm tỉ lệ, có thể phóng quá khung.
+  -> 15/10 chặng 4: `accent` bỏ `scale` (chỉ màu); nhấn bằng cỡ = dòng riêng có cỡ đo (`lines.rows`, `fill._rows`).
 - [ ] C2. Luật theo ký tự OCR: thêm ngoặc kép cho câu trích, đặt lại số bước trong dòng ("1. ...").
 - [ ] C3. Kiểu theo VAI ép một kiểu cho cả vai dù nháp vẽ hai kiểu (khi LLM gộp hai loại vào một vai -- mix1 t02).
 - [ ] C4. "missing" của VLM và của code khác nhau chỉ ghi nhật ký.

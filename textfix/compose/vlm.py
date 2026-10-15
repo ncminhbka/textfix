@@ -66,8 +66,8 @@ code narrows a tight line by itself), "weight" (100-900, as heavy as the draft: 
 (CSS only for outlines, shadows, glows or gradient / metallic letters, as strong as the draft: text-shadow, -webkit-text-stroke, \
 background-clip:text with a linear-gradient) and "color" (#hex fill of the letters as drawn -- white letters with a black \
 outline are "#ffffff" with the outline in "effect").
-ACCENT (optional): a word or number the draft draws bigger or in another color inside one client text ("50%" in "Giảm 50% hôm \
-nay"): {"client": "T#", "text": "<exact substring>", "scale": 1.6, "color": "#hex"}.
+ACCENT (optional): a word or number the draft draws in another color inside one client text ("50%" in "Giảm 50% hôm nay"): \
+{"client": "T#", "text": "<exact substring>", "color": "#hex"}. Sizes come from the draft: never give one.
 
 IMAGES: DRAFT = what the model drew. SLOTS = the draft with every text line marked (red L#). BASE = the draft with the old \
 letters wiped. The list after the images gives each line's machine reading of the garbled letters (often wrong, but numbers, \
