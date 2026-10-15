@@ -3,7 +3,7 @@
 #   bash docker/build.sh                 # -> image textfix:demo
 #   TAG=textfix:demo2 bash docker/build.sh
 # Gom một thư mục build riêng (không gửi output/, bench/ ... cho docker): code + trọng số Hi-SAM / LaMa CHÉP từ
-# ~/persistent-data + Chromium, rồi docker build. Thư mục build để lại cho lần sau (xoá: rm -rf "$CTX").
+# ~/persistent-data + Chromium, rồi docker build. Thư mục build để lại: lần sau chỉ chép lại code (xoá hẳn: rm -rf "$CTX").
 set -euo pipefail
 cd "$(dirname "$0")/.."
 REPO="$PWD"
@@ -37,17 +37,20 @@ if where.startswith(os.path.expanduser("~")):
 EOF
 
 echo "2. Gom thư mục build: $CTX"
-rm -rf "$CTX"
-mkdir -p "$CTX/app/scripts" "$CTX/models/hisam/Hi-SAM/pretrained_checkpoint" "$CTX/models/lama"
+# code: luôn chép mới; trọng số + Chromium (1,9 GB): chỉ chép khi chưa có hoặc khác kích thước (build lại sau khi sửa code nhanh)
+same() { [ -f "$2" ] && [ "$(stat -c %s "$1")" = "$(stat -c %s "$2")" ]; }
+put() { same "$1" "$2" || { mkdir -p "$(dirname "$2")"; cp "$1" "$2"; echo "   chép $(basename "$2")"; }; }
+rm -rf "$CTX/app"
+mkdir -p "$CTX/app/scripts"
 cp -r textfix server assets docker "$CTX/app/"
 cp scripts/check_server.py scripts/start_server.sh "$CTX/app/scripts/"
 cp docker/Dockerfile "$CTX/Dockerfile"
 cp docker/requirements.txt "$CTX/requirements.txt"
-cp -r "$HISAM/Hi-SAM/hi_sam" "$CTX/models/hisam/Hi-SAM/"
-cp "$HISAM/Hi-SAM/pretrained_checkpoint/sam_vit_l_0b3195.pth" "$CTX/models/hisam/Hi-SAM/pretrained_checkpoint/"
-cp "$HISAM/sam_tss_l_textseg.pth" "$CTX/models/hisam/"
-cp "$LAMA" "$CTX/models/lama/big-lama.pt"
-cp -a "$CHROME_DIR" "$CTX/chrome-linux64"
+rm -rf "$CTX/models/hisam/Hi-SAM/hi_sam" && mkdir -p "$CTX/models/hisam/Hi-SAM" && cp -r "$HISAM/Hi-SAM/hi_sam" "$CTX/models/hisam/Hi-SAM/"
+put "$HISAM/Hi-SAM/pretrained_checkpoint/sam_vit_l_0b3195.pth" "$CTX/models/hisam/Hi-SAM/pretrained_checkpoint/sam_vit_l_0b3195.pth"
+put "$HISAM/sam_tss_l_textseg.pth" "$CTX/models/hisam/sam_tss_l_textseg.pth"
+put "$LAMA" "$CTX/models/lama/big-lama.pt"
+same "$CHROME_DIR/chrome" "$CTX/chrome-linux64/chrome" || { rm -rf "$CTX/chrome-linux64"; cp -a "$CHROME_DIR" "$CTX/chrome-linux64"; echo "   chép Chromium"; }
 find "$CTX" -name __pycache__ -prune -exec rm -rf {} +
 du -sh "$CTX"
 
