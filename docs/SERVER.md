@@ -1,5 +1,7 @@
 # Chạy TextFix trên máy chủ GPU (2× A30, JupyterLab)
 
+Deploy khi FLUX / LLM / VLM ở máy khác (máy ra được internet): [DEPLOY.md](DEPLOY.md).
+
 Máy chủ **chỉ cài được bằng pip**: không ra HuggingFace, không apt, không tải được Chromium của Playwright. Mọi thứ khác phải có
 sẵn trong repo hoặc `~/persistent-data`. Mọi lệnh gõ trong Terminal của JupyterLab.
 

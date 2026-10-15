@@ -35,6 +35,7 @@ python scripts/dev_batch.py bench/accept2.json   # chạy một tập qua máy c
 Chạy trên máy chủ bằng ô notebook (`%run scripts/...`): kết quả tự gói thành zip < 24 MB và tự tải về ([docs/SERVER.md](docs/SERVER.md)).
 
 API cho người gọi (6 loại form, mã lỗi, debug từng bước): [docs/API.md](docs/API.md).
+Deploy khi FLUX / LLM / VLM ở máy khác: [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Cấu trúc
 

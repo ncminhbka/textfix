@@ -50,3 +50,19 @@ def test_valid_input_reaches_model_check(body):
 def test_fields_of_other_categories_are_reported():
     req = server.GenerateRequest(category="promo", discount="20%", job_position="Pha chế", foo="x")
     assert server.ignored_fields(req) == ["job_position", "foo"]
+
+
+def test_remote_flux_draw_threads_follow_concurrency_not_gpus(monkeypatch):
+    # FLUX ở máy khác: số luồng vẽ = số nháp gửi cùng lúc, chia vòng lên card (chỉ để chạy Hi-SAM / LaMa); không card: CPU
+    monkeypatch.setenv("TEXTFIX_FLUX_URL", "https://api.test/v1/flux-2-klein-9b")
+    monkeypatch.setenv("TEXTFIX_FLUX_CONCURRENCY", "3")
+    monkeypatch.setattr(server, "gpu_list", lambda: [0, 1])
+    assert server.draw_devices() == ["cuda:0", "cuda:1", "cuda:0"]
+    monkeypatch.setattr(server, "gpu_list", lambda: [])
+    assert server.draw_devices() == ["cpu"] * 3
+
+
+def test_flux_moderation_has_its_own_code():
+    from textfix.flux_api import FluxError, FluxModerated
+    assert server.draw_error(FluxModerated("Content Moderated"), "FLUX vẽ nháp")["code"] == "draw_moderated"
+    assert server.draw_error(FluxError("HTTP 500"), "FLUX vẽ nháp")["code"] == "draw_failed"

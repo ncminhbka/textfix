@@ -96,7 +96,8 @@ Mọi lỗi có **mã cố định**:
 | `code` | Bước hỏng |
 |---|---|
 | `llm_failed` | LLM viết prompt / danh sách chữ (gọi LLM lỗi, trả sai khuôn sau khi thử lại) |
-| `draw_failed` | FLUX vẽ nháp / Hi-SAM tìm nét |
+| `draw_failed` | FLUX vẽ nháp / Hi-SAM tìm nét (`stage` cho biết bước nào) |
+| `draw_moderated` | máy FLUX lọc nội dung (bộ lọc của nhà cung cấp FLUX, TextFix không lọc) |
 | `lines_failed` | đo dòng chữ |
 | `erase_failed` | gỡ chữ (LaMa) |
 | `vlm_failed` | gọi VLM ghép câu (lỗi gọi / sai khuôn) |

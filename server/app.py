@@ -13,6 +13,8 @@ API (giao diện server/ui.html dùng job + hỏi tiến độ; script dùng /ap
 Ảnh từng lần chạy: output/runs/<run_id>/ (request.json, brief.json, v<i>/draft.png, ink.png (mặt nạ nét chữ Hi-SAM), ink.jpg (nét + mặt nạ gỡ chữ), base.jpg (nền đã gỡ chữ),
 slots.jpg, poster.png, poster_first.png (lượt đầu, khi vòng sửa đổi), steps.jpg, ops.jpg, plan.json), phục vụ ở /outputs/<run_id>/...
 
+FLUX ở máy khác (TEXTFIX_FLUX_URL, docs/DEPLOY.md): không nạp FLUX; số luồng VẼ = TEXTFIX_FLUX_CONCURRENCY, card chỉ chạy Hi-SAM / LaMa.
+
 DÂY CHUYỀN: mỗi card GPU một FLUX + một luồng VẼ (chung hàng đợi, TEXTFIX_GPUS="0,1" mặc định mọi card), nhóm luồng THIẾT KẾ
 (TEXTFIX_DESIGN_WORKERS=4, mỗi luồng một Chromium -- Playwright đồng bộ không chạy trong vòng lặp asyncio). Nhiều phiên bản / nhiều
 yêu cầu gối đầu nhau; job ghi kết quả từng phiên bản ngay khi xong (UI hiện dần).
@@ -96,6 +98,12 @@ class ApiError(Exception):
 
 def failure(code: str, stage: str, e: BaseException | None = None) -> dict:
     return {"code": code, "stage": stage, "message": f"{type(e).__name__}: {e}" if e else code}
+
+
+def draw_error(e: BaseException, stage: str) -> dict:
+    """Trạm VẼ hỏng: máy FLUX lọc nội dung -> draw_moderated (không phải lỗi của TextFix), còn lại draw_failed."""
+    from textfix.flux_api import FluxModerated
+    return failure("draw_moderated" if isinstance(e, FluxModerated) else "draw_failed", stage, e)
 
 
 # bước thiết kế (engine.design báo qua progress) -> mã lỗi khi hỏng ở bước đó
@@ -210,32 +218,51 @@ LOAD_LOCK = threading.Lock()   # nạp FLUX từng card một (xem gpu_worker)
 
 
 def gpu_list() -> list[int]:
+    """Card dùng được: TEXTFIX_GPUS="0,1" nếu đặt, không thì mọi card máy thấy (không card nào: [])."""
     env = os.environ.get("TEXTFIX_GPUS")
     if env:
         return [int(x) for x in env.split(",") if x.strip()]
     import torch
-    return list(range(max(1, torch.cuda.device_count())))
+    return list(range(torch.cuda.device_count())) if torch.cuda.is_available() else []
 
 
-def gpu_worker(k: int, args, ready: threading.Event) -> None:
-    """Luồng của card k: nạp FLUX lên card đó, rồi lấy việc VẼ từ hàng đợi chung."""
-    import torch
+def draw_devices() -> list[str]:
+    """Mỗi phần tử = một luồng VẼ và thiết bị của nó.
+    FLUX tại chỗ: mỗi card một luồng (mỗi card một FLUX). FLUX ở máy khác (TEXTFIX_FLUX_URL): số luồng = số nháp gửi sang
+    cùng lúc (TEXTFIX_FLUX_CONCURRENCY), chia vòng lên các card chỉ để chạy Hi-SAM / LaMa; không card nào thì chạy CPU."""
+    from textfix import flux_api
+    gpus = [f"cuda:{k}" for k in gpu_list()]
+    if not flux_api.enabled():
+        if not gpus:
+            raise RuntimeError("không thấy GPU để nạp FLUX (hoặc đặt TEXTFIX_FLUX_URL để gọi FLUX ở máy khác)")
+        return gpus
+    return [(gpus or ["cpu"])[i % max(1, len(gpus))] for i in range(flux_api.concurrency())]
+
+
+def gpu_worker(dev: str, args, ready: threading.Event) -> None:
+    """Một luồng VẼ trên thiết bị dev: có FLUX (tại chỗ: nạp lên card; ở xa: bộ gọi API) + Hi-SAM, lấy việc từ hàng đợi chung."""
+    from textfix import flux_api, hisam
     from textfix.engine import draw
-    from textfix.flux import Flux
     try:
-        torch.cuda.set_device(k)
-        # NẠP LẦN LƯỢT từng card: transformers đổi kiểu số mặc định của torch (toàn cục, không theo luồng) khi nạp bộ mã hoá
-        # chữ -> hai card nạp cùng lúc giẫm nhau, một bản lẫn float32 (Flux.load còn ép bf16 lần nữa). Vẽ thì vẫn song song.
-        with LOAD_LOCK:
-            t0 = time.time()
-            F = Flux(args.model, steps=args.steps, weights_dir=args.weights_dir, device=f"cuda:{k}").load()
-            from textfix import hisam
-            hisam.load(f"cuda:{k}")   # nét chữ: cùng card, nạp sẵn để lỗi thiếu tệp lộ ra lúc khởi động
+        if flux_api.enabled():
+            F = flux_api.RemoteFlux(device=dev)
+            with LOAD_LOCK:
+                hisam.load(dev)   # nét chữ: nạp sẵn để lỗi thiếu tệp lộ ra lúc khởi động
+        else:
+            import torch
+            from textfix.flux import Flux
+            torch.cuda.set_device(dev)
+            # NẠP LẦN LƯỢT từng card: transformers đổi kiểu số mặc định của torch (toàn cục, không theo luồng) khi nạp bộ mã
+            # hoá chữ -> hai card nạp cùng lúc giẫm nhau, một bản lẫn float32 (Flux.load còn ép bf16 lần nữa). Vẽ vẫn song song.
+            with LOAD_LOCK:
+                t0 = time.time()
+                F = Flux(args.model, steps=args.steps, weights_dir=args.weights_dir, device=dev).load()
+                hisam.load(dev)
+            log.info("FLUX %s sẵn sàng (%.0fs, %.1f GB)", dev, time.time() - t0, torch.cuda.memory_allocated(dev) / 2 ** 30)
         STATE["flux"].append(F)
-        log.info("FLUX cuda:%d sẵn sàng (%.0fs, %.1f GB)", k, time.time() - t0, torch.cuda.memory_allocated(k) / 2 ** 30)
     except BaseException as e:   # gồm SystemExit của flux2.util khi thiếu trọng số
-        STATE["error"] = f"cuda:{k}: {type(e).__name__}: {e}"
-        log.error("KHÔNG nạp được FLUX cuda:%d: %s", k, traceback.format_exc())
+        STATE["error"] = f"{dev}: {type(e).__name__}: {e}"
+        log.error("KHÔNG nạp được luồng vẽ %s: %s", dev, traceback.format_exc())
         return
     finally:
         ready.set()
@@ -246,7 +273,7 @@ def gpu_worker(k: int, args, ready: threading.Event) -> None:
         v, fut = task["v"], task["fut"]
         if fut.set_running_or_notify_cancel():
             try:
-                v["gpu"] = k
+                v["gpu"] = dev
                 fut.set_result(draw(F, task["B"], task["W"], task["H"], v["seed"], task["product"], progress=task["progress"]))
             except BaseException as e:
                 fut.set_exception(e)
@@ -269,18 +296,18 @@ def init_models(args) -> None:
     STATE["llm"] = json_call(m["llm"]["url"], m["llm"]["model"], m["llm"]["key_env"], tag="brief", schema=SCHEMA)
     STATE["vlm"] = json_call(m["vlm"]["url"], m["vlm"]["model"], m["vlm"]["key_env"], tag="designer")
     _engine()(np.full((64, 256, 3), 255, np.uint8))   # làm nóng OCR (lần đầu nạp mô hình ONNX)
-    gpus = gpu_list()
+    devs = draw_devices()
     evs = []
-    for k in gpus:
+    for i, dev in enumerate(devs):
         ev = threading.Event()
-        threading.Thread(target=gpu_worker, args=(k, args, ev), name=f"gpu{k}", daemon=True).start()
+        threading.Thread(target=gpu_worker, args=(dev, args, ev), name=f"draw{i}", daemon=True).start()
         evs.append(ev)
     for ev in evs:
         ev.wait()
     if not STATE["flux"]:
-        raise RuntimeError(STATE["error"] or "không nạp được FLUX trên card nào")
-    log.info("Sẵn sàng: %d card vẽ %s, %d luồng thiết kế; LLM %s | VLM %s", len(STATE["flux"]), gpus, DESIGN._max_workers,
-             m["llm"]["model"], m["vlm"]["model"])
+        raise RuntimeError(STATE["error"] or "không nạp được luồng vẽ nào")
+    log.info("Sẵn sàng: %d luồng vẽ %s (FLUX %s), %d luồng thiết kế; LLM %s | VLM %s", len(STATE["flux"]), devs,
+             STATE["flux"][0].info()["model"], DESIGN._max_workers, m["llm"]["model"], m["vlm"]["model"])
 
 
 def page():
@@ -416,7 +443,7 @@ def run_job(job: dict, req: GenerateRequest) -> dict:
         def drawn(f, v=v, Bv=Bv, vd=vd, i=i):
             if f.exception() is not None:
                 log.error("%s v%d lỗi vẽ: %s", run_id, i, f.exception())
-                v.update(status="error", stage="", error=failure("draw_failed", "FLUX vẽ nháp", f.exception()))
+                v.update(status="error", stage="", error=draw_error(f.exception(), v.get("stage") or "FLUX vẽ nháp"))
                 return
             if plain:
                 futs.append(DESIGN.submit(image_one, job, v, f.result(), Bv, vd, f"outputs/{run_id}/v{i}", t_llm))

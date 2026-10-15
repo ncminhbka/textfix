@@ -11,7 +11,7 @@ phải có sẵn trong repo hoặc ~/persistent-data. Kiểm:
   0. thư mục (repo, ~/persistent-data có gì)                4. tài nguyên trong repo (font, icon Lucide, flux2)
   1. gói pip so với requirements.txt -> in MỘT lệnh pip       5. Chromium (zip trong persistent-data, thư viện hệ thống thiếu)
   2. GPU                                                       6. OCR (RapidOCR, mô hình ONNX nằm trong gói pip)
-  3. trọng số FLUX.2-klein distill + base, VAE, bộ mã hoá chữ  7. LLM / VLM nội bộ: danh sách model, JSON, NHIỀU ẢNH; 8. cổng
+  3. FLUX: trọng số tại chỗ, HOẶC máy FLUX ở xa (TEXTFIX_FLUX_URL)  7. LLM / VLM nội bộ: danh sách model, JSON, NHIỀU ẢNH; 8. cổng
 Mã thoát 0 = đủ chạy; 1 = có mục LỖI (đọc dòng "SỬA:").
 """
 
@@ -180,6 +180,15 @@ def check_chrome(data: Path | None, fix: bool) -> None:
             bad(f"có {z} nhưng chưa giải nén", "python scripts/check_server.py --fix")
             return
     if exe is None:
+        try:   # máy ra được internet (docs/DEPLOY.md): Chromium của `playwright install chromium`
+            from textfix.browser import Browser as Reader
+            with Reader() as R:
+                R.page.set_content("<p style='font-size:40px'>Ệ Ợ Ữ</p>")
+                R.page.screenshot()
+            ok("Playwright mở được Chromium của chính nó (playwright install chromium)")
+            return
+        except Exception:
+            pass
         bad("không thấy Chromium nào (máy chủ không tải được bản của Playwright)",
             "chép chrome-linux64.zip (Chrome for Testing, cùng đời với bản playwright) vào ~/persistent-data rồi chạy --fix")
         return
@@ -296,66 +305,8 @@ def check_models(no_call: bool) -> None:
 
 
 # ---------------------------------------------------------------------------------------------------- main
-def main() -> int:
-    for s in (sys.stdout, sys.stderr):
-        if hasattr(s, "reconfigure"):
-            s.reconfigure(encoding="utf-8", line_buffering=True)   # in ngay từng dòng (kể cả qua | tee)
-    # image notebook đặt libcuda lệch driver (thư mục .../compat) lên đầu LD_LIBRARY_PATH (lỗi 803 ngày 01/10): bộ nạp đọc biến
-    # này lúc tiến trình khởi động -> bỏ compat rồi tự chạy lại (giống scripts/start_server.sh)
-    ld = os.environ.get("LD_LIBRARY_PATH", "")
-    if "/compat" in ld:
-        os.environ["LD_LIBRARY_PATH"] = ":".join(p for p in ld.split(":") if "/compat" not in p)
-        os.execv(sys.executable, [sys.executable, *sys.argv])
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--weights-dir", default=os.environ.get("TEXTFIX_WEIGHTS"))
-    ap.add_argument("--port", type=int, default=int(os.environ.get("TEXTFIX_PORT", "8088")))
-    ap.add_argument("--no-call", action="store_true", help="không gọi thử LLM / VLM")
-    ap.add_argument("--fix", action="store_true", help="giải nén Chromium trong persistent-data, ghi PLAYWRIGHT_CHROME_PATH vào .env")
-    a = ap.parse_args()
-    os.environ.setdefault("TEXTFIX_LLM_TIMEOUT", "300")      # lời gọi LLM / VLM treo thì báo lỗi sau 120 s, không đơ mãi
-    os.environ.setdefault("HF_HUB_OFFLINE", "1")          # không ra HuggingFace: đừng treo chờ mạng
-    os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-    from textfix.config import load_env
-    load_env()
-
-    print("0. Thư mục")
-    print(f"  repo: {ROOT}")
-    if HOME / "work" not in ROOT.parents:
-        warn(f"repo không nằm trong {HOME / 'work'} (quy ước máy chủ) -- vẫn chạy được")
-    ok("có .env (biến đã export vẫn thắng)") if (ROOT / ".env").exists() else print("  (không có .env: dùng biến đã export, docs/SERVER.md mục 3)")
-    data = persistent()
-    if data is None:
-        bad("không thấy ~/persistent-data", "đặt TEXTFIX_DATA=<thư mục chứa model> hoặc tạo ~/persistent-data")
-    else:
-        print(f"  persistent-data: {data}")
-        for p in sorted(data.iterdir()):
-            print(f"    {p.name}{'/' if p.is_dir() else ''}  {dir_size(p) if p.is_dir() else gb(p.stat().st_size)}")
-        try:
-            u = shutil.disk_usage(data)
-            print(f"  ổ đĩa còn trống {gb(u.free)} / {gb(u.total)}")
-        except OSError:
-            pass
-
-    print("1. Gói pip (requirements.txt)")
-    print(f"  python {sys.version.split()[0]} ({sys.executable})")
-    check_requirements()
-
-    print("2. GPU")
-    print("  ... import torch", flush=True)
-    try:
-        import torch
-        print(f"  torch {torch.__version__}, CUDA {torch.version.cuda}")
-        n = torch.cuda.device_count() if torch.cuda.is_available() else 0
-        if n == 0:
-            bad(f"torch {torch.__version__} không thấy GPU", "torch phải là bản CUDA; kiểm tra nvidia-smi, LD_LIBRARY_PATH")
-        for i in range(n):
-            p = torch.cuda.get_device_properties(i)
-            free, tot = torch.cuda.mem_get_info(i)
-            ok(f"cuda:{i} {p.name} {gb(tot)}, đang trống {gb(free)}")
-    except Exception as e:
-        bad(f"không import được torch ({e})", "dùng môi trường Python đang chạy repo v3 (đã có torch CUDA)")
-
-    print("3. Trọng số FLUX.2-klein (distill + base)")
+def check_local_flux(a, data) -> None:
+    print("3. Trọng số FLUX.2-klein (distill + base) -- FLUX chạy tại chỗ")
     from textfix.flux import find_weights
     extra = [Path(os.path.expanduser(a.weights_dir))] if a.weights_dir else []
     if data:
@@ -379,6 +330,95 @@ def main() -> int:
     else:
         bad("không thấy text_encoder/config.json", "chép thư mục text_encoder/ (Qwen3-4B) của FLUX.2-klein")
 
+
+def check_remote_flux(no_call: bool) -> None:
+    """FLUX ở máy khác (textfix/flux_api.py): có địa chỉ + khoá; gọi thử một ảnh nhỏ (tốn một lượt vẽ) trừ khi --no-call."""
+    from textfix import flux_api
+    F = flux_api.RemoteFlux()
+    print(f"3. FLUX ở máy khác: {F.url} (gửi cùng lúc {flux_api.concurrency()}, safety_tolerance {F.safety})")
+    if F.url.rstrip("/").endswith("-preview"):
+        warn("điểm cuối -preview đổi model theo thời gian: cùng seed có thể ra ảnh khác -- nên dùng bản cố định")
+    if not F.key:
+        warn("chưa đặt TEXTFIX_FLUX_API_KEY (được, nếu máy FLUX không đòi khoá)")
+    if no_call:
+        return
+    try:
+        t0 = time.time()
+        img = F.generate('A red poster with the words "SALE 50%" in bold white letters', 512, 512, 1)
+        ok(f"FLUX vẽ thử được ảnh {img.shape[1]}x{img.shape[0]} trong {time.time() - t0:.1f} s")
+    except Exception as e:
+        bad(f"gọi FLUX lỗi ({e})", "kiểm TEXTFIX_FLUX_URL / TEXTFIX_FLUX_API_KEY, mạng tới máy FLUX")
+
+
+def main() -> int:
+    for s in (sys.stdout, sys.stderr):
+        if hasattr(s, "reconfigure"):
+            s.reconfigure(encoding="utf-8", line_buffering=True)   # in ngay từng dòng (kể cả qua | tee)
+    # image notebook đặt libcuda lệch driver (thư mục .../compat) lên đầu LD_LIBRARY_PATH (lỗi 803 ngày 01/10): bộ nạp đọc biến
+    # này lúc tiến trình khởi động -> bỏ compat rồi tự chạy lại (giống scripts/start_server.sh)
+    ld = os.environ.get("LD_LIBRARY_PATH", "")
+    if "/compat" in ld:
+        os.environ["LD_LIBRARY_PATH"] = ":".join(p for p in ld.split(":") if "/compat" not in p)
+        os.execv(sys.executable, [sys.executable, *sys.argv])
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--weights-dir", default=os.environ.get("TEXTFIX_WEIGHTS"))
+    ap.add_argument("--port", type=int, default=int(os.environ.get("TEXTFIX_PORT", "8088")))
+    ap.add_argument("--no-call", action="store_true", help="không gọi thử LLM / VLM / FLUX ở xa")
+    ap.add_argument("--fix", action="store_true", help="giải nén Chromium trong persistent-data, ghi PLAYWRIGHT_CHROME_PATH vào .env")
+    a = ap.parse_args()
+    os.environ.setdefault("TEXTFIX_LLM_TIMEOUT", "300")      # lời gọi LLM / VLM treo thì báo lỗi sau 120 s, không đơ mãi
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")          # không ra HuggingFace: đừng treo chờ mạng
+    os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+    from textfix.config import load_env
+    load_env()
+
+    print("0. Thư mục")
+    print(f"  repo: {ROOT}")
+    if HOME / "work" not in ROOT.parents:
+        warn(f"repo không nằm trong {HOME / 'work'} (quy ước máy chủ) -- vẫn chạy được")
+    ok("có .env (biến đã export vẫn thắng)") if (ROOT / ".env").exists() else print("  (không có .env: dùng biến đã export, docs/SERVER.md mục 3)")
+    from textfix import flux_api
+    remote = flux_api.enabled()
+    data = persistent()
+    if data is None:
+        (warn if remote else bad)("không thấy ~/persistent-data" + (" -- được, nếu đã đặt TEXTFIX_HISAM / TEXTFIX_LAMA" if remote else ""),
+                                  "đặt TEXTFIX_DATA=<thư mục chứa model> hoặc tạo ~/persistent-data")
+    else:
+        print(f"  persistent-data: {data}")
+        for p in sorted(data.iterdir()):
+            print(f"    {p.name}{'/' if p.is_dir() else ''}  {dir_size(p) if p.is_dir() else gb(p.stat().st_size)}")
+        try:
+            u = shutil.disk_usage(data)
+            print(f"  ổ đĩa còn trống {gb(u.free)} / {gb(u.total)}")
+        except OSError:
+            pass
+
+    print("1. Gói pip (requirements.txt)")
+    print(f"  python {sys.version.split()[0]} ({sys.executable})")
+    check_requirements()
+
+    print("2. GPU")
+    print("  ... import torch", flush=True)
+    try:
+        import torch
+        print(f"  torch {torch.__version__}, CUDA {torch.version.cuda}")
+        n = torch.cuda.device_count() if torch.cuda.is_available() else 0
+        if n == 0 and remote:
+            warn("không thấy GPU: Hi-SAM + LaMa sẽ chạy CPU (mỗi poster chậm thêm vài giây)")
+        elif n == 0:
+            bad(f"torch {torch.__version__} không thấy GPU", "torch phải là bản CUDA; kiểm tra nvidia-smi, LD_LIBRARY_PATH")
+        for i in range(n):
+            p = torch.cuda.get_device_properties(i)
+            free, tot = torch.cuda.mem_get_info(i)
+            ok(f"cuda:{i} {p.name} {gb(tot)}, đang trống {gb(free)}")
+    except Exception as e:
+        bad(f"không import được torch ({e})", "dùng môi trường Python đang chạy repo v3 (đã có torch CUDA)")
+
+    if remote:
+        check_remote_flux(a.no_call)
+    else:
+        check_local_flux(a, data)
+
     print("3b. Model gỡ chữ: Hi-SAM (tìm nét chữ) + LaMa (vẽ lại nền) -- BẮT BUỘC từ 14/10")
     from textfix import erase, hisam
     lost = hisam.missing()
@@ -393,12 +433,12 @@ def main() -> int:
     print("4. Tài nguyên trong repo")
     nf = len(list((ROOT / "assets" / "fonts").glob("*")))
     ok(f"{nf} font") if nf >= 40 else bad(f"chỉ có {nf} font trong assets/fonts", "git pull / chép lại assets/fonts")
-    try:
-        from flux2 import util  # noqa: F401
-        ok("import flux2 được")
-    except BaseException as e:
-        bad(f"import flux2 lỗi ({e!r})", "xem thông báo; thường do transformers cũ")
-
+    if not remote:
+        try:
+            from flux2 import util  # noqa: F401
+            ok("import flux2 được")
+        except BaseException as e:
+            bad(f"import flux2 lỗi ({e!r})", "xem thông báo; thường do transformers cũ")
     print("5. Chromium (dựng chữ)")
     try:
         check_chrome(data, a.fix)

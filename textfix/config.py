@@ -3,7 +3,8 @@
   TEXTFIX_LLM_URL, TEXTFIX_MODEL, TEXTFIX_LLM_API_KEY     LLM / VLM (OpenAI-compatible, vLLM); một model nhìn được ảnh làm cả hai
   TEXTFIX_VLM_URL, TEXTFIX_VLM_MODEL, TEXTFIX_VLM_API_KEY  VLM riêng (không đặt: dùng LLM)
   TEXTFIX_LLM_TIMEOUT                                      giây chờ mỗi lời gọi (mặc định 300)
-  TEXTFIX_WEIGHTS, TEXTFIX_DEVICE_DIT / _TE / _AE          FLUX.2-klein (xem flux.py)
+  TEXTFIX_FLUX_URL, TEXTFIX_FLUX_API_KEY, ..._CONCURRENCY  FLUX ở máy khác (flux_api.py, docs/DEPLOY.md)
+  TEXTFIX_WEIGHTS, TEXTFIX_DEVICE_DIT / _TE / _AE          FLUX.2-klein tại chỗ (xem flux.py)
   PLAYWRIGHT_CHROME_PATH                                   Chromium có sẵn (máy chủ không tải được bản của Playwright)
 """
 
