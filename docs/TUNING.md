@@ -22,7 +22,7 @@
 7. **Chống khớp quá sát.** Mỗi sửa chạy trên **toàn tập** (không chỉ ca lỗi) + `bench/slots_gt` (`slots_gt.py eval --vs base`)
    + `lines_bench` (`bench/lines_gt`) khi đụng dòng / hình học: không bắt nhầm, không tụt số. Ngưỡng chọn ở **khoảng tách** giữa ca đúng và ca sai trên
    phân bố, không vừa khít một ca. Lỗi một ảnh không lặp lại và không nặng -> ghi "theo dõi", chưa sửa.
-8. **Tính năng dở dang để sau cờ tắt** (vd. `TEXTFIX_GEO`) cho tới khi cả đường đi (đo -> VLM -> dựng) xong và đo được.
+8. **Tính năng dở dang để sau cờ tắt** (vd. `TEXTFIX_GEO`, gỡ 15/10: chữ cong luôn chạy) cho tới khi cả đường đi (đo -> VLM -> dựng) xong và đo được.
 9. **Ghi lại.** Mỗi sửa một dòng ở nhật ký đúng bước, gắn [code] / [prompt LLM] / [prompt VLM] + trạng thái; cập nhật bảng
    "Đã siết prompt"; docs/DESIGN.md cho cơ chế mới. Commit theo cụm (kiểm không có tên dịch vụ nội bộ / bí mật).
 10. **Báo người dùng:** lỗi theo bước, đã sửa gì (số đo), cái gì chờ server, cái gì cần quyết.

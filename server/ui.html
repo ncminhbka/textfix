@@ -412,7 +412,7 @@ async function drawOcr() {
       g += `<g><title>${esc(tip)}</title><rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="${m.orphan ? "#ae3ec922" : KCOL[k] + "22"}" stroke="${m.orphan ? "#ae3ec9" : KCOL[k]}"
             stroke-width="${Math.max(2, W / 400)}"${o && o.kind === "skip" ? ' stroke-dasharray="8 6"' : ""}/>
             <text x="${x0 + 3}" y="${Math.max(14, y0 - 4)}" font-size="${Math.max(14, W / 60)}" fill="${KCOL[k]}" font-weight="700">${m.id}</text></g>`;
-      if (k === "L" && m.path) {   // ô chữ CONG (TEXTFIX_GEO): vẽ đường chân chữ, đậm, trên khung
+      if (k === "L" && m.path) {   // ô chữ CONG: vẽ đường chân chữ, đậm, trên khung
         g += `<polyline points="${m.path.map(q => q[0] + "," + q[1]).join(" ")}" fill="none" stroke="#ff00d0" stroke-width="${Math.max(4, W / 200)}"
               stroke-linecap="round" pointer-events="none"/>`;
       }

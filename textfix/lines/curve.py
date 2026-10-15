@@ -6,14 +6,10 @@ rồi gộp các mẩu OCR của một cung thành MỘT ô L có đường châ
 from __future__ import annotations
 
 import math
-import os
 
 import numpy as np
 
 from .detect import CAP_EM, X_EM
-
-ENABLED = os.environ.get("TEXTFIX_GEO", "on") == "on"   # bật khi B3 (mô tả) + B4 (dựng theo đường chân) xong
-                                                             # (12/10: 7 / 8 nháp g08-g10, g14), gộp lại chỉ thêm rủi ro
 
 NPATH = 16           # số điểm đường chân ghi vào ô
 CHAIN_GAP = 0.8      # hai mảnh nét cùng chuỗi: khe <= 0.8 cao mảnh lớn hơn ...

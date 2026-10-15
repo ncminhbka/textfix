@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..color import lab as _lab  # noqa: E402
-from .curve import ENABLED, _geo_lines
+from .curve import _geo_lines
 from .detect import lines, shape_of
 from .order import _renumber
 from .orphans import _orphans
@@ -38,8 +38,7 @@ def build(draft: np.ndarray, ink: np.ndarray, product: bool = False) -> dict:
         l["ocr_box"] = list(l["box"])
     I: list = []
     glog, masks = [], {}
-    if ENABLED:
-        L, I, glog, masks = _geo_lines(L, I, draft, A, ink, [])
+    L, I, glog, masks = _geo_lines(L, I, draft, A, ink, [])
     L, olog = _orphans(L, draft, ink, masks)
     L, glog = _renumber(L, [], [], glog + olog)
     for l in L:
