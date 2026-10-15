@@ -37,6 +37,7 @@ Chạy trên máy chủ bằng ô notebook (`%run scripts/...`): kết quả t�
 
 API cho người gọi (6 loại form, mã lỗi, debug từng bước): [docs/API.md](docs/API.md).
 Deploy khi FLUX / LLM / VLM ở máy khác: [docs/DEPLOY.md](docs/DEPLOY.md).
+Docker demo build ngay trên notebook (FLUX 9B / LLM / VLM ở máy khác): [docs/DOCKER.md](docs/DOCKER.md).
 
 ## Cấu trúc
 
@@ -54,6 +55,7 @@ Deploy khi FLUX / LLM / VLM ở máy khác: [docs/DEPLOY.md](docs/DEPLOY.md).
 | `server/` | Máy chủ FastAPI ([docs/API.md](docs/API.md)) + giao diện demo (form như app, xem debug từng bước). Test: `tests/test_api.py` |
 | `scripts/dev_batch.py`, `batch_report.py` | Chạy một tập qua máy chủ, báo cáo + một zip |
 | `scripts/replay.py`, `erase_bench.py`, `lines_bench.py` | Máy cá nhân: dựng lại poster / đo bước gỡ chữ / đo bước đo dòng (`bench/lines_gt`) trên nháp đã lưu |
+| `docker/` | Image demo: `build.sh` (gom code + trọng số Hi-SAM / LaMa + Chromium, build), `Dockerfile`, `run.sh`, `textfix.env.example` ([docs/DOCKER.md](docs/DOCKER.md)) |
 | `scripts/golden.py` | Dấu vân tay trạm thiết kế: tái cấu trúc mã thì chạy `record` trước, `check` sau, phải "khớp hết" |
 | `flux2/` | Mã suy luận FLUX.2 của Black Forest Labs (Apache-2.0), nguyên trạng |
 | `assets/` | Font (OFL) |

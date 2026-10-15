@@ -1,0 +1,16 @@
+# TextFix trong docker: FLUX ở máy khác, nên KHÔNG cần transformers / accelerate / safetensors (chỉ FLUX tại chỗ dùng).
+# torch / torchvision: image gốc (notebook) có sẵn bản CUDA thì pip giữ nguyên; chưa có thì pip cài bản CUDA từ Nexus.
+numpy>=1.26
+opencv-python-headless>=4.9
+pillow>=10
+torch>=2.4
+torchvision>=0.19
+einops>=0.8               # Hi-SAM
+rapidocr-onnxruntime>=1.2 # OCR, mô hình ONNX nằm sẵn trong gói
+playwright>=1.45          # dựng HTML; Chromium: PLAYWRIGHT_CHROME_PATH
+openai>=1.40              # LLM / VLM qua API OpenAI-compatible
+fastapi>=0.110
+uvicorn>=0.28
+pydantic>=2.6
+packaging>=23             # scripts/check_server.py
+fonttools[woff]>=4.40
