@@ -88,3 +88,33 @@ def test_host_error_and_busy_account(fake):
 
 def test_result_url_when_host_gives_no_polling_url():
     assert remote._result_url("https://api.eu.bfl.ai/v1/flux-2-klein-9b", "abc") == "https://api.eu.bfl.ai/v1/get_result?id=abc"
+
+
+def test_gateway_speaks_the_same_api_as_the_client(monkeypatch):
+    # scripts/flux_gateway.py (máy FLUX giả trên notebook) <-> textfix.draw.remote: gửi, hỏi, tải ảnh qua HTTP thật
+    import importlib.util
+    import socket
+    import threading
+    import time
+
+    import uvicorn
+    spec = importlib.util.spec_from_file_location("flux_gateway", "scripts/flux_gateway.py")
+    gw = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gw)
+
+    class Fake:
+        def generate(self, prompt, w, h, seed, refs=None):
+            return np.full((h, w, 3), 10 + seed % 200 + (len(refs) if refs else 0), np.uint8)
+    threading.Thread(target=gw.worker, args=(Fake(),), daemon=True).start()
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    srv = uvicorn.Server(uvicorn.Config(gw.app, host="127.0.0.1", port=port, log_level="error"))
+    threading.Thread(target=srv.run, daemon=True).start()
+    while not srv.started:
+        time.sleep(0.05)
+    monkeypatch.setattr(remote, "POLL", 0.02)
+    F = remote.RemoteFlux(url=f"http://127.0.0.1:{port}/v1/flux-2-klein-4b", key="", device="cpu", timeout=20)
+    img = F.generate("x", 64, 48, 5, refs=[np.zeros((8, 8, 3), np.uint8)])
+    srv.should_exit = True
+    assert img.shape == (48, 64, 3) and img[0, 0, 0] == 16

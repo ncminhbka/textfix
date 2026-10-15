@@ -51,6 +51,26 @@ Kết quả từng lượt chạy (ảnh debug, plan.json) nằm ở `~/work/tex
 Tự kiểm trong container (thư mục, thư viện, Hi-SAM / LaMa, Chromium, OCR, gọi thử LLM / VLM / FLUX):
 `docker exec textfix-demo bash -c '"$TEXTFIX_PY" scripts/check_server.py'`.
 
+## Chạy thử trên notebook khi chưa nối được FLUX 9B
+
+`scripts/flux_gateway.py` là máy FLUX giả nói đúng khuôn API của BFL nhưng vẽ bằng FLUX 4B có sẵn trên notebook. Container
+dùng chung mạng với notebook (`--network container:...`): tới máy FLUX giả qua `localhost`, gọi LLM / VLM bằng DNS của notebook.
+GPU: FLUX 4B ở card 0, Hi-SAM + LaMa của container ở card 1.
+
+```bash
+pkill -f server/app.py                                   # máy chủ textfix cũ giữ FLUX trên cả hai card
+cd ~/work/<thư mục repo>
+nohup python scripts/flux_gateway.py --port 8010 --device cuda:0 > flux_gateway.log 2>&1 &
+tail -f flux_gateway.log                                 # đợi "sẵn sàng" (~1 phút), Ctrl+C
+
+docker run -d --name textfix-test --gpus all --shm-size 1g   --network container:$(hostname)   --env-file ~/work/textfix.env   -e TEXTFIX_FLUX_URL=http://localhost:8010/v1/flux-2-klein-4b -e TEXTFIX_FLUX_CONCURRENCY=1 -e TEXTFIX_GPUS=1   -v /u02/jupyter-notebook/work/textfix-data:/data textfix:demo
+docker logs -f textfix-test                              # đợi "Sẵn sàng"
+```
+
+Mở giao diện qua proxy của JupyterLab: `https://<địa-chỉ-jupyter>/user/<tên>/proxy/8004/` (nhớ dấu `/` cuối). Không có `-p`:
+container dùng mạng của notebook nên cổng 8004 nằm ngay trong notebook. Xong thì `docker rm -f textfix-test` và
+`pkill -f flux_gateway.py`.
+
 ## Cập nhật, dừng
 
 ```bash
