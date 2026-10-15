@@ -57,7 +57,7 @@ def _done(rd: Path) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    from textfix import ship
+    from textfix.tools import ship
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", type=Path, default=ROOT / "output" / "runs")
     ap.add_argument("--last", type=int, default=10)

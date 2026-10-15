@@ -3,8 +3,8 @@
 
   python scripts/lines_bench.py --extract              # giải nén nháp + mặt nạ Hi-SAM + plan.json từ các zip báo cáo ở gốc repo
   python scripts/lines_bench.py                        # dòng đã lưu trong plan.json (lượt chạy đó) = mốc
-  python scripts/lines_bench.py --source current       # vùng dòng đã lưu + hướng / kiểu đường theo mã hiện tại (slots.reorient)
-  python scripts/lines_bench.py --source build         # toàn bộ slots.build hiện tại (kết quả bộ dò OCR đệm ở output/lines_data)
+  python scripts/lines_bench.py --source current       # vùng dòng đã lưu + hướng / kiểu đường theo mã hiện tại (reorient)
+  python scripts/lines_bench.py --source build         # toàn bộ build hiện tại (kết quả bộ dò OCR đệm ở output/lines_data)
 
 Ghép dòng dự đoán <-> dòng đáp án theo NÉT: tập điểm nét Hi-SAM trong vùng mỗi dòng, IoU >= MATCH (khung lệch vài px không ảnh
 hưởng). Chỉ số (dòng `eval` của đáp án, loại poster + object):
@@ -57,7 +57,7 @@ def extract() -> None:
 
 
 def shape_of(l: dict) -> str:
-    from textfix.slots import shape_of
+    from textfix.lines.detect import shape_of
     return shape_of(l)
 
 
@@ -124,20 +124,21 @@ def score(gt: list[dict], pred: list[dict], ink: np.ndarray, kinds: tuple = ("po
 
 def predict(src_dir: Path, source: str, ink: np.ndarray) -> list[dict]:
     from PIL import Image
-    from textfix import slots
+    from textfix.lines.page import build
+    from textfix.lines.detect import reorient
     if source == "build":
         with ocr_cache(src_dir):
-            return slots.build(np.asarray(Image.open(src_dir / "draft.jpg").convert("RGB")), ink)["L"]
+            return build(np.asarray(Image.open(src_dir / "draft.jpg").convert("RGB")), ink)["L"]
     L = json.loads((src_dir / "plan.json").read_text(encoding="utf-8"))["slots"]["L"]
     if source == "current":
-        slots.reorient(np.asarray(Image.open(src_dir / "draft.jpg").convert("RGB")), ink, L)
+        reorient(np.asarray(Image.open(src_dir / "draft.jpg").convert("RGB")), ink, L)
     return L
 
 
 @contextmanager
 def ocr_cache(src_dir: Path):
     """Đệm ra đĩa hai lời gọi chậm của bộ dò (dòng OCR, bản đồ vùng chữ) cho một nháp: đo lại nhiều lần không chạy lại OCR."""
-    from textfix import ocr
+    from textfix.lines import ocr
     read0, reg0 = ocr._read, ocr.regions
     fl, fr = src_dir / "ocr_lines.json", src_dir / "ocr_regions.npz"
 

@@ -21,8 +21,8 @@ JS = """([fam, wt, a, b]) => { const c = document.createElement('canvas').getCon
 
 
 def main() -> int:
-    from textfix.browser import Browser
-    from textfix.fonts import CATALOG, faces_for, family
+    from textfix.render.browser import Browser
+    from textfix.render.fonts import CATALOG, faces_for, family
     rows = {}
     with Browser() as B:
         for key, (_, _, _, files) in CATALOG.items():

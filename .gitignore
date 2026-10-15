@@ -26,3 +26,4 @@ Thumbs.db
 *.tgz
 # ảnh sản phẩm tham chiếu của bộ thử (nhỏ, có giấy phép: bench/refs/SOURCES.md)
 !bench/refs/*.jpg
+build/

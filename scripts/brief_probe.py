@@ -31,7 +31,8 @@ def main() -> None:
     ap.add_argument("--threads", type=int, default=8)
     a = ap.parse_args()
     from server.app import GenerateRequest, form_of
-    from textfix import config, ship
+    from textfix import config
+    from textfix.tools import ship
     from textfix.brief import SCHEMA, count_tokens, make_brief
     from textfix.llm import json_call
     config.load_env()

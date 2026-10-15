@@ -33,8 +33,8 @@ class Engine:
 
     def __enter__(self) -> "Engine":
         from .brief import SCHEMA
-        from .browser import Browser
         from .llm import json_call
+        from .render.browser import Browser
         config.load_env()
         self.models = config.models()
         m = self.models
@@ -77,7 +77,7 @@ def draw(flux, B: dict, W: int, H: int, seed: int, product: np.ndarray | None = 
          ink: np.ndarray | None = None, progress=_noop) -> dict:
     """TRẠM VẼ (GPU): FLUX vẽ nháp -> Hi-SAM tìm nét chữ. draft / ink có sẵn thì bỏ bước tương ứng.
     -> {draft, ink (bool cỡ nháp), timing}."""
-    from . import hisam
+    from .draw import hisam
     T = {}
     if draft is None:
         progress("FLUX vẽ nháp")
@@ -94,7 +94,7 @@ def draw(flux, B: dict, W: int, H: int, seed: int, product: np.ndarray | None = 
     out = {"draft": draft, "ink": np.asarray(ink, bool), "timing": T,
            "device": getattr(flux, "dev_dit", None)}   # card của luồng vẽ: LaMa ở trạm thiết kế chạy cùng card (chia tải hai card)
     if product is not None:   # chữ in trên sản phẩm khách tải: để bước thiết kế nhận ra các dòng đó trong nháp và GIỮ nguyên
-        from .ocr import read_lines
+        from .lines.ocr import read_lines
         try:
             out["product_ocr"] = [l["text"] for l in read_lines(product) if sum(ch.isalnum() for ch in l["text"]) >= 2]
         except Exception:   # OCR ảnh sản phẩm hỏng: vẫn còn lời dặn + lựa chọn keep của VLM
@@ -104,18 +104,22 @@ def draw(flux, B: dict, W: int, H: int, seed: int, product: np.ndarray | None = 
 
 def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -> dict:
     """TRẠM THIẾT KẾ (chặng B, 14/10): dòng (OCR + nét chữ) -> gỡ mọi dòng (LaMa, MỘT lần) -> VLM GHÉP câu khách <-> dòng + kiểu
-    theo vai -> code chép nguyên văn, cỡ / lề / tập theo nháp (fill) -> trả điểm ảnh nháp cho dòng giữ -> dựng -> kiểm -> sửa
+    theo vai -> code chép nguyên văn, cỡ / lề / tập theo nháp (compose.layout) -> trả điểm ảnh nháp cho dòng giữ -> dựng -> kiểm -> sửa
     bằng code. d = draw(...)."""
-    from . import erase, fill, render, slots
-    from .compose import fate, vlm as cvlm
+    from . import erase, lines, render
+    from .compose import fate
+    from .compose import vlm as cvlm
+    from .compose.assign import resolve
+    from .compose.layout import layout, public
+    from .lines.view import _typo_notes
     draft, ink, T = d["draft"], d["ink"], dict(d["timing"])
     texts = B["texts"]
     t0 = time.time()
     progress("đo dòng (OCR + nét chữ)")
-    M0 = slots.build(draft, ink, product=product)
-    printed = slots.mark_printed(M0, d.get("product_ocr")) if product else []
+    M0 = lines.build(draft, ink, product=product)
+    printed = lines.mark_printed(M0, d.get("product_ocr")) if product else []
     if printed:
-        slots._typo_notes(M0["L"], M0.get("geo_log") or [])   # ghi lại phần "chữ khó" cho dòng in trên sản phẩm
+        _typo_notes(M0["L"], M0.get("geo_log") or [])   # ghi lại phần "chữ khó" cho dòng in trên sản phẩm
     geo_log = list(M0.get("geo_log") or [])
     M = cvlm.view(M0)
     T["dong"] = time.time() - t0
@@ -152,7 +156,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
         llog.append(f"VLM bỏ sót {left} -> hỏi lại: có {sorted(fate.mentioned(A2))}")
     if A.get("dropped"):
         llog.append(f"bỏ mục ghép sai khuôn: {A['dropped']}")
-    U, rlog0, miss_i = fill.resolve(A, M, texts)
+    U, rlog0, miss_i = resolve(A, M, texts)
     # DÒNG CHỮ POSTER KHÔNG CÒN CHỮ (câu VLM ghép đã có chỗ khác): xin câu cùng vai còn thiếu / chữ lấp trước khi gỡ trống
     empty_l = fate.no_words(U)
     if empty_l:
@@ -160,8 +164,8 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
         A2 = cvlm.reask(draft, M, B["prompt_en"], texts, vlm, empty_l, product=product, base=clean, ask=cvlm.REFILL)
         fate.merge(A, A2, empty_l)
         llog.append(f"dòng không còn chữ {empty_l} -> hỏi lại xin chữ: {[(u['marks'], u['kind'], u['clients'] or u['text_vlm']) for u in A2['assign']]}")
-        U, rlog0, miss_i = fill.resolve(A, M, texts)
-    U, llay = fill.layout(U, M, ink, A["styles"], A["accent"], texts, base=clean)
+        U, rlog0, miss_i = resolve(A, M, texts)
+    U, llay = layout(U, M, ink, A["styles"], A["accent"], texts, base=clean)
     log = geo_log + llog + rlog0 + llay
     if product:
         log.insert(0, f"ảnh sản phẩm khách tải: chữ đọc được {d.get('product_ocr') or []} -> dòng nháp là chữ in trên sản phẩm {printed}")
@@ -200,14 +204,14 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     rinfo = [{"id": r["id"], "unit": r.get("unit"), "fs": round(float(r.get("fs") or r.get("size") or 0), 1),
               "shrink": round(float(r.get("shrink") or 1), 2), "sx": r.get("sx", 1), "angle": round(float(r.get("angle") or 0), 1),
               "path": bool(r.get("path"))} for r in res or []]
-    plan = {"style": A["styles"], "assign": A["assign"], "accent": A["accent"], "ops": fill.public(U), "fates": fate.table(U, M),
+    plan = {"style": A["styles"], "assign": A["assign"], "accent": A["accent"], "ops": public(U), "fates": fate.table(U, M),
             "render": rinfo,
-            "missing": missing, "notes": A.get("notes"), "errors": errs, "log": log, "slots": slots.public(M), "slots_mode": "L",
+            "missing": missing, "notes": A.get("notes"), "errors": errs, "log": log, "slots": lines.public(M), "slots_mode": "L",
             "errors_first": errs_first,
             "erase": {"mask_pct": round(100 * float(mask.mean()), 2), "ink_pct": round(100 * float(ink.mean()), 2),
                       "kept": sorted(kept), "orphans": [l["id"] for l in M["L"] if l.get("orphan")], "log": elog}}
     ink_img = erase.ink_image(draft, ink, mask, M, kept)
-    steps = _row([draft, slots.marked_image(draft, M), ink_img, base, poster])
+    steps = _row([draft, lines.marked_image(draft, M), ink_img, base, poster])
     return {"draft": draft, "ink": ink, "ink_image": ink_img, "hisam_image": erase.hisam_image(draft, ink), "clean": clean, "base": base, "mask": mask, "poster": poster,
             "poster_first": poster_first, "steps": steps, "plan": plan, "timing": {k: round(v, 1) for k, v in T.items()}}
 

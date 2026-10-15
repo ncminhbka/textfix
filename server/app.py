@@ -102,7 +102,7 @@ def failure(code: str, stage: str, e: BaseException | None = None) -> dict:
 
 def draw_error(e: BaseException, stage: str) -> dict:
     """Trạm VẼ hỏng: máy FLUX lọc nội dung -> draw_moderated (không phải lỗi của TextFix), còn lại draw_failed."""
-    from textfix.flux_api import FluxModerated
+    from textfix.draw.remote import FluxModerated
     return failure("draw_moderated" if isinstance(e, FluxModerated) else "draw_failed", stage, e)
 
 
@@ -230,27 +230,27 @@ def draw_devices() -> list[str]:
     """Mỗi phần tử = một luồng VẼ và thiết bị của nó.
     FLUX tại chỗ: mỗi card một luồng (mỗi card một FLUX). FLUX ở máy khác (TEXTFIX_FLUX_URL): số luồng = số nháp gửi sang
     cùng lúc (TEXTFIX_FLUX_CONCURRENCY), chia vòng lên các card chỉ để chạy Hi-SAM / LaMa; không card nào thì chạy CPU."""
-    from textfix import flux_api
+    from textfix.draw import remote
     gpus = [f"cuda:{k}" for k in gpu_list()]
-    if not flux_api.enabled():
+    if not remote.enabled():
         if not gpus:
             raise RuntimeError("không thấy GPU để nạp FLUX (hoặc đặt TEXTFIX_FLUX_URL để gọi FLUX ở máy khác)")
         return gpus
-    return [(gpus or ["cpu"])[i % max(1, len(gpus))] for i in range(flux_api.concurrency())]
+    return [(gpus or ["cpu"])[i % max(1, len(gpus))] for i in range(remote.concurrency())]
 
 
 def gpu_worker(dev: str, args, ready: threading.Event) -> None:
     """Một luồng VẼ trên thiết bị dev: có FLUX (tại chỗ: nạp lên card; ở xa: bộ gọi API) + Hi-SAM, lấy việc từ hàng đợi chung."""
-    from textfix import flux_api, hisam
+    from textfix.draw import remote, hisam
     from textfix.engine import draw
     try:
-        if flux_api.enabled():
-            F = flux_api.RemoteFlux(device=dev)
+        if remote.enabled():
+            F = remote.RemoteFlux(device=dev)
             with LOAD_LOCK:
                 hisam.load(dev)   # nét chữ: nạp sẵn để lỗi thiếu tệp lộ ra lúc khởi động
         else:
             import torch
-            from textfix.flux import Flux
+            from textfix.draw.flux import Flux
             torch.cuda.set_device(dev)
             # NẠP LẦN LƯỢT từng card: transformers đổi kiểu số mặc định của torch (toàn cục, không theo luồng) khi nạp bộ mã
             # hoá chữ -> hai card nạp cùng lúc giẫm nhau, một bản lẫn float32 (Flux.load còn ép bf16 lần nữa). Vẽ vẫn song song.
@@ -284,10 +284,11 @@ def init_models(args) -> None:
     from textfix import config
     from textfix.brief import SCHEMA
     from textfix.llm import json_call
-    from textfix.ocr import _engine
+    from textfix.lines.ocr import _engine
     if not os.environ.get("TEXTFIX_LLM_URL") or not os.environ.get("TEXTFIX_MODEL"):
         raise RuntimeError("chưa đặt TEXTFIX_LLM_URL / TEXTFIX_MODEL (export trong terminal, docs/SERVER.md)")
-    from textfix import erase, hisam
+    from textfix import erase
+    from textfix.draw import hisam
     lost = hisam.missing() + ([] if erase.lama_ready() else [erase.LAMA_PATH])
     if lost:   # người dùng chốt 14/10: thiếu tệp thì báo rõ và dừng, không lùi về cách nào khác
         raise RuntimeError("thiếu tệp model gỡ chữ (docs/SERVER.md, mục Hi-SAM và LaMa): " + "; ".join(lost))
@@ -313,7 +314,7 @@ def init_models(args) -> None:
 def page():
     """Chromium của luồng thiết kế hiện tại (mở lần đầu dùng)."""
     if getattr(LOCAL, "browser", None) is None:
-        from textfix.browser import Browser
+        from textfix.render.browser import Browser
         LOCAL.browser = Browser().__enter__()
     return LOCAL.browser.page
 
@@ -337,11 +338,11 @@ def jsonable(o):
 
 def design_one(job: dict, v: dict, d: dict, Bv: dict, product: bool, vd: Path, url: str, t_llm: float) -> None:
     """TRẠM THIẾT KẾ cho một phiên bản + lưu ảnh / JSON debug. Lỗi -> v["error"] (không dừng phiên bản khác)."""
-    from textfix import slots
+    from textfix.lines.view import marked_image
     from textfix.engine import design
     from textfix.render import ops_image
     try:
-        from textfix import hisam
+        from textfix.draw import hisam
         save(d["draft"], vd / "draft.png")   # có ngay khi vẽ xong: UI xem được nháp trong lúc thiết kế
         hisam.to_png(d["ink"], vd / "ink.png")   # mặt nạ nét chữ: đủ để dựng lại tại máy cùng nháp + plan.json
         v.update(draft_url=f"{url}/draft.png")
@@ -356,7 +357,7 @@ def design_one(job: dict, v: dict, d: dict, Bv: dict, product: bool, vd: Path, u
         M = {**P["slots"], "size": [d["draft"].shape[1], d["draft"].shape[0]],
              "by": {m["id"]: m for m in P["slots"]["L"]}}
         save(np.asarray(ops_image(r["draft"], M, P)), vd / "ops.jpg", 88)
-        save(np.asarray(slots.marked_image(r["draft"], M)), vd / "slots.jpg", 88)
+        save(np.asarray(marked_image(r["draft"], M)), vd / "slots.jpg", 88)
         first = r["poster_first"] is not r["poster"]
         if first:
             save(r["poster_first"], vd / "poster_first.png")
@@ -397,7 +398,7 @@ def run_job(job: dict, req: GenerateRequest) -> dict:
     """Một yêu cầu: LLM một lần (brief + các hướng thiết kế), rồi n phiên bản vào dây chuyền VẼ -> THIẾT KẾ. Kết quả từng phiên
     bản ghi vào job["result"]["posters"] ngay khi xong (UI hiện dần)."""
     from textfix.brief import make_brief
-    from textfix.flux import SIZES
+    from textfix.draw.flux import SIZES
     t_all = time.time()
     run_id = job["run_id"]
     rd = RUNS / run_id

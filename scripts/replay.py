@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""MÁY CÁ NHÂN: dựng lại poster theo chặng B trên các plan ĐÃ LƯU, KHÔNG gọi VLM -- phần ghép câu <-> dòng và kiểu theo vai rút
-từ lệnh html cũ (fill.from_ops), phần còn lại chạy như trạm thiết kế: fill.resolve -> fill.layout -> nền -> render_units ->
+"""MÁY CÁ NHÂN: dựng lại poster trên các plan ĐÃ LƯU, KHÔNG gọi VLM -- dùng lại câu trả lời VLM đã lưu (assign, kiểu theo vai),
+phần còn lại chạy như trạm thiết kế: resolve -> layout -> nền -> render_units ->
 check_units -> autofix_units. -> ảnh  nháp | poster cũ | đơn vị chữ (màu = tập) | poster mới  + rows.json (số đo).
 
   python -X utf8 scripts/replay.py <thư mục ra> accept2h:accept2 mix1c:mix1      # <thư mục trong output>[:<tên manifest>]
   python -X utf8 scripts/replay.py <thư mục ra> accept2h:accept2 --only e05,h02
-Dòng lấy từ plan đã lưu (id khớp với lệnh cũ); độ dày nét (độ đậm mặc định) đo lại như slots.lines. Nền LaMa gỡ mọi dòng: tính
+Dòng lấy từ plan đã lưu (id khớp với lệnh cũ); độ dày nét (độ đậm mặc định) đo lại như textfix.lines.detect.lines. Nền LaMa gỡ mọi dòng: tính
 MỘT lần mỗi poster (sau bước dời khung khỏi icon / chấm đầu dòng), lưu ở <thư mục ra>/cache/ -- LaMa trên CPU ~10 s / poster.
 Mặt nạ nét chữ: <lượt chạy>/v0/ink.png; chưa có thì chạy Hi-SAM tại máy rồi lưu lại."""
 import argparse
@@ -25,7 +25,7 @@ def letter_em(font, text, upper):
     import unicodedata
     from fontTools.pens.boundsPen import BoundsPen
     from fontTools.ttLib import TTFont
-    from textfix.fonts import CATALOG, FONTS_DIR
+    from textfix.render.fonts import CATALOG, FONTS_DIR
     if font not in _EM:
         try:
             f = TTFont(str(FONTS_DIR / next(iter(CATALOG[font][3].values()))))
@@ -44,10 +44,15 @@ def letter_em(font, text, upper):
 
 
 _EM = {}
-from textfix import erase, fill, hisam, render, slots   # noqa: E402
+from textfix import erase, render
+from textfix.draw import hisam
+from textfix.compose.layout import layout, public
+from textfix.compose.assign import resolve
+from textfix.lines.printed import _flat
+from textfix.lines.detect import reorient   # noqa: E402
 from textfix.compose import vlm as cvlm   # noqa: E402
-from textfix.browser import Browser   # noqa: E402
-from textfix.glyph import measure   # noqa: E402
+from textfix.render.browser import Browser   # noqa: E402
+from textfix.lines.glyph import measure   # noqa: E402
 
 ap = argparse.ArgumentParser()
 ap.add_argument("out")
@@ -70,7 +75,7 @@ with Browser() as B:
             if not (os.path.exists(r + "plan.json") and dr):
                 continue
             P = json.load(open(r + "plan.json", encoding="utf-8"))
-            if not (P.get("slots") or {}).get("L") or not (P.get("ops") or P.get("assign")):
+            if not (P.get("slots") or {}).get("L") or not P.get("assign"):   # plan trước 14/10 (lệnh html): không dựng lại
                 continue
             T = json.load(open(f"output/{setn}/{m['run_id']}/brief.json", encoding="utf-8"))["texts"]
             D = np.asarray(Image.open(dr).convert("RGB"))
@@ -85,7 +90,7 @@ with Browser() as B:
                 if l.get("ocr_box"):
                     l["box"] = list(l["ocr_box"])
                 l.pop("mark", None)
-            slots.reorient(D, ink, L)
+            reorient(D, ink, L)
             for l in L:
                 if l.get("vertical"):   # cỡ lưu trong plan đo theo dòng ngang
                     l["size"] = 0.8 * min(l["box"][2] - l["box"][0], l["box"][3] - l["box"][1])
@@ -102,11 +107,9 @@ with Browser() as B:
             else:
                 clean = erase.erase(D, ink, M)[0]
                 Image.fromarray(clean).save(cpath)
-            # plan chặng B: câu trả lời VLM đã ở khuôn ghép; plan cũ: rút từ lệnh html
-            A = {"assign": P["assign"], "styles": P.get("style") or {}, "accent": P.get("accent") or []} if P.get("assign") \
-                else fill.from_ops(P, T)
-            U, rlog, miss = fill.resolve(A, M, T)
-            U, llog = fill.layout(U, M, ink, A["styles"], A["accent"], T, base=clean)
+            A = {"assign": P["assign"], "styles": P.get("style") or {}, "accent": P.get("accent") or []}
+            U, rlog, miss = resolve(A, M, T)
+            U, llog = layout(U, M, ink, A["styles"], A["accent"], T, base=clean)
             elog = []
             base, mask = erase.settle(D, clean, ink, M, {"ops": U}, elog)
             poster, res, dlog = render.render_units(B.page, base, U, M)
@@ -124,7 +127,7 @@ with Browser() as B:
                     break
                 poster, U, errs, res = p2, U2, e2, res2
             old = Image.open(next(iter(glob.glob(r + "poster.*")))).convert("RGB")
-            pub = {**P, "ops": fill.public(U)}
+            pub = {**P, "ops": public(U)}
             tiles = [Image.fromarray(D), old, render.ops_image(D, M, pub), Image.fromarray(np.asarray(poster))]
             h = 720
             tiles = [t.resize((round(t.width * h / t.height), h)) for t in tiles]
@@ -139,7 +142,7 @@ with Browser() as B:
             import re   # số bước / ngoặc kép do mã đặt lại không tính là lệch
             placed = lambda u: re.sub(r"^\d{1,2}\.\s+", "", "".join(x for e in u.get("els") or [] for x in e["lines"]).strip().strip("“”"))  # noqa: E731
             off = [u["id"] for u in U if u["kind"] == "text" and u["clients"]
-                   and slots._flat(placed(u)) != slots._flat("".join(T[k]["text"] for k in u["clients"]))]
+                   and _flat(placed(u)) != _flat("".join(T[k]["text"] for k in u["clients"]))]
             fs = {}
             for rr in res:
                 u = next((u for u in U if u["id"] == rr["unit"]), None)

@@ -74,6 +74,7 @@ class Flux:
 
     def load(self) -> "Flux":
         import torch
+
         from flux2 import util
         if self.variant not in self.weights:
             raise FileNotFoundError(f"không thấy {MODELS[self.variant][1]} -- đặt {MODELS[self.variant][2]} hoặc --weights-dir")
@@ -107,6 +108,7 @@ class Flux:
     # ------------------------------------------------------------------------------------------------ mã hoá
     def _encode(self, prompt: str):
         import torch
+
         from flux2.sampling import prc_txt
         with torch.no_grad():
             ctx = self.te([prompt]).to(torch.bfloat16)[0].to(self.dev_dit)
@@ -117,6 +119,7 @@ class Flux:
         """Ảnh tham chiếu -> (token, id), như flux2.sampling.encode_image_refs nhưng VAE ở thiết bị riêng."""
         import torch
         from PIL import Image
+
         from flux2.sampling import default_prep, prc_img
         limit = 2024 ** 2 if len(imgs) == 1 else 1024 ** 2   # trần điểm ảnh của mã tham chiếu
         toks, ids = [], []
@@ -133,6 +136,7 @@ class Flux:
     def _sample(self, ctx, w: int, h: int, seed: int, refs=None) -> np.ndarray:
         """Euler theo flux2.sampling.get_schedule. Bản có CFG chạy một batch [có prompt, prompt rỗng]."""
         import torch
+
         from flux2.sampling import get_schedule, prc_img
         dev, cfg = self.dev_dit, self.cfg
         g = torch.Generator(device=dev).manual_seed(int(seed))

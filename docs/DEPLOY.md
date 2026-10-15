@@ -93,7 +93,7 @@ song song máy VLM chịu được và RAM (mỗi luồng một Chromium).
 
 ## Máy FLUX tự host
 
-Lớp nối (`textfix/flux_api.py`) nói theo khuôn API của Black Forest Labs. Máy FLUX tự host cần nhận đúng khuôn đó:
+Lớp nối (`textfix/draw/remote.py`) nói theo khuôn API của Black Forest Labs. Máy FLUX tự host cần nhận đúng khuôn đó:
 - `POST <TEXTFIX_FLUX_URL>`, header `x-key`, thân JSON `{prompt, width, height, seed, output_format: "png", safety_tolerance,
   input_image, input_image_2..4}` (ảnh tham chiếu là base64 PNG) -> `{id, polling_url}`;
 - `GET polling_url` (không có thì `<gốc>/v1/get_result?id=`) -> `{status, result: {sample: <URL ảnh>}}`; `status` là `Pending` /
@@ -101,7 +101,7 @@ Lớp nối (`textfix/flux_api.py`) nói theo khuôn API của Black Forest Labs
 
 Yêu cầu để nháp đúng như TextFix cần:
 - **dùng nguyên prompt** (không tự nâng prompt: LLM bước 1 đã viết prompt theo hướng dẫn của BFL);
-- **đúng cỡ** `width x height` gửi sang (các cỡ trong `textfix/flux.py` `SIZES`, bội số 16, ~1 MP); lệch cỡ thì TextFix co về, mất nét;
+- **đúng cỡ** `width x height` gửi sang (các cỡ trong `textfix/draw/flux.py` `SIZES`, bội số 16, ~1 MP); lệch cỡ thì TextFix co về, mất nét;
 - **nhận `seed`**: cùng prompt, cỡ, seed -> cùng ảnh (chạy lại được);
 - **nhận ảnh tham chiếu** (ảnh sản phẩm khách tải: FLUX giữ sản phẩm, TextFix giữ chữ in trên sản phẩm);
 - **trả PNG** (JPEG nén mạnh làm Hi-SAM thấy nét chữ kém).

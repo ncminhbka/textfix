@@ -10,6 +10,9 @@ from __future__ import annotations
 
 import numpy as np
 
+from .call import _system, plan
+from .parse import parse
+
 
 def view(M: dict) -> dict:
     """Ô để VLM và bộ dựng làm việc: chỉ dòng chữ (plan.json cũ có thể còn S / I / shell: bỏ)."""
@@ -18,8 +21,7 @@ def view(M: dict) -> dict:
 
 
 def describe(M: dict) -> str:
-    from .. import slots
-    note = lambda m: (slots._curve_note(m) if m.get("path") else f", drawn at {m['angle']:.0f} degrees" if abs(m.get("angle") or 0) >= 2   # noqa: E731
+    note = lambda m: (_curve_note(m) if m.get("path") else f", drawn at {m['angle']:.0f} degrees" if abs(m.get("angle") or 0) >= 2   # noqa: E731
                       else "") + (", found by the stroke detector (big decorated lettering)" if m.get("missed") and not m.get("orphan") else "") \
         + (", STRAY LETTERING (letter shapes that may be junk, a logo or decoration)" if m.get("orphan") else "") \
         + (", PRINTED ON THE CLIENT'S PRODUCT: kind \"keep\"" if m.get("printed") else "")
@@ -27,7 +29,7 @@ def describe(M: dict) -> str:
     # VLM ghép ngày vào mẩu 21px và xoá dòng OCR đọc đúng "01/12 - 07/12"). Chỉ để VLM biết L# nào là dòng nào -- code không
     # dùng chữ này để viết.
     li = "\n".join(f"{m['id']}: machine reading {(m.get('ocr') or '').strip()!r}, ~{m['size']:.0f}px, color {m['color']}{note(m)}"
-                   f"{slots._look(m)}" for m in M["L"]) or "(none)"
+                   f"{_look(m)}" for m in M["L"]) or "(none)"
     return f"Text lines:\n{li}"
 
 
@@ -81,9 +83,8 @@ FONT CATALOG (key: family, class): {fonts}"""
 
 def ask(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, product: bool = False, base: np.ndarray | None = None,
         fresh: bool = False, meta: dict | None = None) -> dict:
-    """Một lời gọi cho mọi dòng -> câu trả lời đã đọc (fill.parse). fresh: bỏ qua bộ đệm (gọi lại sau câu trả lời rỗng)."""
-    from .. import fill, slots
-    return fill.parse(slots.plan(draft, M, prompt, texts, call, slots._system(SYSTEM), describe(M), base, product=product,
+    """Một lời gọi cho mọi dòng -> câu trả lời đã đọc (parse). fresh: bỏ qua bộ đệm (gọi lại sau câu trả lời rỗng)."""
+    return parse(plan(draft, M, prompt, texts, call, _system(SYSTEM), describe(M), base, product=product,
                                  meta=meta, fresh=fresh))
 
 
@@ -100,9 +101,38 @@ def reask(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, line
     """Hỏi lại RIÊNG một số dòng (fresh): REASK -- dòng câu trả lời đầu bỏ sót (người dùng chốt 15/10: bỏ sót -> hỏi lại; vẫn
     không -> giữ); REFILL -- dòng chữ poster không còn chữ (câu VLM ghép đã có chỗ khác): xin câu cùng vai còn thiếu / chữ lấp
     trước khi gỡ trống. -> câu trả lời đã đọc, chỉ còn mục chạm các dòng đó."""
-    from .. import fill, slots
     desc = describe(M) + "\n\n" + ask.format(ids=", ".join(lines))
-    A = fill.parse(slots.plan(draft, M, prompt, texts, call, slots._system(SYSTEM), desc, base, product=product, fresh=True))
+    A = parse(plan(draft, M, prompt, texts, call, _system(SYSTEM), desc, base, product=product, fresh=True))
     want = set(lines)
     A["assign"] = [{**u, "marks": [m for m in u["marks"] if m in want]} for u in A["assign"] if want & set(u["marks"])]
     return A
+
+
+def _look(m: dict) -> str:
+    """Kiểu chữ đo trên nháp: độ đậm (độ dày nét / cỡ chữ), nét dày-mảnh (chữ có chân / viết tay), viết hoa, bóng / viền."""
+    out = []
+    if m.get("stroke") and m.get("size"):
+        r = m["stroke"] / m["size"]   # độ dày nét / em
+        out.append("weight " + ("light" if r < 0.07 else "regular" if r < 0.11 else "bold" if r < 0.16 else "black")
+                   + f" (stroke ~{m['stroke']:.0f}px)")
+    if (m.get("stroke_contrast") or 0) >= 2.2:
+        out.append("thick-thin strokes (serif / script)")
+    if m.get("caps"):
+        out.append("all caps")
+    e = m.get("effect")
+    if e:
+        if abs(e.get("dx", 0)) + abs(e.get("dy", 0)) >= 1:
+            out.append(f"drop shadow {e.get('color')} offset ({e['dx']:.0f},{e['dy']:.0f})px")
+        else:
+            out.append(f"outline / glow {e.get('color')}")
+    return (", " + ", ".join(out)) if out else ""
+
+
+def _curve_note(m: dict) -> str:
+    """Ô chữ chạy theo đường cong: vòm lên hay võng xuống, dài bao nhiêu (để VLM viết vừa một dòng)."""
+    pt = np.asarray(m["path"], np.float64)
+    ln = float(np.sum(np.hypot(*np.diff(pt, axis=0).T)))
+    mid, chord = pt[len(pt) // 2], (pt[0] + pt[-1]) / 2
+    n = max(2, int(round(ln / max(1.0, 0.55 * (m.get("size") or 1.0)))))
+    return (f", CURVED LINE: the letters run along an {'arch (bulging up)' if mid[1] < chord[1] else 'arc bulging down (a smile)'}, "
+            f"room for about {n} characters")

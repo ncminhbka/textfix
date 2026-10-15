@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from textfix import flux
+from textfix.draw import flux
 from textfix.brief.instructions import ORIENT
 
 

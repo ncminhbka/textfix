@@ -1,12 +1,6 @@
-"""HÌNH HỌC CHỮ (09/10, đợt nâng cấp chữ cong / một dòng nhiều cỡ) -- bổ sung cho ô L của slots.build:
-
-  arcs(ink, L, I, W, H)  -> chữ chạy theo CUNG TRÒN (tiêu đề cong, vòng con dấu, chữ "nụ cười"): OCR chỉ cho khung thẳng, cắt
-                            cung thành mẩu xoay lệch hoặc bỏ hai đầu cung (thành chi tiết I). Dò từ NÉT: chuỗi mảnh nét cùng cỡ
-                            nối nhau, khớp đường tròn qua tâm các mảnh; cung rõ (võng >= 0.25 cao chữ, lệch khớp nhỏ) -> MỘT ô L
-                            {curve: cx, cy, r (bán kính ĐƯỜNG CHÂN), a0, a1 (độ, toạ độ ảnh: 0 phải, 90 dưới), up}.
-  runs(L)                -> MỘT DÒNG NHIỀU CỠ ("GIẢM" nhỏ + "50%" to): OCR tách thành các ô riêng; các ô liền nhau cùng đường
-                            chân, cỡ lệch >= 1.4 lần -> MỘT ô L {runs: [{text, size, x0, x1}], base}.
-Bộ thử: scripts/geo_synth.py (đáp án tuyệt đối trên nền bản xoá thật).
+"""CHỮ CONG: chữ chạy theo cung tròn / đường lượn (tiêu đề vòm, vòng con dấu, chữ "nụ cười"). OCR chỉ cho khung thẳng,
+cắt cung thành mẩu xoay lệch; ở đây dò từ NÉT: chuỗi mảnh nét cùng cỡ nối nhau, khớp đường tròn / bậc 3 qua tâm các mảnh,
+rồi gộp các mẩu OCR của một cung thành MỘT ô L có đường chân (path). Vùng chữ của bộ dò mà OCR không trả dòng nào -> ô mới.
 """
 
 from __future__ import annotations
@@ -15,6 +9,8 @@ import math
 import os
 
 import numpy as np
+
+from .detect import CAP_EM, X_EM
 
 ENABLED = os.environ.get("TEXTFIX_GEO", "on") == "on"   # bật khi B3 (mô tả) + B4 (dựng theo đường chân) xong
                                                              # (12/10: 7 / 8 nháp g08-g10, g14), gộp lại chỉ thêm rủi ro
@@ -30,90 +26,10 @@ ARC_SPAN = 3.2       # vùng chữ của bộ dò chỉ là cung khi dài >= 3.2
                      # 17 cung thật dài 3.7 - 12.3 cao dòng; 1 vùng dài 2.8 là hai dòng nghiêng xếp chồng ("GIẢM" / "30%", g06)
 ARC_LINE = 0.18      # và đường thẳng khớp tệ: lệch trung vị >= 0.18 cao chữ
 ARC_BLIND = 7        # cung >= 7 mảnh mà OCR không đọc được chữ nào vẫn là chữ (OCR hay trượt hẳn chữ cong)
-RUN_SIZE = 1.4       # một dòng nhiều cỡ: hai ô liền nhau cỡ lệch >= 1.4 lần ...
-RUN_BASE = 0.15      # ... đường chân lệch <= 0.15 cỡ lớn ...
-RUN_GAP = 0.7        # ... khe ngang <= 0.7 cỡ lớn
-RUN_MIN = 24.0       # ... và cỡ lớn >= 24 px (chữ li ti trang trí -- dãy số nhị phân -- không phải dòng nhiều cỡ)
 
 
 BAND_MIN_H = 0.035   # DẢI CHỮ hiển thị: cao chữ >= 3.5% cạnh ngắn ảnh (chữ thân để OCR lo)
-BAND_GAP = 0.9       # hai mảnh nét cùng dải: khe ngang <= 0.9 cao chữ, cao lệch <= 1.6 lần, chồng nhau theo chiều dọc >= 0.3
 BAND_TILT = 4.0      # dải nghiêng: >= 4 độ
-
-
-def bands(ink: np.ndarray, W: int, H: int) -> list[dict]:
-    """Các DẢI CHỮ hiển thị trong mặt nạ nét (12/10, từ probe chữ khó): mảnh nét cùng cỡ nối nhau theo chiều ngang thành dải,
-    đường tâm = đa thức bậc <= 3 qua tâm các lát dọc. Chữ dính liền vì viền / 3D (cả từ là một mảnh) vẫn đo được -- khác `arcs`
-    (khớp đường tròn qua từng chữ cái rời). -> [{pts (đường TÂM, trái -> phải), h (cao chữ), span, sag (theo cao chữ), tilt (độ),
-    box, mask, n (số mảnh)}]"""
-    import cv2
-    m = cv2.morphologyEx(ink.astype(np.uint8), cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
-    n, cc, st, _ = cv2.connectedComponentsWithStats(m, 8)
-    comps = []
-    for i in range(1, n):
-        x, y, w, h, a = st[i]
-        if a < 40 or h < 10 or w > 0.95 * W or h > 0.6 * H:
-            continue
-        sub = cc[y:y + h, x:x + w] == i
-        ext = [np.ptp(np.nonzero(sub[:, c])[0]) + 1 for c in range(0, w, 3) if sub[:, c].any()]
-        comps.append({"i": i, "x0": x, "y0": y, "x1": x + w, "y1": y + h, "hg": float(np.median(ext))})
-    par = list(range(len(comps)))
-
-    def f(i):
-        while par[i] != i:
-            par[i] = par[par[i]]
-            i = par[i]
-        return i
-    for i, a in enumerate(comps):
-        for j in range(i + 1, len(comps)):
-            b = comps[j]
-            hi, lo = max(a["hg"], b["hg"]), min(a["hg"], b["hg"])
-            gx = max(b["x0"] - a["x1"], a["x0"] - b["x1"], 0)
-            ov = min(a["y1"], b["y1"]) - max(a["y0"], b["y0"])
-            if hi <= 1.6 * lo and gx <= BAND_GAP * hi and ov >= 0.3 * lo:
-                par[f(i)] = f(j)
-    groups = {}
-    for i in range(len(comps)):
-        groups.setdefault(f(i), []).append(comps[i])
-    out = []
-    for g in groups.values():
-        hg = float(np.median([c["hg"] for c in g]))
-        x0, x1 = min(c["x0"] for c in g), max(c["x1"] for c in g)
-        if hg < BAND_MIN_H * min(W, H) or x1 - x0 < 2.0 * hg:
-            continue
-        sel = np.isin(cc, [c["i"] for c in g])
-        xs, mid, ext = [], [], []
-        for x in range(x0, x1, 4):
-            ys = np.nonzero(sel[:, x:x + 4].any(1))[0]
-            if len(ys):
-                xs.append(x + 2)
-                mid.append((ys[0] + ys[-1]) / 2)
-                ext.append(ys[-1] - ys[0] + 1)
-        xs, mid, ext = np.array(xs, float), np.array(mid), np.array(ext, float)
-        if len(xs) < 8:
-            continue
-        deg = 3 if len(xs) >= 16 else 2
-        u = (xs - xs.mean()) / max(1.0, np.ptp(xs))
-        co = np.polyfit(u, mid, deg)
-        for _ in range(2):   # bỏ lát lệch (dấu thanh làm lát cao vọt, khe chữ)
-            r = np.abs(np.polyval(co, u) - mid)
-            keep = r <= max(0.25 * hg, 2.5 * np.median(r))
-            if keep.sum() < 8:
-                break
-            co = np.polyfit(u[keep], mid[keep], deg)
-        px = np.linspace(xs.min(), xs.max(), NPATH)
-        py = np.polyval(co, (px - xs.mean()) / max(1.0, np.ptp(xs)))
-        chord = np.array([px[-1] - px[0], py[-1] - py[0]])
-        nrm = np.array([-chord[1], chord[0]]) / max(1e-6, float(np.linalg.norm(chord)))
-        sag = float(np.max(np.abs((np.c_[px, py] - [px[0], py[0]]) @ nrm)))
-        tilt = math.degrees(math.atan2(chord[1], chord[0]))
-        slope = np.gradient(py, px)
-        h = float(np.median(ext) * math.cos(math.atan(float(np.median(np.abs(slope))))))   # lát dọc cắt xiên chữ nghiêng
-        ys_, xs_ = np.nonzero(sel)
-        out.append({"pts": [[float(a), float(b)] for a, b in zip(px, py)], "h": h, "sag": sag / max(h, 1.0), "tilt": tilt,
-                    "span": float(np.sum(np.hypot(np.diff(px), np.diff(py)))), "n": len(g),
-                    "box": [float(xs_.min()), float(ys_.min()), float(xs_.max() + 1), float(ys_.max() + 1)], "mask": sel})
-    return out
 
 
 def _circle(pts: np.ndarray) -> tuple[float, float, float]:
@@ -384,7 +300,7 @@ def apply_arcs(L: list[dict], I: list[dict], found: list[dict], cap_em: float) -
                "scale": a.get("scale"), **({"curve": a["curve"]} if a.get("curve") else {}),
                "sag": a.get("sag"), "merged": [l.get("ocr") or "" for l in cov_L],   # bằng chứng, ghi cho debug
                "poly": [[a["box"][0], a["box"][1]], [a["box"][2], a["box"][1]], [a["box"][2], a["box"][3]], [a["box"][0], a["box"][3]]]}
-        zone = mk.copy()   # vùng chữ của ô: vùng dò được + khung các mẩu đã gộp (slots._geo_lines thêm dải dọc đường chân)
+        zone = mk.copy()   # vùng chữ của ô: vùng dò được + khung các mẩu đã gộp (_geo_lines thêm dải dọc đường chân)
         for m in cov_L + cov_I:
             if m.get("poly"):
                 import cv2
@@ -458,3 +374,148 @@ def region_line(mask: np.ndarray, pad: float) -> dict | None:
     res = float(np.median(np.abs(np.hypot(cen[:, 0] - cx, cen[:, 1] - cy) - r)))
     return {"center": cen, "h": h, "t": t, "sag": sag / h, "res": res / h, "tilt": math.degrees(math.atan2(chord[1], chord[0])),
             "span": float(np.sum(np.hypot(*np.diff(cen, axis=0).T))), "circle": (cx, cy, r)}
+
+
+def _geo_lines(L: list, I: list, draft: np.ndarray, A: np.ndarray, ink0: np.ndarray, shells: list,
+               missed: bool = True) -> tuple[list, list, list[str], dict]:
+    """CHỮ HÌNH DẠNG KHÓ từ VÙNG CHỮ của bộ dò (ocr.regions: bản đồ của chính RapidOCR trước khi bị ép khung 4 điểm). Đo trên 1307
+    vùng của 162 nháp (12/10): mọi vùng hiển thị võng >= 0.3 cao dòng đều là chữ cong thật (dòng thẳng <= 0.24).
+      (a) vùng CONG -> MỘT ô L có đường chân, gộp các mẩu OCR và chi tiết nằm trên nó;
+      (b) vùng KHÔNG có dòng OCR nào, có nét chữ Hi-SAM (>= 10% vùng) và bộ đọc đọc ra chữ -> ô L mới
+          (dòng to bị OCR bỏ ở khâu ép khung: "FLASH SALE", dòng giữa của nhãn dán), thay các ô chi tiết vụn nằm trong nó.
+          KHÔNG làm khi khách tải ảnh sản phẩm (missed=False): chữ in trên sản phẩm cũng bị bước xoá gỡ và cũng "không có dòng
+          OCR" (12/10: con dấu bánh pía "DAU", chữ dọc trên lon) -- các ô chi tiết + "keep" đang lo đúng phần đó.
+    Dòng thẳng đã có ô OCR: không đụng. -> (L, I, log, masks {id ô L tạo ra ở đây: vùng chữ của nó (bool cỡ ảnh)}): build đo
+    lại vỏ / chi tiết với các vùng này là CHỮ (xem _layers)."""
+    import cv2
+
+    from . import ocr
+    H, W = A.shape[:2]
+    ink = np.asarray(ink0, bool)   # nét mực = nét chữ của Hi-SAM (14/10; trước: chỗ bước xoá FLUX đã gỡ)
+    found, log, masks = [], [], {}
+    cen_in = lambda b, m: bool(m[int(min(H - 1, max(0, (b[1] + b[3]) / 2))), int(min(W - 1, max(0, (b[0] + b[2]) / 2)))])   # noqa: E731
+    regs = ocr.regions(draft)
+    log.append(f"bộ dò: {len(regs)} vùng chữ" if regs else "bộ dò: KHÔNG lấy được bản đồ vùng chữ (phiên bản RapidOCR?) -- phần chữ khó không chạy")
+    for R in regs:
+        g = region_line(R["mask"], R["pad"])
+        if g is None or g["h"] < BAND_MIN_H * min(W, H):   # chỉ chữ hiển thị (cao dòng >= 3.5% cạnh ngắn)
+            continue
+        k = max(1, int(round(R["pad"])))
+        near = cv2.dilate(R["mask"].astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * k + 1, 2 * k + 1))) > 0
+        ys, xs = np.nonzero(near)
+        box = [float(xs.min()), float(ys.min()), float(xs.max() + 1), float(ys.max() + 1)]
+        # cao chữ thật: bề rộng dải nét mực NGANG đường tâm (bỏ 5% hai mép: dấu thanh, đuôi chữ); không có nét (chữ còn trên nền
+        # hoặc nằm trong vỏ không đo được): 0.6 cao dòng
+        cen = g["center"]
+        t = np.gradient(cen, axis=0)
+        t /= np.maximum(np.linalg.norm(t, axis=1, keepdims=True), 1e-6)
+        nrm = np.c_[-t[:, 1], t[:, 0]]
+        iy, ix = np.nonzero(ink & near)
+        ext = 0.6 * g["h"]
+        if len(ix) >= 50:
+            P_ = np.c_[ix, iy].astype(np.float64)
+            d2 = ((P_[:, None, :] - cen[None, :, :]) ** 2).sum(2)
+            j = d2.argmin(1)
+            v = ((P_ - cen[j]) * nrm[j]).sum(1)
+            lo, hi = np.percentile(v, [5, 95])
+            ext = float(np.clip(hi - lo, 0.35 * g["h"], 1.0 * g["h"]))
+            cen = cen + nrm * ((lo + hi) / 2)   # tâm dải nét (lõi vùng của bộ dò có thể lệch khỏi tâm chữ)
+        on = [l for l in L if cen_in(l["box"], near)]
+        # HAI DÒNG NGHIÊNG XẾP CHỒNG dính một vùng (13/10 accept1 g06: "GIẢM" / "30%" trên ruy băng chéo) cũng "võng" như một vòm
+        # -> vùng tách được thành các dòng bằng khe không nét thì không phải vòm; đi tiếp nhánh dòng OCR sót
+        # ... và vùng NGẮN (dài < ARC_SPAN cao dòng, vài chữ cái) không đủ để nói là cong: đường tâm đi theo hình chữ
+        curved = g["sag"] >= ARC_SAG and g["span"] >= ARC_SPAN * g["h"]
+        stack = _stacked(near, ink, g["tilt"], ext) if curved else [0]
+        if curved and len(stack) == 1:
+            found.append({"box": box, "geo": "arc", "path": _baseline(cen, np.full(len(cen), ext / 2)), "scale": None, "h": ext,
+                          "mask": near, "parts": ARC_BLIND, "sag": round(g["sag"], 2), **circle_of(cen, ext)})
+            continue
+        if not missed or on or g["span"] < 1.5 * g["h"]:
+            continue
+        # (b) dòng bị sót: phải là LỚP PHỦ bị gỡ (nét mực chiếm >= 10% vùng; chữ in trên vật / hoạ tiết ảnh còn nguyên trên nền)
+        if float((ink & near).sum()) < 0.1 * float(near.sum()):
+            continue
+        ang = g["tilt"] if abs(g["tilt"]) >= BAND_TILT else 0.0
+        for part, pext in _stacked(near, ink, g["tilt"], ext):
+            pys, pxs = np.nonzero(part)
+            pbox = [float(pxs.min()), float(pys.min()), float(pxs.max() + 1), float(pys.max() + 1)]
+            rect = cv2.minAreaRect(np.c_[pxs, pys].astype(np.float32))
+            text = ocr.read_region(draft, rect)
+            if sum(ch.isalnum() for ch in text) < 2:   # hàng sao, hoạ tiết: bộ đọc không ra chữ -> để các ô chi tiết lo như cũ
+                continue
+            poly = [[float(a), float(b)] for a, b in cv2.boxPoints(rect)]
+            caps = sum(ch.isupper() or ch.isdigit() for ch in text if ch.isalnum()) >= 0.8 * sum(ch.isalnum() for ch in text)
+            col = np.median(draft[ink & part], axis=0) if (ink & part).any() else np.array([20, 20, 20])
+            new = {"id": f"L{1 + max([int(l['id'][1:]) for l in L] or [0])}", "box": pbox, "ocr_box": list(pbox), "poly": poly, "ocr": text,
+                   "base": None, "size": float(pext / (CAP_EM if caps else X_EM)), "color": "#%02x%02x%02x" % tuple(int(x) for x in col),
+                   "angle": float(ang), "caps": bool(caps), "stroke": None, "stroke_contrast": None, "effect": None,
+                   "missed": True}
+            gone = [c for c in I if cen_in(c["box"], part)]
+            I = [c for c in I if c not in gone]
+            L = L + [new]
+            masks[new["id"]] = part
+            log.append(f"dòng OCR sót: vùng chữ {[round(x) for x in pbox]} đọc {text!r} + {[c['id'] for c in gone]} -> {new['id']}")
+    L, I, lg = apply_arcs(L, I, found, CAP_EM)
+    for l in L:
+        mk = l.pop("_mask", None)
+        if mk is None:
+            continue
+        # vùng chữ của ô cung = vùng bộ dò + các mẩu đã gộp + dải dọc đường chân (cung nối dài ra ngoài vùng bộ dò)
+        band = np.zeros((H, W), np.uint8)
+        sz = float(l["size"])
+        for (ax, ay), (bx, by) in zip(l["path"][:-1], l["path"][1:]):
+            ln = float(np.hypot(bx - ax, by - ay)) or 1.0
+            nx, ny = (by - ay) / ln, -(bx - ax) / ln   # pháp tuyến "lên" của hướng đọc
+            cv2.fillConvexPoly(band, np.int32([[ax - nx * 0.25 * sz, ay - ny * 0.25 * sz], [bx - nx * 0.25 * sz, by - ny * 0.25 * sz],
+                                               [bx + nx * 1.1 * sz, by + ny * 1.1 * sz], [ax + nx * 1.1 * sz, ay + ny * 1.1 * sz]]), 1)
+        mk = mk | band.astype(bool)
+        masks[l["id"]] = mk
+        # MÀU MỰC đo trên chính vùng chữ (số đo màu của mẩu OCR đầu cung lấy trên khung thẳng cắt xiên chữ; cung OCR không đọc
+        # được thì không có màu): các điểm bị gỡ đổi màu mạnh nhất = lõi nét, không lẫn quầng
+        sel = ink & mk
+        if int(sel.sum()) >= 50:
+            core = sel & (cv2.erode(ink.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0)   # lõi nét, không lẫn viền khử răng cưa
+            core = core if int(core.sum()) >= 30 else sel
+            l["color"] = "#%02x%02x%02x" % tuple(int(v) for v in np.median(draft[core], axis=0))
+    return L, I, log + lg, masks
+
+
+STACK_VALLEY = 0.2   # hai dòng xếp chồng dính một vùng: giữa vùng có một dải gần như không nét (<= 20% mật độ nét của mỗi dòng)
+
+
+def _stacked(near: np.ndarray, ink: np.ndarray, tilt: float, ext: float) -> list[tuple[np.ndarray, float]]:
+    """Một vùng chữ của bộ dò có thể DÍNH hai dòng xếp chồng sát nhau ("FLASH" trên "SALE", 12/10 dev3 g07: một ô cỡ 244 px).
+    Chiếu nét mực lên trục vuông góc hướng đọc: có một KHE (dải gần như không nét) ở khoảng giữa, hai bên đều có nét -> tách tại
+    khe thành hai vùng (đệ quy cho ba dòng). -> [(vùng, cao chữ)] trên xuống; không có khe: [(near, ext)]."""
+    iy, ix = np.nonzero(ink & near)
+    if len(ix) < 200:
+        return [(near, ext)]
+    t = np.radians(tilt)
+    v = -ix * np.sin(t) + iy * np.cos(t)   # toạ độ vuông góc hướng đọc
+    v0, v1 = np.percentile(v, [1, 99])
+    hgt = v1 - v0
+    if hgt < 20:
+        return [(near, ext)]
+    n = max(8, int(hgt / 3))
+    hist = np.histogram(v, bins=n, range=(v0, v1))[0].astype(np.float64)
+    hist = np.convolve(hist, np.ones(3) / 3, mode="same")
+    best = None
+    for k in range(int(0.25 * n), int(0.75 * n) + 1):
+        up, dn = hist[:k].max(), hist[k + 1:].max() if k + 1 < n else 0.0
+        if hist[k] <= STACK_VALLEY * min(up, dn) and (best is None or hist[k] < hist[best]):
+            best = k
+    if best is None:
+        return [(near, ext)]
+    cut = v0 + (best + 0.5) * hgt / n
+    yy, xx = np.nonzero(near)
+    side = (-xx * np.sin(t) + yy * np.cos(t)) < cut
+    out = []
+    for sel in (side, ~side):
+        m = np.zeros_like(near)
+        m[yy[sel], xx[sel]] = True
+        pv = v[(v < cut) if sel is side else (v >= cut)]
+        if m.sum() < 30 or len(pv) < 50:
+            return [(near, ext)]
+        lo, hi = np.percentile(pv, [5, 95])
+        out += _stacked(m, ink, tilt, float(hi - lo))
+    return out

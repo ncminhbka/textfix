@@ -7,9 +7,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-
-
-FONTS_DIR = Path(os.environ.get("TEXTFIX_FONTS", Path(__file__).resolve().parents[1] / "assets" / "fonts"))
+FONTS_DIR = Path(os.environ.get("TEXTFIX_FONTS", Path(__file__).resolve().parents[2] / "assets" / "fonts"))
 
 
 # khoá -> (css family, lớp, fallback, {độ đậm: tệp}). Tệp nằm ở FONTS_DIR (assets/fonts/): CHỈ giấy phép OFL (dùng thương mại được), đủ 134 ký tự dấu tiếng Việt (02/10: bỏ mọi SVN-*).

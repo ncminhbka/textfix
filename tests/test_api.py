@@ -63,6 +63,6 @@ def test_remote_flux_draw_threads_follow_concurrency_not_gpus(monkeypatch):
 
 
 def test_flux_moderation_has_its_own_code():
-    from textfix.flux_api import FluxError, FluxModerated
+    from textfix.draw.remote import FluxError, FluxModerated
     assert server.draw_error(FluxModerated("Content Moderated"), "FLUX vẽ nháp")["code"] == "draw_moderated"
     assert server.draw_error(FluxError("HTTP 500"), "FLUX vẽ nháp")["code"] == "draw_failed"

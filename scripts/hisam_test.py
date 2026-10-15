@@ -109,7 +109,7 @@ def load(a, device: str):
 
 
 def main(argv: list[str] | None = None) -> int:
-    from textfix import multigpu, ship
+    from textfix.tools import multigpu, ship
     ap = argparse.ArgumentParser()
     ap.add_argument("sets", nargs="*", help="tên tập đã chạy (accept2, mix1...)")
     ap.add_argument("--dir", type=Path, default=None, help="thư mục ảnh (png / jpg) thay cho nháp của tập")

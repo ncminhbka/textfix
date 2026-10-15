@@ -1,82 +1,61 @@
-"""GỠ CHỮ GIUN khỏi nháp: mặt nạ từ nét chữ Hi-SAM, nền dưới chữ do LaMa vẽ lại -- MỘT lượt LaMa cho cả poster.
-
-  ink = hisam.strokes(draft)                        # nét chữ (trạm vẽ)
-  clean, mask = erase(draft, ink, M)                # gỡ MỌI dòng của M["L"] -> nền VLM nhìn
-  base, mask = settle(draft, clean, ink, M, plan)   # dòng VLM chọn "keep" trở về điểm ảnh nháp (không gọi LaMa lần nữa)
-
-Chất lượng gỡ chữ do mặt nạ quyết: LaMa sạch khi mặt nạ ôm sát nét, hỏng khi mặt nạ trùm cả nút / icon. Mỗi dòng cùng một cách:
-  1. NÉT    các MẢNH nét Hi-SAM của dòng: mỗi mảnh thuộc đúng một dòng (dòng có nhiều điểm của nó nhất, >= nửa mảnh --
-            lines.ink.own, cùng luật bước đo dòng), nên đuôi chữ / dấu thanh thò khỏi khung đi cùng chữ và hai dòng sát nhau không
-            gỡ chung một mảnh; cộng nét không dòng nào sở hữu nằm trong lõi dòng. Hi-SAM đã trả lời "có phải chữ không", nên vòng
-            con dấu, viền nút, hoạ tiết không bị kéo vào. Mảnh TRANG TRÍ đầu dòng (chấm "•", lines.lead) không phải chữ: ở lại.
-  2. DỰ PHÒNG  Hi-SAM thấy quá ít ở dòng (chữ rất nhỏ): thêm các mảng cùng màu mực cỡ một chữ cái; vẫn không có thì lấy lõi dòng.
-  3. QUẦNG  Hi-SAM chỉ thấy thân nét. Trong dải sát nét, điểm khác nền của dòng là viền dày / bóng đổ / quầng sáng; nền phẳng thì
-            lan tiếp theo đuôi mờ. Quầng phải dính vào nét (icon đứng cách chữ một khe nền thì không), không lấn sang dòng khác.
-  4. DẤU CÂU  mảng đậm nhỏ nằm gọn trong lõi dòng, giữa nét đầu và nét cuối (gạch nối, dấu chấm Hi-SAM bỏ qua).
-Nét của dòng giữ (chữ in trên sản phẩm) và mảnh trang trí không bao giờ vào mặt nạ. Còn sót quầng mờ / nét nhỏ thì chữ dựng mới đè lên.
-Số đo và các hướng đã thử, đã bỏ: docs/TUNING.md (mục gỡ chữ), công cụ đo scripts/erase_bench.py.
+"""Mặt nạ gỡ chữ theo từng dòng: mảnh nét của dòng, dự phòng màu mực, quầng, dấu câu (xem erase/__init__.py).
 """
 
 from __future__ import annotations
 
 import os
-import threading
 from dataclasses import dataclass
 
 import numpy as np
 
-from .color import hex_lab, lab
-from .lines.ink import Ink, own
+from ..color import hex_lab, lab
+from ..lines.ink import Ink, own
 
 # --- vùng của dòng (theo cao dòng)
 GROW_HOLD = 0.3     # vùng "thuộc dòng" (giữ / đếm chồng lấn)
+
+
 GROW_SEARCH = 0.6   # vùng tìm nét / quầng
+
+
 GROW_CORE = 0.1     # lõi dòng
+
+
 HEIGHT_CAP = 2.2    # cỡ dòng <= 2,2 lần cao mảng nét cao (khung OCR trùm hai hàng thì "cỡ" phình, dải quầng nuốt icon)
+
+
 # --- 1. nét
 MASK_GROW = float(os.environ.get("TEXTFIX_MASK_GROW", "0.12"))   # nới quanh nét (viền khử răng cưa còn lại thì LaMa vẽ lại hình chữ)
+
+
 # --- 2. dự phòng
 WEAK = 0.08         # Hi-SAM phủ < 8% lõi dòng = thấy quá ít (dòng thường 21-30%)
+
+
 INK_SAME = 25.0     # cùng màu mực: <= 25 ΔE
+
+
 INK_IN = 0.7        # mảng cùng màu mực là nét khi >= 70% nằm trong vùng dòng (vòng con dấu, viền nút phần lớn ở ngoài)
+
+
 GLYPH_MAX = 2.0     # ... và cạnh dài <= 2 cao dòng (một chữ cái)
+
+
 # --- 3. quầng
 HALO_REACH = 0.35   # dải sát nét rộng 0,35 cao dòng
+
+
 HALO_DE = 14.0      # điểm trong dải khác nền của dòng > 14 ΔE là quầng (nền ước từ vành ngay ngoài dải, trong vùng dòng: chữ
+
+
                     # trong nút thì vành là lòng nút, lòng nút không thành quầng)
 HALO_LO = 7.0       # nền phẳng: quầng lan tiếp qua điểm 7-14 ΔE liền với nó (đuôi bóng mờ dần); điểm đậm hơn ngoài dải là hình khác
+
+
 HALO_FLAT = 8.0     # nền phẳng = vành lệch trung vị <= 8 ΔE; nền có vân / ảnh chụp thì không lan
+
+
 HALO_LINE = 0.25    # dòng "có quầng" (nhật ký) khi quầng > 25% phần nét đã nới
-
-LAMA_PATH = os.path.expanduser(os.environ.get("TEXTFIX_LAMA", "~/persistent-data/lama/big-lama.pt"))
-
-
-# ---------------------------------------------------------------- API
-
-def erase(draft: np.ndarray, ink: np.ndarray, M: dict, device: str | None = None,
-          log: list | None = None) -> tuple[np.ndarray, np.ndarray]:
-    """Gỡ mọi dòng của M["L"]: LaMa lấp mặt nạ, ngoài mặt nạ giữ nguyên điểm ảnh nháp. -> (nền sạch chữ, mặt nạ).
-    device: card chạy LaMa (nên là card đã vẽ nháp, để chia tải). Thiếu big-lama.pt: báo lỗi và dừng."""
-    if not lama_ready():
-        raise RuntimeError(f"thiếu tệp LaMa {LAMA_PATH} (docs/SERVER.md, mục LaMa; đổi chỗ: export TEXTFIX_LAMA=<đường dẫn>)")
-    mask = erase_mask(draft, ink, M, set(), log)
-    if not mask.any():
-        return draft.copy(), mask
-    return _blend(inpaint(draft, mask, device), draft, mask), mask
-
-
-def settle(draft: np.ndarray, clean: np.ndarray, ink: np.ndarray, M: dict, P: dict | None = None,
-           log: list | None = None) -> tuple[np.ndarray, np.ndarray]:
-    """Nền dựng của một kế hoạch P: nền sạch chữ trong mặt nạ của các dòng KHÔNG giữ, nháp gốc ở mọi chỗ khác. Chỗ hai mặt nạ
-    chồng nhau thuộc dòng bị gỡ. Không gọi LaMa. -> (nền, mặt nạ)."""
-    kept = kept_of(P)
-    mask = erase_mask(draft, ink, M, kept, log)
-    return (clean if not kept else _blend(clean, draft, mask)), mask
-
-
-def kept_of(P: dict | None) -> set:
-    """Các dòng lệnh "keep" của kế hoạch (giữ nguyên điểm ảnh nháp)."""
-    return {m for op in (P or {}).get("ops") or [] if op.get("kind") == "keep" for m in op.get("marks") or op.get("slots") or []}
 
 
 def line_region(l: dict, H: int, W: int, grow: float) -> np.ndarray:
@@ -100,8 +79,6 @@ def line_region(l: dict, H: int, W: int, grow: float) -> np.ndarray:
     k = max(1, int(round(grow * h)))
     return cv2.dilate(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * k + 1, 2 * int(1.6 * k) + 1))).astype(bool)
 
-
-# ---------------------------------------------------------------- mặt nạ
 
 @dataclass
 class _Page:
@@ -276,68 +253,3 @@ def _punctuation(w: _Window, d: np.ndarray, got: np.ndarray, grown: np.ndarray) 
     small = [i for i in range(1, n) if not edge[i] and max(s[i, cv2.CC_STAT_WIDTH], s[i, cv2.CC_STAT_HEIGHT]) <= w.hgt
              and s[i, cv2.CC_STAT_LEFT] >= lo and s[i, cv2.CC_STAT_LEFT] + s[i, cv2.CC_STAT_WIDTH] - 1 <= hi]
     return np.isin(c, small) if small else np.zeros(got.shape, bool)
-
-
-# ---------------------------------------------------------------- LaMa
-
-_LAMA: dict = {}
-_LAMA_LOCK = threading.Lock()
-
-
-def lama_ready() -> bool:
-    return os.path.exists(LAMA_PATH)
-
-
-def _lama(device: str | None):
-    """Một bản LaMa (TorchScript) mỗi thiết bị, nạp lần đầu dùng (có khoá: nhiều luồng thiết kế gọi cùng lúc) -> (model, khoá)."""
-    import torch
-    dev = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    with _LAMA_LOCK:
-        if dev not in _LAMA:
-            _LAMA[dev] = (torch.jit.load(LAMA_PATH, map_location=dev).eval(), threading.Lock())
-        return dev, *_LAMA[dev]
-
-
-def inpaint(img: np.ndarray, mask: np.ndarray, device: str | None = None) -> np.ndarray:
-    """LaMa vẽ lại phần trong mặt nạ theo nền xung quanh (một lượt, không khuếch tán). Ảnh đệm phản chiếu tới bội số 8."""
-    import torch
-    dev, net, lock = _lama(device)
-    H, W = img.shape[:2]
-    ph, pw = (8 - H % 8) % 8, (8 - W % 8) % 8
-    im = np.pad(img, ((0, ph), (0, pw), (0, 0)), mode="reflect")
-    mk = np.pad(mask.astype(np.float32), ((0, ph), (0, pw)))
-    with lock, torch.no_grad():
-        o = net(torch.from_numpy(im).permute(2, 0, 1)[None].float().div(255).to(dev), torch.from_numpy(mk)[None, None].to(dev))
-    return (o[0].permute(1, 2, 0).float().cpu().numpy()[:H, :W] * 255).round().clip(0, 255).astype(np.uint8)
-
-
-def _blend(inside: np.ndarray, outside: np.ndarray, mask: np.ndarray) -> np.ndarray:
-    """Ghép theo mặt nạ, mép mềm 1 px (không lộ đường cắt)."""
-    import cv2
-    a = cv2.GaussianBlur(mask.astype(np.float32), (0, 0), 1.0)[..., None]
-    return (inside * a + outside * (1 - a)).round().clip(0, 255).astype(np.uint8)
-
-
-# ---------------------------------------------------------------- ảnh xem
-
-def hisam_image(draft: np.ndarray, ink: np.ndarray) -> np.ndarray:
-    """Đầu ra thô của Hi-SAM: nháp nhạt đi, nét chữ tô HỒNG."""
-    vis = draft.astype(np.float32) * 0.55 + 255 * 0.45
-    ink = np.asarray(ink, bool)
-    vis[ink] = vis[ink] * 0.15 + np.asarray((235, 0, 200), np.float32) * 0.85
-    return vis.round().clip(0, 255).astype(np.uint8)
-
-
-def ink_image(draft: np.ndarray, ink: np.ndarray, mask: np.ndarray, M: dict, kept: set) -> np.ndarray:
-    """Bước gỡ chữ: nét bị gỡ XANH LÁ, phần nới / quầng VÀNG, nét của dòng giữ XANH DƯƠNG, nét không thuộc dòng nào HỒNG."""
-    H, W = draft.shape[:2]
-    hold = np.zeros((H, W), bool)
-    for l in M["L"]:
-        if l["id"] in kept:
-            hold |= line_region(l, H, W, GROW_HOLD)
-    ink = np.asarray(ink, bool)
-    vis = draft.astype(np.float32) * 0.55 + 255 * 0.45
-    for sel, col, a in ((mask & ~ink, (255, 210, 0), 0.55), (mask & ink, (0, 170, 60), 0.85), (ink & ~mask & hold, (30, 110, 240), 0.85),
-                        (ink & ~mask & ~hold, (235, 0, 200), 0.85)):
-        vis[sel] = vis[sel] * (1 - a) + np.asarray(col, np.float32) * a
-    return vis.round().clip(0, 255).astype(np.uint8)

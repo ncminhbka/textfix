@@ -181,7 +181,7 @@ def check_chrome(data: Path | None, fix: bool) -> None:
             return
     if exe is None:
         try:   # máy ra được internet (docs/DEPLOY.md): Chromium của `playwright install chromium`
-            from textfix.browser import Browser as Reader
+            from textfix.render.browser import Browser as Reader
             with Reader() as R:
                 R.page.set_content("<p style='font-size:40px'>Ệ Ợ Ữ</p>")
                 R.page.screenshot()
@@ -221,7 +221,7 @@ def check_chrome(data: Path | None, fix: bool) -> None:
         warn("không có ldd, bỏ qua kiểm thư viện")
     print("  ... mở Chromium bằng Playwright", flush=True)
     try:
-        from textfix.browser import Browser as Reader
+        from textfix.render.browser import Browser as Reader
         t0 = time.time()
         with Reader() as R:
             R.page.set_content("<p style='font-size:40px'>Ệ Ợ Ữ</p>")
@@ -307,7 +307,7 @@ def check_models(no_call: bool) -> None:
 # ---------------------------------------------------------------------------------------------------- main
 def check_local_flux(a, data) -> None:
     print("3. Trọng số FLUX.2-klein (distill + base) -- FLUX chạy tại chỗ")
-    from textfix.flux import find_weights
+    from textfix.draw.flux import find_weights
     extra = [Path(os.path.expanduser(a.weights_dir))] if a.weights_dir else []
     if data:
         extra += [d for d in data.iterdir() if d.is_dir() and "klein" in d.name.lower()]
@@ -333,9 +333,9 @@ def check_local_flux(a, data) -> None:
 
 def check_remote_flux(no_call: bool) -> None:
     """FLUX ở máy khác (textfix/flux_api.py): có địa chỉ + khoá; gọi thử một ảnh nhỏ (tốn một lượt vẽ) trừ khi --no-call."""
-    from textfix import flux_api
-    F = flux_api.RemoteFlux()
-    print(f"3. FLUX ở máy khác: {F.url} (gửi cùng lúc {flux_api.concurrency()}, safety_tolerance {F.safety})")
+    from textfix.draw import remote
+    F = remote.RemoteFlux()
+    print(f"3. FLUX ở máy khác: {F.url} (gửi cùng lúc {remote.concurrency()}, safety_tolerance {F.safety})")
     if F.url.rstrip("/").endswith("-preview"):
         warn("điểm cuối -preview đổi model theo thời gian: cùng seed có thể ra ảnh khác -- nên dùng bản cố định")
     if not F.key:
@@ -377,8 +377,8 @@ def main() -> int:
     if HOME / "work" not in ROOT.parents:
         warn(f"repo không nằm trong {HOME / 'work'} (quy ước máy chủ) -- vẫn chạy được")
     ok("có .env (biến đã export vẫn thắng)") if (ROOT / ".env").exists() else print("  (không có .env: dùng biến đã export, docs/SERVER.md mục 3)")
-    from textfix import flux_api
-    remote = flux_api.enabled()
+    from textfix.draw import remote
+    remote = remote.enabled()
     data = persistent()
     if data is None:
         (warn if remote else bad)("không thấy ~/persistent-data" + (" -- được, nếu đã đặt TEXTFIX_HISAM / TEXTFIX_LAMA" if remote else ""),
@@ -420,7 +420,8 @@ def main() -> int:
         check_local_flux(a, data)
 
     print("3b. Model gỡ chữ: Hi-SAM (tìm nét chữ) + LaMa (vẽ lại nền) -- BẮT BUỘC từ 14/10")
-    from textfix import erase, hisam
+    from textfix import erase
+    from textfix.draw import hisam
     lost = hisam.missing()
     ok(f"Hi-SAM đủ tệp ở {hisam.HOME}") if not lost else bad("thiếu tệp Hi-SAM: " + "; ".join(lost), "docs/SERVER.md, mục Hi-SAM")
     ok(f"LaMa: {erase.LAMA_PATH}") if erase.lama_ready() else bad(f"thiếu {erase.LAMA_PATH}", "docs/SERVER.md, mục LaMa")
@@ -449,7 +450,7 @@ def main() -> int:
     try:
         import numpy as np
         from PIL import Image, ImageDraw, ImageFont
-        from textfix.ocr import read_lines
+        from textfix.lines.ocr import read_lines
         im = Image.new("RGB", (600, 160), "white")
         f = next(iter(sorted((ROOT / "assets" / "fonts").glob("BeVietnamPro-Black.*"))), None)
         ImageDraw.Draw(im).text((20, 40), "SALE 50%", fill="black", font=ImageFont.truetype(str(f), 64) if f else None)

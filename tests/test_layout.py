@@ -6,7 +6,7 @@ import pytest
 
 
 def test_font_heights_differ_by_family():
-    from textfix.fonts import CAP_EM, X_EM, heights
+    from textfix.render.fonts import CAP_EM, X_EM, heights
     assert heights("anton")[0] > 0.8 and heights("allura")[0] < 0.62   # chữ hẹp cao / thư pháp thấp: không dùng một hằng chung
     assert heights("bungee")[1] == pytest.approx(heights("bungee")[0], abs=0.01)   # font toàn chữ hoa
     assert heights("khong-co") == (CAP_EM, X_EM)
@@ -14,7 +14,7 @@ def test_font_heights_differ_by_family():
 
 def test_room_grows_into_free_background_only():
     import numpy as np
-    from textfix.fill import room
+    from textfix.compose.size import room
     lab = np.zeros((100, 400, 3))
     lab[:, 290:] = (50, 40, 0)                 # mép vỏ / hình ở x >= 290
     blocked = np.zeros((100, 400), bool)
@@ -33,12 +33,12 @@ def test_room_grows_into_free_background_only():
     (None, None, "#123456", "#123456"),
 ])
 def test_color_needs_two_sources(glyph, ink, vlm, want):
-    from textfix.fill import pick_color
+    from textfix.compose.style import pick_color
     assert pick_color(glyph, ink, vlm)[0] == want
 
 
 def test_row_of_mixed_sizes_reads_left_to_right():
-    from textfix.fill import _reading
+    from textfix.compose.geometry import _reading
     giam, big = [100, 120, 180, 160], [190, 60, 420, 165]   # "Giảm" nhỏ | "50%" to, cùng hàng: mép trên của chữ to cao hơn
     under = [100, 200, 420, 240]
     assert _reading([big, under, giam]) == [2, 0, 1]

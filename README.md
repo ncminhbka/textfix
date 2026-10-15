@@ -5,16 +5,17 @@ giữ nguyên mọi điểm ảnh khác của nháp, gỡ chữ giun và viết 
 
 ## Luồng
 
+Mỗi bước là một gói trong `textfix/`; `textfix/engine.py` nối chúng lại.
+
 ```
 form / prompt
-  -> LLM: prompt FLUX.2 (theo hướng dẫn nâng prompt của BFL) + câu của khách          textfix/brief/
-  -> FLUX.2-klein vẽ nháp                                                            textfix/flux.py
-  -> Hi-SAM tìm nét chữ của nháp (mặt nạ từng điểm ảnh)                             textfix/hisam.py
-  -> đo DÒNG chữ: OCR chia vùng dòng; hướng, cao chữ, màu, nét đo trên nét Hi-SAM      textfix/slots.py, lines/, geo.py
-  -> gỡ chữ: mảnh nét của từng dòng + quầng, LaMa lấp một lần                          textfix/erase.py
-  -> VLM đọc nháp: dòng nào là câu nào; số phận mỗi dòng viết / giữ / xoá             textfix/compose/
-  -> bố cục: cỡ theo font thật, nới vào nền trống, tập cùng vai, màu                   textfix/fill.py
-  -> dựng chữ trên nền (Chromium), kiểm lỗi, sửa bằng code                            textfix/render.py
+  1.  LLM: prompt FLUX.2 (theo hướng dẫn nâng prompt của BFL) + câu của khách      brief/
+  2.  FLUX.2-klein vẽ nháp; Hi-SAM tìm nét chữ (mặt nạ từng điểm ảnh)              draw/
+  4a. DÒNG chữ: OCR chia vùng dòng; hướng, cao chữ, màu, nét đo trên nét Hi-SAM     lines/
+  4b. gỡ chữ: mảnh nét của từng dòng + quầng, LaMa lấp một lần                      erase/
+  4c. VLM đọc nháp: dòng nào là câu nào; số phận mỗi dòng viết / giữ / xoá          compose/ (vlm, fate, assign)
+  4d. bố cục: cỡ theo font thật, nới vào nền trống, tập cùng vai, màu               compose/ (layout, size, style)
+  5.  dựng chữ trên nền (Chromium), kiểm lỗi, sửa bằng code                         render/
   -> poster
 ```
 
@@ -41,24 +42,26 @@ Deploy khi FLUX / LLM / VLM ở máy khác: [docs/DEPLOY.md](docs/DEPLOY.md).
 
 | Đường dẫn | Việc |
 |---|---|
-| `textfix/engine.py` | Nối toàn bộ luồng: `Engine.brief`, `make` (vẽ + sửa), `fix` (sửa nháp có sẵn) |
-| `textfix/brief/` | LLM đầu luồng: danh sách chữ + prompt FLUX; code kiểm theo bằng chứng (không số bịa, chữ khách luôn có, prompt vẽ đúng danh sách). Test: `pytest tests/test_brief.py` |
-| `textfix/flux.py` | FLUX.2-klein: vẽ nháp |
-| `textfix/hisam.py` | Hi-SAM: mặt nạ nét chữ của nháp |
-| `textfix/erase.py` | Gỡ chữ giun: mặt nạ từ nét Hi-SAM (nét, dự phòng, quầng, dấu câu) + LaMa một lượt. Test: `pytest tests/test_erase.py` |
-| `textfix/slots.py` | Dòng chữ: OCR chia vùng dòng, chữ cong (`geo.py`), chữ dọc, cụm nét lạ |
-| `textfix/lines/` | Hình học + số đo dòng trên nét Hi-SAM: hướng (nét + OCR), cao chữ, đường chân, màu, trang trí đầu dòng, hàng nhiều cỡ. Test: `pytest tests/test_lines.py` |
-| `textfix/compose/` | VLM đọc nháp (`vlm.py`, hỏi lại dòng bỏ sót) + một bảng số phận dòng (`fate.py`). Test: `pytest tests/test_fate.py` |
-| `textfix/fill.py` | Ghép câu vào dòng + bố cục (cỡ theo font, nới khung, tập, màu). Test: `pytest tests/test_layout.py` |
-| `textfix/render.py` | Dựng HTML đúng khung dòng (thẻ font), kiểm lỗi |
-| `textfix/ocr.py`, `glyph.py`, `geo.py` | OCR dòng, đo nét (cỡ, màu), chữ cong |
-| `textfix/fonts.py` | Bộ font OFL đủ dấu tiếng Việt |
-| `textfix/ship.py` | Gói kết quả máy chủ thành zip < 24 MB, tự tải về trình duyệt (JupyterLab) |
-| `server/` | Máy chủ FastAPI ([docs/API.md](docs/API.md)) + giao diện demo (form như app, xem debug từng bước). Test: `pytest tests/test_api.py` |
+| `textfix/engine.py` | Nối toàn bộ luồng: `Engine.brief`, `make` (vẽ + sửa), `fix` (sửa nháp có sẵn); hai trạm `draw` / `design` cho máy chủ |
+| `textfix/brief/` | 1. LLM đầu luồng: danh sách chữ + prompt FLUX; code kiểm theo bằng chứng (không số bịa, chữ khách luôn có, prompt vẽ đúng danh sách). Test: `tests/test_brief.py` |
+| `textfix/draw/` | 2. `flux.py` FLUX tại chỗ, `remote.py` FLUX ở máy khác ([docs/DEPLOY.md](docs/DEPLOY.md)), `hisam.py` nét chữ của nháp. Test: `tests/test_flux*.py` |
+| `textfix/lines/` | 4a. Dòng chữ: `page.build` (điều phối), `detect` (dòng OCR + số đo nét), `split` (tách mục), `curve` (chữ cong), `orphans` (nét OCR không thấy), `order` (đánh số), `printed` (chữ trên sản phẩm), `view` (ảnh / JSON); hình học trên nét Hi-SAM: `ink`, `group`, `angle`, `measure`, `lead`, `runs`; `ocr`, `glyph`. Test: `tests/test_lines.py` |
+| `textfix/erase/` | 4b. Gỡ chữ giun: `mask` (nét, dự phòng, quầng, dấu câu), `lama` (một lượt LaMa), `view` (ảnh debug). Test: `tests/test_erase.py` |
+| `textfix/compose/` | 4c–4d. `call` + `vlm` (lời gọi VLM, hỏi lại dòng bỏ sót), `parse`, `fate` (một bảng số phận dòng), `assign` (câu ↔ dòng), `layout` (bố cục) với `geometry`, `size` (cỡ theo font, nới khung), `style` (màu), `text` (ngắt dòng). Test: `tests/test_fate.py`, `tests/test_layout.py` |
+| `textfix/render/` | 5. `page` (dựng trong Chromium; mã trang ở `js`), `check` (bộ kiểm, tương phản), `fix` (vòng sửa), `geometry`, `style`, `view`; `fonts` (bộ font OFL đủ dấu tiếng Việt), `browser` |
+| `textfix/tools/` | Không thuộc dây chuyền: `multigpu` (chạy hàng loạt trên mọi card), `ship` (zip < 24 MB tự tải về, JupyterLab), `audit` (cờ nghi hỏng) |
+| `textfix/config.py`, `llm.py`, `color.py` | Biến môi trường, gọi LLM / VLM (OpenAI-compatible), màu CIELAB |
+| `server/` | Máy chủ FastAPI ([docs/API.md](docs/API.md)) + giao diện demo (form như app, xem debug từng bước). Test: `tests/test_api.py` |
 | `scripts/dev_batch.py`, `batch_report.py` | Chạy một tập qua máy chủ, báo cáo + một zip |
 | `scripts/replay.py`, `erase_bench.py`, `lines_bench.py` | Máy cá nhân: dựng lại poster / đo bước gỡ chữ / đo bước đo dòng (`bench/lines_gt`) trên nháp đã lưu |
+| `scripts/golden.py` | Dấu vân tay trạm thiết kế: tái cấu trúc mã thì chạy `record` trước, `check` sau, phải "khớp hết" |
 | `flux2/` | Mã suy luận FLUX.2 của Black Forest Labs (Apache-2.0), nguyên trạng |
 | `assets/` | Font (OFL) |
+
+Tên cũ (trước 15/10, còn gặp trong `docs/TUNING.md`, `docs/ROADMAP.md`): `slots.py` → `lines/` (+ `compose/call.py`),
+`fill.py` → `compose/` (`assign`, `layout`, `geometry`, `size`, `style`, `text`, `parse`), `geo.py` → `lines/curve.py`,
+`glyph.py` / `ocr.py` → `lines/`, `flux.py` / `flux_api.py` / `hisam.py` → `draw/` (`flux_api` thành `remote`),
+`erase.py` → `erase/`, `render.py` / `fonts.py` / `browser.py` → `render/`, `ship.py` / `multigpu.py` / `audit.py` → `tools/`.
 
 ## Giấy phép tài nguyên
 

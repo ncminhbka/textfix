@@ -1,5 +1,7 @@
 # Lộ trình: TextFix chỉ sửa chữ, Hi-SAM + LaMa thay bản xoá FLUX
 
+> Tên mô-đun trong tệp này là tên cũ (trước khi xếp lại theo bước, 15/10); bảng tên cũ → chỗ mới ở cuối README.
+
 Bắt đầu 14/10/2026. Tệp này là nguồn duy nhất cho câu hỏi "đang ở đâu, còn gì". Mỗi việc xong thì tick, kèm một dòng số đo
 nếu có. Đường cũ (bản xoá FLUX) nằm ở nhánh git `legacy-flux-erase`, không so sánh, không phát triển.
 

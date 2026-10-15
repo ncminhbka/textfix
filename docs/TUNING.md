@@ -1,5 +1,7 @@
 # Theo dõi tune từng bước
 
+> Tên mô-đun trong tệp này là tên cũ (trước khi xếp lại theo bước, 15/10); bảng tên cũ → chỗ mới ở cuối README.
+
 ## Quy tắc tune khi nhận một tập dev mới
 
 1. **Nhận đủ dữ liệu.** Giải nén vào `output/<tập>/`; đếm `plan.json` so với manifest. Zip cụt / thiếu -> cứu phần còn
@@ -18,7 +20,7 @@
    luật theo một ca. Mỗi sửa có số trước -> sau: replay plan cũ / dựng lại / bộ đáp án ô / bộ tổng hợp; không đo được local
    (LLM, VLM, FLUX) thì ghi **chờ server**.
 7. **Chống khớp quá sát.** Mỗi sửa chạy trên **toàn tập** (không chỉ ca lỗi) + `bench/slots_gt` (`slots_gt.py eval --vs base`)
-   + `geo_synth` khi đụng ô / hình học: không bắt nhầm, không tụt số. Ngưỡng chọn ở **khoảng tách** giữa ca đúng và ca sai trên
+   + `lines_bench` (`bench/lines_gt`) khi đụng dòng / hình học: không bắt nhầm, không tụt số. Ngưỡng chọn ở **khoảng tách** giữa ca đúng và ca sai trên
    phân bố, không vừa khít một ca. Lỗi một ảnh không lặp lại và không nặng -> ghi "theo dõi", chưa sửa.
 8. **Tính năng dở dang để sau cờ tắt** (vd. `TEXTFIX_GEO`) cho tới khi cả đường đi (đo -> VLM -> dựng) xong và đo được.
 9. **Ghi lại.** Mỗi sửa một dòng ở nhật ký đúng bước, gắn [code] / [prompt LLM] / [prompt VLM] + trạng thái; cập nhật bảng
@@ -31,7 +33,8 @@ Trạng thái: **đo** (có số đo trên cả tập) · **thử** (chỉ thử
 thật để biết) · **đề xuất** (chưa làm) · **chấp nhận** (quyết không sửa).
 Loại sửa: **[code]** luật / số đo trong mã · **[prompt LLM]** system prompt B0 · **[prompt VLM]** system prompt designer B3.
 Tập: `dev2` = bench/dev2.json (chạy server 09/10, đủ 62 ảnh / 32 ca) · `gt` = bench/slots_gt (23 ảnh, đáp án ô) · `synth` =
-scripts/geo_synth.py (chữ cong / nghiêng / nhiều cỡ tổng hợp, đáp án tuyệt đối).
+scripts/geo_synth.py (chữ cong / nghiêng / nhiều cỡ tổng hợp; đã gỡ 15/10 cùng `geo.bands`, thay bằng `bench/lines_gt`).
+Tái cấu trúc mã (không đổi hành vi): `scripts/golden.py record` trước, `check` sau, phải "khớp hết".
 
 ## Các bước
 

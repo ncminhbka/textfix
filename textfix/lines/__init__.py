@@ -1,6 +1,6 @@
 """HÌNH HỌC VÀ SỐ ĐO DÒNG từ NÉT Hi-SAM (bước 4a).
 
-Vùng dòng do OCR chia (slots.lines: bộ dò + các bước tách / gộp). Ở đây mỗi dòng nhận các MẢNH NÉT của nó (một mảnh thuộc
+Vùng dòng do OCR chia (lines.detect.lines: bộ dò + các bước tách / gộp). Ở đây mỗi dòng nhận các MẢNH NÉT của nó (một mảnh thuộc
 đúng một dòng) và mọi đại lượng hình học đo trên chính các mảnh đó:
 
     G = measure_lines(draft, ink, regions, ocr_angles, boxes)
@@ -18,13 +18,17 @@ from __future__ import annotations
 import numpy as np
 
 from .angle import SNAP, VERTICAL, direction, orient, wrap
+from .detect import lines, reorient  # noqa: F401
 from .group import Group
 from .ink import Ink, own
 from .lead import lead
 from .measure import CAP_EM, measure
+from .page import build  # noqa: F401
+from .printed import mark_printed  # noqa: F401
 from .runs import rows
+from .view import marked_image, public  # noqa: F401
 
-__all__ = ["CAP_EM", "SNAP", "VERTICAL", "Ink", "measure_lines", "rows", "wrap"]
+__all__ = ["CAP_EM", "Ink", "SNAP", "VERTICAL", "build", "lines", "mark_printed", "marked_image", "measure_lines", "public", "reorient", "rows", "wrap"]
 
 NONE = {"ornament": [], "x0": None, "h_cap": None, "h_x": None, "base": None, "color": None, "stroke": None, "stroke_contrast": None}
 
@@ -47,4 +51,3 @@ def measure_lines(draft: np.ndarray, ink: Ink, regions: list[np.ndarray], ocr_an
                     "ornament": [[int(x), int(y), int(x + w), int(y + h)] for x, y, w, h in ink.stats[orn, :4]],
                     "x0": x0, **measure(draft, ink, ids)})
     return out
-

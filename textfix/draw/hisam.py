@@ -59,6 +59,7 @@ def load(device: str | None = None):
         if str(REPO) not in sys.path:
             sys.path.insert(0, str(REPO))
         import argparse
+
         from hi_sam.modeling.build import model_registry
         from hi_sam.modeling.predictor import SamPredictor
         ns = argparse.Namespace(model_type="vit_l", checkpoint=None, device=device, hier_det=False, input_size=[1024, 1024],

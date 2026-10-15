@@ -2,8 +2,8 @@
 lý do (plan.json "fates").
 
 Luật, theo thứ tự (người dùng chốt 15/10):
-  1. VLM ghép câu khách / chữ lấp vào dòng -> text (đơn vị do bước ghép, fill.resolve, quyết);
-  2. chữ in trên sản phẩm khách tải (slots.mark_printed) -> keep, trừ khi VLM ghép câu khách (fill.resolve);
+  1. VLM ghép câu khách / chữ lấp vào dòng -> text (đơn vị do bước ghép, compose.assign.resolve, quyết);
+  2. chữ in trên sản phẩm khách tải (lines.mark_printed) -> keep, trừ khi VLM ghép câu khách (compose.assign.resolve);
   3. VLM nói keep / skip -> theo VLM: TIN VLM khi nó xoá;
   4. VLM CÓ nhắc dòng mà không còn chữ cho nó (câu đã có chỗ khác, chữ lấp mang số bịa) -> hỏi lại xin câu cùng vai còn thiếu /
      chữ lấp (compose.vlm.REFILL: dòng giun trên pill / cùng cấp không xoá trống nếu còn chữ để viết); vẫn không -> skip: chữ giun

@@ -1,0 +1,56 @@
+"""BƯỚC 4b -- GỠ CHỮ GIUN khỏi nháp: mặt nạ từ nét chữ Hi-SAM, nền dưới chữ do LaMa vẽ lại -- MỘT lượt LaMa cho cả poster.
+
+  ink = hisam.strokes(draft)                        # nét chữ (trạm vẽ)
+  clean, mask = erase(draft, ink, M)                # gỡ MỌI dòng của M["L"] -> nền VLM nhìn
+  base, mask = settle(draft, clean, ink, M, plan)   # dòng VLM chọn "keep" trở về điểm ảnh nháp (không gọi LaMa lần nữa)
+
+Chất lượng gỡ chữ do mặt nạ quyết: LaMa sạch khi mặt nạ ôm sát nét, hỏng khi mặt nạ trùm cả nút / icon. Mỗi dòng cùng một cách:
+  1. NÉT    các MẢNH nét Hi-SAM của dòng: mỗi mảnh thuộc đúng một dòng (dòng có nhiều điểm của nó nhất, >= nửa mảnh --
+            lines.ink.own, cùng luật bước đo dòng), nên đuôi chữ / dấu thanh thò khỏi khung đi cùng chữ và hai dòng sát nhau không
+            gỡ chung một mảnh; cộng nét không dòng nào sở hữu nằm trong lõi dòng. Hi-SAM đã trả lời "có phải chữ không", nên vòng
+            con dấu, viền nút, hoạ tiết không bị kéo vào. Mảnh TRANG TRÍ đầu dòng (chấm "•", lines.lead) không phải chữ: ở lại.
+  2. DỰ PHÒNG  Hi-SAM thấy quá ít ở dòng (chữ rất nhỏ): thêm các mảng cùng màu mực cỡ một chữ cái; vẫn không có thì lấy lõi dòng.
+  3. QUẦNG  Hi-SAM chỉ thấy thân nét. Trong dải sát nét, điểm khác nền của dòng là viền dày / bóng đổ / quầng sáng; nền phẳng thì
+            lan tiếp theo đuôi mờ. Quầng phải dính vào nét (icon đứng cách chữ một khe nền thì không), không lấn sang dòng khác.
+  4. DẤU CÂU  mảng đậm nhỏ nằm gọn trong lõi dòng, giữa nét đầu và nét cuối (gạch nối, dấu chấm Hi-SAM bỏ qua).
+Nét của dòng giữ (chữ in trên sản phẩm) và mảnh trang trí không bao giờ vào mặt nạ. Còn sót quầng mờ / nét nhỏ thì chữ dựng mới đè lên.
+Phần: mask.py (mặt nạ theo từng dòng), lama.py (LaMa), view.py (ảnh debug).
+Số đo và các hướng đã thử, đã bỏ: docs/TUNING.md (mục gỡ chữ), công cụ đo scripts/erase_bench.py.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+
+from .lama import LAMA_PATH, _blend, inpaint, lama_ready  # noqa: F401
+from .mask import _dilate, erase_mask, line_region  # noqa: F401
+from .view import hisam_image, ink_image  # noqa: F401
+
+# ---------------------------------------------------------------- API
+
+def erase(draft: np.ndarray, ink: np.ndarray, M: dict, device: str | None = None,
+          log: list | None = None) -> tuple[np.ndarray, np.ndarray]:
+    """Gỡ mọi dòng của M["L"]: LaMa lấp mặt nạ, ngoài mặt nạ giữ nguyên điểm ảnh nháp. -> (nền sạch chữ, mặt nạ).
+    device: card chạy LaMa (nên là card đã vẽ nháp, để chia tải). Thiếu big-lama.pt: báo lỗi và dừng."""
+    if not lama_ready():
+        raise RuntimeError(f"thiếu tệp LaMa {LAMA_PATH} (docs/SERVER.md, mục LaMa; đổi chỗ: export TEXTFIX_LAMA=<đường dẫn>)")
+    mask = erase_mask(draft, ink, M, set(), log)
+    if not mask.any():
+        return draft.copy(), mask
+    return _blend(inpaint(draft, mask, device), draft, mask), mask
+
+
+def settle(draft: np.ndarray, clean: np.ndarray, ink: np.ndarray, M: dict, P: dict | None = None,
+           log: list | None = None) -> tuple[np.ndarray, np.ndarray]:
+    """Nền dựng của một kế hoạch P: nền sạch chữ trong mặt nạ của các dòng KHÔNG giữ, nháp gốc ở mọi chỗ khác. Chỗ hai mặt nạ
+    chồng nhau thuộc dòng bị gỡ. Không gọi LaMa. -> (nền, mặt nạ)."""
+    kept = kept_of(P)
+    mask = erase_mask(draft, ink, M, kept, log)
+    return (clean if not kept else _blend(clean, draft, mask)), mask
+
+
+def kept_of(P: dict | None) -> set:
+    """Các dòng lệnh "keep" của kế hoạch (giữ nguyên điểm ảnh nháp)."""
+    return {m for op in (P or {}).get("ops") or [] if op.get("kind") == "keep" for m in op.get("marks") or op.get("slots") or []}
+
+__all__ = ["LAMA_PATH", "_dilate", "erase_mask", "hisam_image", "ink_image", "inpaint", "lama_ready", "line_region"]

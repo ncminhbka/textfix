@@ -48,7 +48,7 @@ def _load(p: Path):
 
 def summarize(rd: Path) -> list[dict]:
     """Một lượt chạy -> mỗi ảnh một bản tóm tắt {v, mode, errors, shrink, missing, n_texts, flags, files}."""
-    from textfix import audit
+    from textfix.tools import audit
     B = _load(rd / "brief.json") or {}
     out = []
     for vd in sorted(rd.glob("v*")):

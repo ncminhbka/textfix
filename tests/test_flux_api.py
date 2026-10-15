@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from textfix import flux_api
+from textfix.draw import remote
 
 
 def png(w: int, h: int) -> bytes:
@@ -44,23 +44,23 @@ class FakeBFL:
 
 @pytest.fixture
 def fake(monkeypatch):
-    monkeypatch.setattr(flux_api, "POLL", 0)
-    monkeypatch.setattr(flux_api, "BUSY_WAIT", 0)
+    monkeypatch.setattr(remote, "POLL", 0)
+    monkeypatch.setattr(remote, "BUSY_WAIT", 0)
 
     def use(*a, **kw):
         f = FakeBFL(*a, **kw)
-        monkeypatch.setattr(flux_api.urllib.request, "urlopen", f)
+        monkeypatch.setattr(remote.urllib.request, "urlopen", f)
         return f
     return use
 
 
-def remote():
-    return flux_api.RemoteFlux(url="https://api.test/v1/flux-2-klein-9b", key="k", device="cpu", timeout=5)
+def client():
+    return remote.RemoteFlux(url="https://api.test/v1/flux-2-klein-9b", key="k", device="cpu", timeout=5)
 
 
 def test_draws_after_polling_and_sends_what_the_draft_needs(fake):
     f = fake(["Pending", "Generating", "Ready"])
-    img = remote().generate("a poster", 64, 48, 7, refs=[np.zeros((10, 10, 3), np.uint8)])
+    img = client().generate("a poster", 64, 48, 7, refs=[np.zeros((10, 10, 3), np.uint8)])
     assert img.shape == (48, 64, 3) and img[0, 0].tolist() == [200, 30, 30]
     b = f.posts[0]
     assert (b["width"], b["height"], b["seed"], b["output_format"]) == (64, 48, 7, "png") and "input_image" in b
@@ -69,22 +69,22 @@ def test_draws_after_polling_and_sends_what_the_draft_needs(fake):
 
 def test_wrong_size_from_host_is_brought_back_to_the_agreed_size(fake):
     fake(["Ready"], size=(70, 50))
-    assert remote().generate("x", 64, 48, 0).shape == (48, 64, 3)
+    assert client().generate("x", 64, 48, 0).shape == (48, 64, 3)
 
 
 def test_moderation_is_its_own_error(fake):
     fake(["Pending", "Content Moderated"])
-    with pytest.raises(flux_api.FluxModerated):
-        remote().generate("x", 64, 48, 0)
+    with pytest.raises(remote.FluxModerated):
+        client().generate("x", 64, 48, 0)
 
 
 def test_host_error_and_busy_account(fake):
     fake(["Error"])
-    with pytest.raises(flux_api.FluxError):
-        remote().generate("x", 64, 48, 0)
+    with pytest.raises(remote.FluxError):
+        client().generate("x", 64, 48, 0)
     f = fake(["Ready"], busy=2)   # 429 hai lần (đủ việc đang chạy) -> chờ rồi gửi lại
-    assert remote().generate("x", 64, 48, 0).shape == (48, 64, 3) and len(f.posts) == 1
+    assert client().generate("x", 64, 48, 0).shape == (48, 64, 3) and len(f.posts) == 1
 
 
 def test_result_url_when_host_gives_no_polling_url():
-    assert flux_api._result_url("https://api.eu.bfl.ai/v1/flux-2-klein-9b", "abc") == "https://api.eu.bfl.ai/v1/get_result?id=abc"
+    assert remote._result_url("https://api.eu.bfl.ai/v1/flux-2-klein-9b", "abc") == "https://api.eu.bfl.ai/v1/get_result?id=abc"

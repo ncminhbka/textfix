@@ -1,0 +1,204 @@
+"""BƯỚC 4c -- GHÉP: câu khách <-> dòng nháp thành ĐƠN VỊ (một câu nhiều dòng, một dòng nhiều câu, câu ghép hai lần,
+thứ tự các bước, số thứ tự đầu hàng). Chữ luôn là nguyên văn câu khách.
+"""
+
+from __future__ import annotations
+
+import re
+from collections import Counter
+
+from ..lines.printed import _flat
+from .geometry import SPLIT_RATIO, _reading, _stacked
+
+PIECE_SIM = 0.8     # các mẩu chữ VLM nối lại giống câu khách >= 0,8 = một câu chia nhiều chỗ (VLM viết lệch dấu: "TRƢƠNG", i03)
+
+
+def resolve(A: dict, M: dict, texts: list[dict]) -> tuple[list[dict], list[str], list[int]]:
+    """Đơn vị dựng từ phần ghép của VLM; số phận dòng theo compose.fate. -> (đơn vị, nhật ký, câu khách không có trên poster)."""
+    by, log = M["by"], []
+    from difflib import SequenceMatcher
+    sim = lambda a, b: SequenceMatcher(None, _flat(a), _flat(b)).ratio()  # noqa: E731
+    U = []
+    for u in A.get("assign") or []:
+        u = {**u, "marks": [m for m in u["marks"] if m in by], "clients": [k for k in u["clients"] if 0 <= k < len(texts)]}
+        if u["marks"]:
+            U.append(u)
+    # MỘT DÒNG MỘT ĐƠN VỊ: viết > giữ > xoá; ngang nhau: đơn vị đứng trước (VLM ghi thêm keep cho dòng đã có chữ -> hai lớp chữ)
+    rank = lambda u: 0 if u["kind"] == "text" and (u["clients"] or u["text_vlm"]) else 1 if u["kind"] == "keep" else 2  # noqa: E731
+    owner = {}
+    for i, u in sorted(enumerate(U), key=lambda t: (rank(t[1]), t[0])):
+        for m in u["marks"]:
+            owner.setdefault(m, i)
+    for i, u in enumerate(U):
+        lost = [m for m in u["marks"] if owner[m] != i]
+        if lost:
+            log.append(f"{u['id']}: dòng {lost} đã thuộc đơn vị khác -> bỏ khỏi đơn vị này")
+            u["marks"] = [m for m in u["marks"] if owner[m] == i]
+    U = [u for u in U if u["marks"]]
+    # CHỮ IN TRÊN SẢN PHẨM KHÁCH TẢI (mark_printed: chữ OCR trùng chữ đọc trên ảnh sản phẩm) giữ nguyên điểm ảnh -- trừ khi VLM
+    # ghép dòng đó vào một CÂU KHÁCH: VLM nhìn ảnh thấy đó là chữ poster (14/10 dev2 d39 / d14: tiêu đề "Cà phê hoà tan Classic"
+    # vẽ hai dòng, dòng "Classic" trùng chữ trên gói -> bị giữ dạng giun, câu dồn vào một dòng)
+    for u in list(U):
+        pr = [m for m in u["marks"] if by[m].get("printed")]
+        if pr and u["kind"] != "keep" and not u["clients"]:
+            log.append(f"{u['id']}: {pr} là chữ in trên sản phẩm khách tải -> giữ nguyên")
+            U.append({**u, "id": u["id"] + "p", "kind": "keep", "marks": pr, "clients": [], "split": None, "text_vlm": ""})
+            u["marks"] = [m for m in u["marks"] if m not in pr]
+    U = [u for u in U if u["marks"]]
+    # MỘT CÂU CHIA Ở NHIỀU ĐƠN VỊ (VLM ghi mỗi mẩu một mục: "Du lịch Mây Ngàn -" | "0283 777 8899", 14/10 mix1 m04): các mẩu nối
+    # lại theo thứ tự đọc ra đúng câu -> gộp thành một đơn vị nhiều dòng, mỗi dòng một mẩu
+    for k in {u["clients"][0] for u in U if len(u["clients"]) == 1 and u["split"]}:
+        us = [u for u in U if u["kind"] == "text" and u["clients"] == [k] and u["split"] and len(u["split"]) == len(u["marks"])]
+        if len(us) < 2:
+            continue
+        us = [us[i] for i in _reading([by[u["marks"][0]]["box"] for u in us])]
+        if sim("".join(p for u in us for p in u["split"]), texts[k]["text"]) < PIECE_SIM:
+            continue
+        us[0].update(marks=[m for u in us for m in u["marks"]], split=[p for u in us for p in u["split"]], split_ok=True)
+        U = [u for u in U if u not in us[1:]]
+        log.append(f"{us[0]['id']}: câu T{k} chia ở {[u['id'] for u in us]} -> một đơn vị {us[0]['marks']}")
+    # SPLIT trong MỘT đơn vị: chỉ dùng mảnh rỗng (VLM nói dòng đó không thuộc câu -- 14/10 mix1 m01: dòng thứ ba là tên máy FLUX
+    # tự vẽ) -> dòng rời đơn vị, xoá trống (VLM đã nhìn dòng và nói không có chữ khách nào ở đó). Ngắt câu vào các dòng là việc
+    # của code (bề rộng nét, layout); split chỉ còn cho chữ cong và phải nối lại đúng câu khách.
+    # ... TRỪ dòng để trống đứng CÙNG HÀNG, ngay cạnh một dòng có chữ của đơn vị, không chồng lên nó (final2 g18: VLM dồn "Giảm 50%"
+    # vào ô "50%", để trống ô "Giảm" bên cạnh -> chữ co còn 0,32): đó là một phần của hàng, giữ lại, code ngắt câu theo sức chứa.
+    # Dòng để trống CHỒNG lên dòng khác (OCR đọc trùng một mẩu) vẫn rời đơn vị.
+    for u in list(U):
+        if u["split"] and len(u["split"]) == len(u["marks"]) and any(not p.strip() for p in u["split"]):
+            full = [m for m, p in zip(u["marks"], u["split"]) if p.strip()]
+            empty = [m for m, p in zip(u["marks"], u["split"]) if not p.strip()]
+            stay = [m for m in empty if any(_beside(by[m]["box"], by[f]["box"]) for f in full)
+                    and not any(_cover_min(by[m]["box"], by[o]["box"]) > 0.5 for o in u["marks"] if o != m)]
+            out = [m for m in empty if m not in stay]
+            if stay:
+                u["split"], u["split_ok"] = None, False
+                log.append(f"{u['id']}: split để trống dòng {stay} cùng hàng cạnh dòng có chữ -> giữ trong đơn vị, code ngắt câu")
+            else:
+                u["split"] = [p for p in u["split"] if p.strip()]
+            u["marks"] = [m for m in u["marks"] if m not in out]
+            if out:
+                U.append({**u, "id": u["id"] + "x", "kind": "skip", "marks": out, "clients": [], "split": None, "text_vlm": "", "vlm_out": True})
+                log.append(f"{u['id']}: split để trống dòng {out} -> dòng đó rời đơn vị, xoá trống")
+        if u["split"] and not u.get("split_ok") and (len(u["clients"]) != 1
+                                                   or _flat("".join(u["split"])) != _flat(texts[u["clients"][0]]["text"])):
+            u["split"] = None
+    U = [u for u in U if u["marks"]]
+    # MỘT CÂU Ở NHIỀU ĐƠN VỊ: đơn vị có chữ OCR giống câu nhất nhận câu; đơn vị kia: còn câu CÙNG VAI chưa có chỗ thì nhận câu đó
+    # (FLUX vẽ lặp một hàng: 5f35 "Gội dưỡng" hai lần, "Đính đá" chưa có chỗ), không thì thành dòng lấp (chữ VLM nếu có)
+    used = Counter(k for u in U for k in u["clients"])
+    ocr = lambda u: " ".join(by[m].get("ocr") or "" for m in u["marks"])  # noqa: E731
+    for k, n in list(used.items()):
+        if n < 2:
+            continue
+        us = [u for u in U if k in u["clients"]]
+        # các chỗ của câu XẾP CHỒNG liền nhau, cùng cỡ (FLUX vẽ một câu thành hai dòng, VLM ghi mỗi dòng một mục -- 14/10 dev2
+        # d31: dòng dưới giữ chữ giun ngay dưới câu đã viết) -> một đơn vị nhiều dòng
+        # (một hàng list FLUX vẽ lặp mà còn câu cùng vai chưa có chỗ thì không gộp: hàng lặp nhận câu đó, như dưới)
+        if all(u["clients"] == [k] and u["kind"] == "text" for u in us) and not any(
+                not used[j] and texts[j]["role"] == texts[k]["role"] for j in range(len(texts))):
+            Ls = sorted((by[m] for u in us for m in u["marks"]), key=lambda l: (l["box"][1], l["box"][0]))
+            if _stacked(Ls) and max(l["size"] for l in Ls) / min(l["size"] for l in Ls) <= SPLIT_RATIO:
+                us[0].update(marks=[l["id"] for l in Ls], split=None)
+                U = [u for u in U if not any(u is x for x in us[1:])]
+                used[k] = 1
+                log.append(f"câu T{k}: {[u['id'] for u in us]} xếp chồng liền nhau -> một đơn vị {us[0]['marks']}")
+                continue
+        best = max(us, key=lambda u: (sim(u["text_vlm"], texts[k]["text"]), sim(ocr(u), texts[k]["text"])))
+        for u in us:
+            if u is best:
+                continue
+            free = [j for j in range(len(texts)) if not used[j] and texts[j]["role"] == texts[k]["role"]]
+            u["clients"] = [j for j in u["clients"] if j != k]
+            used[k] -= 1
+            if free and not u["clients"]:
+                u["clients"] = [free[0]]
+                used[free[0]] += 1
+                log.append(f"{u['id']}: câu T{k} đã ở {best['id']} -> nhận câu cùng vai chưa có chỗ T{free[0]}")
+            else:
+                u["role_vlm"] = u["role_vlm"] or texts[k]["role"]
+                log.append(f"{u['id']}: câu T{k} đã ở {best['id']} -> dòng lấp" + (f" {u['text_vlm']!r}" if u["text_vlm"] else ""))
+    # DÒNG LẤP (VLM tự viết, không câu khách): số không có trong câu khách nào là dữ kiện bịa -> không viết
+    tnums = {n for t in texts for n in re.findall(r"\d+", t["text"])}
+    for u in U:
+        if u["kind"] == "text" and not u["clients"] and u["text_vlm"]:
+            bad = [n for n in re.findall(r"\d+", u["text_vlm"]) if n not in tnums]
+            if bad:
+                log.append(f"{u['id']}: chữ lấp {u['text_vlm']!r} có số không có trong câu khách {bad} -> bỏ")
+                u["text_vlm"] = ""
+    # đơn vị "text" không còn chữ (câu đã có chỗ khác, chữ lấp bị bỏ): dòng của nó về luật 4 của compose.fate (skip)
+    U = [u for u in U if not (u["kind"] == "text" and not u["clients"] and not u["text_vlm"])]
+    from . import fate
+    extra, flog = fate.leftovers(U, M, fate.mentioned(A))
+    U += extra
+    log += flog
+    log += order(U, M, texts)
+    log += _markers(U, M, texts)
+    missing =[j for j in range(len(texts)) if not used[j] and texts[j].get("source") != "ai"]
+    return U, log, missing
+
+
+def _beside(a: list, b: list) -> bool:
+    """Hai khung cùng hàng (chồng dọc >= nửa khung thấp hơn) và sát nhau (khe ngang <= 1 cao khung cao hơn)."""
+    h = max(a[3] - a[1], b[3] - b[1])
+    return (min(a[3], b[3]) - max(a[1], b[1]) >= 0.5 * min(a[3] - a[1], b[3] - b[1])
+            and max(a[0] - b[2], b[0] - a[2]) <= h)
+
+
+def _cover_min(a: list, b: list) -> float:
+    """Diện tích giao / diện tích khung nhỏ hơn."""
+    w, h = min(a[2], b[2]) - max(a[0], b[0]), min(a[3], b[3]) - max(a[1], b[1])
+    return max(0.0, w) * max(0.0, h) / max(1e-6, min((a[2] - a[0]) * (a[3] - a[1]), (b[2] - b[0]) * (b[3] - b[1])))
+
+
+def _markers(U: list[dict], M: dict, texts: list[dict]) -> list[str]:
+    """SỐ THỨ TỰ FLUX VẼ TRƯỚC CÁC HÀNG (số trong vòng tròn / ô vuông đứng riêng một dòng, 14/10 dev2 d20 / d19): chữ giun số
+    bị xoá thì để lại vòng tròn trống, giữ thì số sai (1, 4, 2, 3, 4). -> viết lại số: dòng chỉ 1-2 chữ số, ngay bên trái một
+    hàng chữ đã viết câu khách (cùng hàng, khe <= 3 cỡ). Số = thứ tự câu khách nếu là các bước (brief "ordered"), không thì thứ
+    tự đọc các hàng có số. Không phải các dòng số đứng riêng khác (giá, ngày)."""
+    by = M["by"]
+    rows = [u for u in U if u["kind"] == "text" and u["clients"]]
+    found = []
+    for u, m in [(u, m) for u in U if not (u["kind"] == "text" and (u["clients"] or u["text_vlm"])) for m in u["marks"]]:
+        l = by[m]
+        if not re.fullmatch(r"\s*\d{1,2}\s*[.)]?\s*", l.get("ocr") or ""):
+            continue
+        b, s = l["box"], l["size"]
+        cy = (b[1] + b[3]) / 2
+        nxt = [r for r in rows for m in r["marks"][:1] if by[m]["box"][1] <= cy <= by[m]["box"][3]
+               and 0 <= by[m]["box"][0] - b[2] <= 3 * max(s, by[m]["size"])]
+        if nxt:
+            found.append((u, m, nxt[0]))
+    if len(found) < 2:   # một số lẻ loi không phải đánh số hàng
+        return []
+    ordered = sorted(j for j, t in enumerate(texts) if t.get("ordered"))
+    found.sort(key=lambda p: (by[p[1]]["box"][1], by[p[1]]["box"][0]))
+    out = []
+    for i, (u, m, r) in enumerate(found):
+        k = r["clients"][0]
+        n = 1 + ordered.index(k) if k in ordered else i + 1
+        u["marks"] = [x for x in u["marks"] if x != m]
+        U.append({"id": f"n_{m}", "kind": "text", "marks": [m], "clients": [], "split": None, "text_vlm": str(n),
+                  "role_vlm": "step_no", "why": "số thứ tự trước hàng"})
+        out.append(f"{m}: số FLUX vẽ trước hàng {r['id']} -> viết lại '{n}'")
+    U[:] = [u for u in U if u["marks"]]
+    return out
+
+
+def order(U: list[dict], M: dict, texts: list[dict]) -> list[str]:
+    """CÁC BƯỚC theo thứ tự khách (người dùng chốt 14/10, kể cả lưới 2x2 và khi lệch hình minh hoạ FLUX vẽ): đơn vị viết đúng một
+    câu "ordered" (brief: bước của poster hướng dẫn), xếp theo thứ tự đọc -> hoán CÂU giữa các đơn vị cho tăng dần. Khung, cỡ,
+    kiểu của đơn vị giữ nguyên. Danh sách khác (ưu điểm, nút) để VLM gán theo ảnh."""
+    by = M["by"]
+    us = [u for u in U if u["kind"] == "text" and len(u["clients"]) == 1 and texts[u["clients"][0]].get("ordered")]
+    if len(us) < 2:
+        return []
+    box = lambda u: [min(by[m]["box"][0] for m in u["marks"]), min(by[m]["box"][1] for m in u["marks"]),  # noqa: E731
+                     max(by[m]["box"][2] for m in u["marks"]), max(by[m]["box"][3] for m in u["marks"])]
+    seq = [us[i] for i in _reading([box(u) for u in us])]
+    cur = [u["clients"][0] for u in seq]
+    if cur == sorted(cur):
+        return []
+    for u, k in zip(seq, sorted(cur)):
+        if u["clients"][0] != k:
+            u["clients"], u["split"] = [k], None
+    return [f"các bước: thứ tự đọc {['T%d' % k for k in cur]} -> theo thứ tự khách {['T%d' % k for k in sorted(cur)]}"]
