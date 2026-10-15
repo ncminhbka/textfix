@@ -11,8 +11,9 @@ import unicodedata
 from difflib import get_close_matches
 
 WORD = re.compile(r"[^\W\d_]+")   # một chữ (chỉ chữ cái)
-LINK = re.compile(r"(?:https?://|www\.)\S+|[\w.+-]+@[\w-]+(?:\.[\w-]+)+|\b[\w-]+(?:\.[\w-]+)*\.(?:vn|com|net|org|io|me)\b(?:/\S*)?",
-                  re.I)
+# liên kết dừng ở khoảng trắng / ngoặc / dấu nháy (khách viết link trong ngoặc kép: "www.ironfit.vn")
+LINK = re.compile(r"(?:https?://|www\.)[^\s\"'“”()<>]+|[\w.+-]+@[\w-]+(?:\.[\w-]+)+"
+                  r"|\b[\w-]+(?:\.[\w-]+)*\.(?:vn|com|net|org|io|me)\b(?:/[^\s\"'“”()<>]*)?", re.I)
 NUMBER = re.compile(r"\d(?:[\d.,]|\s(?=\d))*")   # "185.000", "1,5", "0909 123 456"
 FUZZY = 0.8   # chữ >= 4 ký tự giống >= 80% một chữ của khách vẫn tính là của khách (khách gõ sai một ký tự)
 

@@ -135,6 +135,52 @@ def test_prompt_wins_form_only_on_real_conflict():
     assert "185.000đ" in by_text(B)   # prompt nhắc lại đúng giá form -> không phải bị đè, dù LLM khai vậy
 
 
+def test_vague_prompt_cannot_override_form():
+    # brief_probe 15/10 dev2 d38: "làm banner giúp mình", LLM khai đè tên tiệm / địa chỉ / ngày -> mất tên tiệm và địa chỉ
+    form = {"category": "opening", "opening_date": "01/11/2026", "store_name": "Tiệm Bánh Nhà Gạo", "address": "12 Trần Phú, Đà Nẵng"}
+    B = brief([("Khai trương ngày 01/11/2026", "date", "user")], 'A bakery banner "Khai trương ngày 01/11/2026".',
+              "làm banner giúp mình", form, overridden=["address", "opening_date", "store_name"])
+    assert {"Tiệm Bánh Nhà Gạo", "12 Trần Phú, Đà Nẵng"} <= set(by_text(B))
+    assert "overridden" not in B["log"]
+
+
+def test_prompt_with_replacement_overrides_form():
+    form = {"category": "promo", "title": "Ưu đãi tháng 11", "discount": "Giảm 20%", "store_name": "Mắt Kính Sao Mai"}
+    B = brief([("SUMMER VIBES", "headline", "user"), ("GIẢM 30% TOÀN BỘ KÍNH", "offer", "user")],
+              'A beach poster "SUMMER VIBES", "GIẢM 30% TOÀN BỘ KÍNH".',
+              'Poster kính râm, tiêu đề "SUMMER VIBES" và "GIẢM 30% TOÀN BỘ KÍNH"', form, overridden=["discount", "title"])
+    assert "Ưu đãi tháng 11" not in by_text(B) and "Giảm 20%" not in by_text(B)
+    assert "Mắt Kính Sao Mai" in by_text(B)
+
+
+def test_llm_step_numbers_are_removed_not_treated_as_invented_facts():
+    # brief_probe 15/10 accept2 l02: "1. Chụp ảnh sản phẩm lỗi" bị bỏ như số bịa, thêm lại không số -> lẫn lộn
+    form = {"category": "guide", "title": "Đổi trả", "step_1": "Chụp ảnh sản phẩm lỗi", "step_2": "Gửi qua Zalo của shop"}
+    B = brief([("1. Chụp ảnh sản phẩm lỗi", "step", "user"), ("Bước 2: Gửi qua Zalo của shop", "step", "user")],
+              'A guide "1. Chụp ảnh sản phẩm lỗi", "Bước 2: Gửi qua Zalo của shop".', None, form)
+    steps = [t["text"] for t in B["texts"] if t.get("ordered")]
+    assert steps == ["Chụp ảnh sản phẩm lỗi", "Gửi qua Zalo của shop"]
+    assert '"Chụp ảnh sản phẩm lỗi"' in B["prompt_en"] and "1." not in B["prompt_en"]
+
+
+def test_link_written_in_quotes_is_the_users():
+    B = brief([("www.ironfit.vn", "contact", "user")], 'A gym poster with "www.ironfit.vn".', 'thêm website "www.ironfit.vn"')
+    assert "www.ironfit.vn" in by_text(B) and "facts_not_from_user" not in B["log"]
+
+
+def test_inserted_texts_are_a_separate_sentence():
+    B = brief([("Tiệm nail Hồng Nhung", "headline", "user")], "A pink salon poster with soft light", NAIL)
+    assert 'soft light. The poster also shows the texts "Tiệm nail Hồng Nhung".' in B["prompt_en"]
+
+
+def test_llm_typo_in_prompt_fixed_in_place():
+    # brief_probe 15/10 dev2 d22: texts "COMBO GIA ĐÌNH", prompt viết "COMBO GIA ĐỊNH"
+    B = brief([("COMBO GIA ĐÌNH", "headline", "user")], 'A hotpot banner with "COMBO GIA ĐỊNH" on top. Warm light.',
+              'banner "COMBO GIA ĐÌNH"')
+    assert B["prompt_en"].startswith('A hotpot banner with "COMBO GIA ĐÌNH" on top.')
+    assert "quoted_added" not in B["log"]
+
+
 def test_plain_image_has_no_texts():
     B = brief([], "A cow in a field.", "ảnh một con bò", intent="image")
     assert B["mode"] == "image" and B["texts"] == []

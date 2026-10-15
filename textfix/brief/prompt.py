@@ -42,6 +42,7 @@ def compose(pe: str, texts: list[dict], rewrites: list[tuple[str, str]]) -> tupl
     for old, new in rewrites:
         pe = pe.replace(old, new)
     pe = _match_case(pe, texts)
+    pe = _fix_typos(pe, texts, notes)
     pe = _remove_foreign(pe, texts, notes)
     pe = _quote_once(pe)
     pe = _outside_quotes(pe, lambda s: ORPHAN_PUNCT.sub("", RATIO.sub("", s)))
@@ -59,6 +60,29 @@ def _match_case(pe: str, texts: list[dict]) -> str:
     """Chuỗi trùng một câu khi không phân biệt hoa / thường -> viết đúng như câu."""
     by = {t["text"].casefold(): t["text"] for t in texts}
     return QUOTED.sub(lambda m: '"' + by.get(" ".join(m.group(1).split()).casefold(), m.group(1)) + '"', pe)
+
+
+TYPO = 0.85   # chuỗi trong ngoặc giống >= 85% một câu đã chốt chưa có trong prompt = LLM chép sai câu đó
+
+
+def _fix_typos(pe: str, texts: list[dict], notes: Notes) -> str:
+    """LLM chép sai vài ký tự của một câu khi viết prompt ("COMBO GIA ĐỊNH" cho "COMBO GIA ĐÌNH"): sửa TẠI CHỖ thành câu đúng,
+    giữ vị trí của chữ trong câu tả (gỡ đi rồi chèn lại thì chữ mất chỗ của nó)."""
+    from difflib import SequenceMatcher
+    quoted = {" ".join(q.split()).casefold() for q in QUOTED.findall(pe)}
+    free = [t["text"] for t in texts if t["text"].casefold() not in quoted]
+
+    def one(m):
+        q = m.group(1)
+        if not free or approved(q, texts):
+            return m.group(0)
+        best = max(free, key=lambda t: SequenceMatcher(None, q.casefold(), t.casefold()).ratio())
+        if SequenceMatcher(None, q.casefold(), best.casefold()).ratio() < TYPO:
+            return m.group(0)
+        free.remove(best)
+        notes.add("typo_fixed", f"{q} -> {best}")
+        return f'"{best}"'
+    return QUOTED.sub(one, pe)
 
 
 def approved(q: str, texts: list[dict]) -> bool:
@@ -110,7 +134,10 @@ def _insert_missing(pe: str, texts: list[dict], notes: Notes) -> str:
     notes["quoted_added"] = miss
     s = _sentences(pe)
     add = " The poster also shows the texts " + ", ".join(f'"{t}"' for t in miss) + "."
-    return (s[0] + add + "".join(s[1:])) if s else add.strip()
+    if not s:
+        return add.strip()
+    head = s[0].rstrip()
+    return head + ("" if head[-1:] in ".!?" else ".") + add + "".join(s[1:])
 
 
 def _fit(pe: str, notes: Notes) -> str:

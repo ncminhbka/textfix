@@ -39,6 +39,7 @@ FIELD_ROLE = {"title": "headline", "discount": "offer", "applied_product": "subh
               "special_offer": "offer", "job_position": "headline", "job_desc": "body", "apply_deadline": "date",
               "apply_method": "contact", "guide_steps": "list_item", "store_name": "info", "phone": "contact",
               "address": "contact", "website_link": "contact"}
+ORDINAL = re.compile(r"^\s*(?:(?:bước|step)\s*)?\d{1,2}\s*[.):\-–]\s*", re.I)   # "Bước 1: ", "1. ", "2) " đầu câu
 STAR_TEXT = re.compile(r"^\d+(?:[.,]\d+)?\s*(?:sao|stars?)$", re.I)   # câu chỉ ghi số sao ("5 sao")
 USER_QUOTES = re.compile(r'"([^"]+)"|“([^”]+)”')
 QUOTED = re.compile(r'"([^"]+)"')
@@ -77,7 +78,7 @@ def plan_texts(proposed: list, *, prompt: str | None, form: dict, overridden: li
     fields = form_values(form)
     passages = [prompt] + [x for vs in fields.values() for x in vs]
     plan = TextPlan()
-    over = accepted_overrides(overridden, fields, prompt)
+    over = accepted_overrides(overridden, fields, prompt, proposed)
     if over:
         plan.notes["overridden"] = sorted(over)
     gone = {fold(x) for k in over for x in fields[k]}
@@ -93,12 +94,27 @@ def plan_texts(proposed: list, *, prompt: str | None, form: dict, overridden: li
     return plan
 
 
-def accepted_overrides(claimed: list, fields: dict[str, list[str]], prompt: str) -> set[str]:
-    """Prompt thắng form (người dùng chốt): ô LLM khai là bị prompt đè. Không nhận khi giá trị ô có ngay trong prompt -- khi đó
-    prompt chỉ nhắc lại, không đè."""
+# loại vai: giá trị thay thế cho một ô form phải cùng loại với ô đó
+ROLE_KIND = {"headline": "title", "subheadline": "title", "label": "title", "offer": "offer", "price": "offer",
+             "old_price": "offer", "date": "date", "contact": "contact", "info": "contact", "body": "body",
+             "review_quote": "body", "review_name": "name", "list_item": "list", "step": "list", "cta": "cta"}
+
+
+def accepted_overrides(claimed: list, fields: dict[str, list[str]], prompt: str, proposed: list) -> set[str]:
+    """Prompt thắng form (người dùng chốt) -- khi prompt THẬT SỰ đưa giá trị khác cho ô đó. Ô k LLM khai bị đè chỉ được nhận khi:
+      - giá trị ô không có ngay trong prompt (có thì prompt chỉ nhắc lại), và
+      - có một câu LLM đề xuất lấy từ PROMPT (không từ ô form nào) cùng loại vai với ô k: giá trị thay thế.
+    Prompt "làm banner giúp mình" không thay được tên tiệm, địa chỉ hay ngày nào."""
     if not prompt:
         return set()
-    return {k for k in claimed or [] if k in fields and not all(fold(x) in fold(prompt) for x in fields[k])}
+    from_form, in_prompt = Evidence([x for vs in fields.values() for x in vs]), Evidence([prompt])
+    kinds = set()
+    for t in proposed or []:
+        text = norm(t.get("text") or "") if isinstance(t, dict) and t.get("source") != "ai" else ""
+        if text and in_prompt.coverage(text)[0] >= USER_COVERAGE and not from_form.holds(text, PRESENT):
+            kinds.add(ROLE_KIND.get(t.get("role"), "body"))
+    return {k for k in claimed or [] if k in fields and not all(fold(x) in fold(prompt) for x in fields[k])
+            and ROLE_KIND.get(field_role(k), "body") in kinds}
 
 
 def vet(proposed: list, ev: Evidence, passages: list[str], gone: set[str], plan: TextPlan) -> None:
@@ -108,6 +124,12 @@ def vet(proposed: list, ev: Evidence, passages: list[str], gone: set[str], plan:
         if not isinstance(t, dict):
             continue
         text, role = norm(t.get("text") or ""), t.get("role") if t.get("role") in ROLES else "body"
+        if role in ("step", "list_item") and ORDINAL.match(text) and ORDINAL.sub("", text):
+            # đánh số là việc của code (các bước theo thứ tự khách): bỏ số LLM tự viết, cả trong prompt
+            plain = ORDINAL.sub("", text)
+            plan.rewrites.append((f'"{text}"', f'"{plain}"'))
+            plan.notes.add("ordinal_removed", text)
+            text = plain
         claimed_user = t.get("source") != "ai"
         if not text or plan.has(text) or fold(text) in gone:
             continue
