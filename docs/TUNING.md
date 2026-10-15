@@ -37,7 +37,7 @@ scripts/geo_synth.py (chữ cong / nghiêng / nhiều cỡ tổng hợp, đáp �
 
 | Bước | Việc | Mã | Có AI | Núm chỉnh chính | Đo bằng |
 |---|---|---|---|---|---|
-| B0 Brief | intent (poster / ảnh thường), câu khách nguyên văn, prompt FLUX, các hướng thiết kế; code giữ cam kết | `textfix/brief.py` | LLM | `SYSTEM`, `FIELD_ROLE`, `ORIENT`, luật nguyên văn / ngoặc kép / trường form / `overridden` | brief.json: câu khách đủ / thừa / sai, `log` |
+| B0 Brief | intent (poster / ảnh thường), câu khách nguyên văn, prompt FLUX, các hướng thiết kế; code giữ cam kết | `textfix/brief/` | LLM | `instructions.SYSTEM`, `texts.USER_COVERAGE / PRESENT / SNAP / AI_MAX`, `prompt.TOKEN_LIMIT` | brief.json: câu khách đủ / thừa / sai, `log` |
 | B1 Nháp | FLUX.2-klein vẽ cả poster có chữ | `textfix/flux.py` | FLUX | prompt (B0), seed, số bước | mắt: bố cục, số hàng danh sách |
 | B2 Nét chữ + gỡ chữ | Hi-SAM tìm nét chữ của nháp (trạm vẽ); mặt nạ nét + quầng theo dòng, LaMa lấp MỘT lần, dòng "keep" được trả điểm ảnh nháp | `textfix/hisam.py`, `lonly.py` (erase_mask, erase, settle) | Hi-SAM + LaMa | `MASK_GROW`, `WEAK`, `HALO_*` | `scripts/erase_bench.py` (ký tự OCR còn đọc được trên nền, % đổi), xem mắt `ink.jpg` / `base.jpg` |
 | B2.5 Dòng | dòng OCR + chữ cong + cụm nét OCR không đọc (`orphan`) + chấm tròn đầu dòng; không còn ô vỏ / chi tiết / dấu đầu dòng | `slots.py` (lines, build, _orphans, _lead_dots), `glyph.py`, `geo.py` | OCR | `ORPHAN_*`, `DOT_*`, ngưỡng `geo.py` | số dòng, dòng cong, cụm nét trên các nháp đã lưu |

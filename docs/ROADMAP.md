@@ -99,12 +99,81 @@ khai; không cắt câu khách, chữ dài thì co; nháp thiếu câu thì ch�
   ứng neon dev2 d06), `brief.SNAP` (d03), `PIECE_SIM`. `SET_RATIO 1,25` đã đo lại trên mix1 + dev2: 129 / 150 cặp cùng vai <= 1,2,
   khe thưa 1,2-1,4 -> giữ.
 
+## Thiết kế lại bước 3-4-5 -- kế hoạch DUYỆT 15/10 (đang làm)
+
+Lý do: bước 4 dồn luật vá theo kiểu sai của OCR (OCR quyết hình học dòng); nhiều lỗi cũ có gốc ở bước 1-2 (dòng lặp do LLM, prompt
+bị cắt 512 token) đã chặn từ gốc. Nguyên tắc: nét Hi-SAM = hình học, vùng DBNet (`ocr.regions`) = dòng nào, bộ đọc OCR chỉ đọc,
+VLM = nghĩa, brief = nội dung; một biểu diễn dòng {path, h_cap, h_x, ink, rows} cho mọi hình dạng; ngưỡng theo cao chữ.
+Người dùng chốt: không định vị vùng sản phẩm; chữ FLUX vẽ trên vật GIỮ (kể cả giun); TIN VLM khi xoá dòng, dòng bỏ sót hỏi lại
+riêng rồi GIỮ; CHO NỚI chữ vào nền trống cùng màu, không vượt vỏ / dòng khác.
+- [ ] Chặng 0: lượt máy chủ dev2 + mix1 với bước 1-2 mới (nháp mới + mốc); bộ đáp án chia dòng `bench/lines_gt` (Claude gán);
+  `scripts/lines_bench.py` (chỉ số dòng + dựng lại bằng câu trả lời VLM đã lưu, đổi id theo chồng lấn nét).
+- [ ] Chặng 1: `textfix/lines/` (vùng DBNet + nét Hi-SAM, tách hàng / mục, đường chân thẳng / tròn / bậc 3, số đo từ nét, đọc
+  dòng đã nắn, đánh số khối) thay `slots` đo dòng + `glyph` + `geo` + `_split_gaps` / `TILT_*` / `_vertical` / `_trim_lead` /
+  `_lead_dots` / `_stacked` / `fill.TALL`. Qua chặng: F1 dòng >= OCR hiện tại, giảm gộp / tách / góc.
+- [ ] Chặng 2: `erase` dùng đúng mảnh nét của dòng + xuất quầng làm hiệu ứng.
+- [ ] Chặng 3: `compose/vlm.py` (lời dặn ba số phận, hỏi lại dòng bỏ sót, `fresh=True`) + `compose/fate.py` (một bảng số phận).
+- [ ] Chặng 4: `compose/assign.py` + `layout.py` (cỡ theo font thật + câu khách, nới chỗ, sàn tập, màu một nguồn, hiệu ứng / font
+  đối chiếu số đo).
+- [ ] Chặng 5: render gọn (một cách dựng theo path, bỏ `OUTLINE_*`, gỡ mã chết).
+- [ ] Chặng 6: UI / plan.json / replay / tài liệu; lượt máy chủ dev2 + mix1; `final2` một lần.
+
+## Bước 3: gỡ chữ giun (Hi-SAM + LaMa) -- chuẩn hoá 15/10
+
+- [x] Tách khỏi `lonly.py` thành `textfix/erase.py` (một việc): `erase_mask` 120 dòng -> các bước có tên `_window` (cao dòng
+  chặn 2,2 lần nét cao), `_strokes` (nét + dự phòng màu mực / lõi dòng), `_halo` (quầng, đuôi mờ, không lấn dòng khác),
+  `_punctuation`; `color.py` (Lab dùng chung, trước là hàm riêng của slots). Chú thích nói nguyên tắc, số đo ở TUNING.
+- [x] LaMa: một bản + khoá MỖI CARD, chạy trên card đã vẽ nháp (`draw` trả `device`) -- hết dồn card 0, hết nạp tranh nhau.
+- [x] Kiểm hành vi không đổi: mặt nạ bản mới so bản cũ trên 135 nháp thật (dev2 / mix1 / accept2), gỡ hết + giữ theo kế hoạch: 270 / 270 lần giống hệt từng điểm ảnh, cả nhật ký; thời gian như cũ.
+- [x] `tests/test_erase.py` 8 test trên ảnh tổng hợp: phủ nét + bóng đổ, icon cách khe không bị gỡ, dòng giữ không vào mặt nạ,
+  settle trả điểm ảnh nháp, ngoài mặt nạ không đổi, thiếu LaMa báo lỗi.
+- Người dùng chấp nhận: còn vài quầng mờ / nét nhỏ, chữ dựng mới đè lên.
+
+## Bước 2: FLUX vẽ nháp -- chuẩn hoá 15/10
+
+- [x] Đối chiếu mã tham chiếu BFL (`flux2/sampling.py`): lịch, Euler, CFG, ảnh tham chiếu (t = 10, 20...; trần 2024^2 / 1024^2),
+  số bước mặc định -- khớp. `guidance=None` như mã tham chiếu (klein 4B không có nhúng guidance: ảnh không đổi).
+- [x] `flux.SIZES` là nguồn DUY NHẤT các tỉ lệ (thêm 3:4); `tests/test_flux.py`: ~1 MP, bội 16, đúng tỉ lệ, khớp `brief.ORIENT`,
+  tìm trọng số. Ép bf16 trong `Flux.load` (bỏ `check_dtypes` vá ở server); bỏ tham số chết `neg`; `generate` từ chối cỡ lệch 16.
+- Số đo (dev2 14/10, 73 nháp, 2x A30): vẽ trung vị 2,3 s, max 4,3 s; ~17 GB / card (docs/SERVER.md).
+- [ ] CHỜ NGƯỜI DÙNG: tỉ lệ lạ ở API -> âm thầm vẽ 1:1 (`server.app.run_job`) -- đề xuất trả 422 kèm danh sách tỉ lệ.
+- [ ] Lỗi lúc vẽ (hết VRAM...) -> phiên bản "error", không thử lại (cùng câu hỏi D1).
+- [ ] Không lọc nội dung ảnh (mã BFL có bộ lọc NSFW / bản quyền cho Mistral, không dùng với klein) -- cần khi mở API công khai?
+
 ## Chặng C -- Thi
 
 - [ ] `bench/final2.json` (32 ca mới, người dùng chọn thi bộ này), một lượt, chấm; so cùng seed với nhánh `legacy-ops-html`.
 - [ ] (cũ) `bench/final1.json`, một lượt, chấm. Ngưỡng: hỏng <= 10%, không mất chữ sản phẩm, không số / giá / liên hệ bịa.
 
-## Bước LLM đầu luồng (brief) -- ghi nhận 14/10 tối, CHỜ người dùng chọn hướng
+## Bước LLM đầu luồng (brief) -- LÀM LẠI 15/10, chờ đo trên máy chủ
+
+Người dùng chốt 15/10: lời khách BẨN (không ngoặc kép, viết thường, lỗi gõ, không dấu) là bình thường; LLM chuẩn hoá NHẸ (bỏ từ
+thừa, hoa / thường, dấu câu, thêm dấu, lỗi gõ rõ ràng, tách câu dài -- không đổi số / tên, không diễn đạt lại); bịa PHONG PHÚ hơn
+(tối đa 6 câu: tiêu đề, khẩu hiệu, nút, nhãn + tối đa 3 dòng lợi ích chung, vẫn cấm số / ưu đãi / tên / cam kết); chữ trong
+prompt theo chuẩn BFL (ngoặc kép lồng trong câu tả vật mang chữ) -- KHÔNG đổi sang "code nối danh sách" như đề xuất 14/10.
+Đã làm (`textfix/brief/` -- gói 4 tệp + `tests/test_brief.py`, `textfix/llm.py`):
+- [x] LLM viết `texts` TRƯỚC `prompt_en` (thứ tự khoá trong khuôn JSON), `source` bắt buộc.
+- [x] Kiểm theo SỰ THẬT thay nguyên văn: số / liên kết của câu phải có trong lời khách (bỏ câu bịa SĐT / giá); câu "user" >= 50%
+  chữ có trong lời khách (so bỏ dấu + gần đúng), phần LLM thêm không có chữ ưu đãi / cam kết; còn lại xét như chữ phụ trợ. Bỏ
+  `_strip_values` / luật "ghép chữ khách"; `_snap` chỉ sửa khi LLM đổi CHỮ CÁI (đánh đổi: lỗi gõ chữ cái của khách giữ nguyên).
+- [x] Chuỗi ngoặc kép của khách / ô form "đã có" khi >= 80% chữ + mọi số nằm trong texts (không đòi khớp từng ký tự).
+- [x] Chữ thiếu trong prompt chèn SAU CÂU ĐẦU (không nối cuối); chuỗi lạ chỉ bỏ cả câu khi câu không còn chữ đúng; prompt cắt
+  câu tả ở cuối cho vừa 512 token (đếm bằng tokenizer Qwen3 ở máy, không có thì ước 0,33 token / byte).
+- [x] `llm.json_call`: gọi lại tối đa 2 lần khi JSON hỏng / lỗi mạng (áp cho cả VLM -- một phần A2, D2); tham số `fresh`.
+- [ ] Đo: `%run scripts/brief_probe.py` (209 ca dev / accept, chỉ bước LLM) -> so texts / prompt với brief lượt 14/10.
+- [ ] Rồi 5 ca vẽ thật: `dev_batch.py bench/dev2.json --only d03,d05,d20,d31,d39 --fresh`.
+- [x] Chuẩn hoá (người dùng 15/10: "chuẩn open-source, không vá chằng chịt"): gói `textfix/brief/` -- `instructions.py` (lời dặn,
+  khuôn), `evidence.py` (đối chiếu lời khách), `texts.py` (chốt chữ: user / ai / bỏ + bảo đảm), `prompt.py` (hợp đồng prompt, chỗ
+  DUY NHẤT sửa prompt); `tests/test_brief.py` 26 test LLM giả. API `make_brief` giữ nguyên.
+- [x] Lỗi cũ: bước của form hướng dẫn (API gửi `step_1`, `step_2`...) bị thêm lại với vai `info` -> không có thứ tự / không viết
+  hoa; nay vai "step".
+- [ ] Ngưỡng `texts.USER_COVERAGE` 0,5 / `PRESENT` 0,8 / `SNAP` 0,85 / `evidence.FUZZY` 0,8 chọn theo suy luận -> chỉnh theo số
+  đo brief_probe.
+- [ ] CHỜ NGƯỜI DÙNG -- API cho đội test (họ đổ form user vào API khi chốt dự án):
+  (a) trường không thuộc loại form bị bỏ âm thầm (`server.app.form_of`); (b) `category` lạ âm thầm thành promo; (c) [ĐÃ SỬA 15/10 ở bước 2: `flux.SIZES` thêm 3:4 = 864x1152, test khớp với `ORIENT`]; (d) LLM hỏng hẳn sau 3 lần -> job "error" (= D1);
+  (e) thiếu trường bắt buộc khi không có prompt -> chặn, cần ghi trong tài liệu API.
+
+Ghi nhận 14/10 tối (trước khi làm lại):
 
 Việc của LLM (người dùng chốt): bịa chữ phụ khi đề sơ sài; phân loại có chữ / không chữ; viết trung thực chữ khách; KHAI TRUNG
 THỰC những chữ đã bảo FLUX vẽ; prompt_en theo đúng chuẩn làm giàu prompt của BFL (không dặn font / cỡ / vị trí -- đã sửa).
@@ -173,7 +242,8 @@ P2 -- nhỏ / hiếm:
 
 - [ ] D1. (P0) Một lỗi bất kỳ trong trạm thiết kế (VLM JSON hỏng / quá giờ, Hi-SAM, LaMa, Chromium) -> phiên bản "error", không
   có poster; yêu cầu MỘT ảnh thì cả job lỗi. Không có đường lui -- cần chọn: thử lại không cache, rồi trả gì (nháp? báo lỗi rõ?).
-- [ ] D2. (P0) Brief (LLM) hỏng JSON / quá giờ -> cả job lỗi, không thử lại (cache + `max_retries=1` chỉ cho lỗi mạng).
+- [x] D2. (P0) Brief (LLM) hỏng JSON / quá giờ -> cả job lỗi, không thử lại (cache + `max_retries=1` chỉ cho lỗi mạng).
+  15/10: `llm.json_call` gọi lại tối đa 2 lần; hết lượt vẫn lỗi job (chưa chọn trả gì -- cùng câu hỏi D1).
 - [ ] D3. (P1) Cache brief theo nội dung: cùng yêu cầu -> cùng brief mãi mãi (kể cả brief lỗi đã lưu); muốn "thử lại" phải xoá
   ~/.cache/textfix. Khi demo: bấm tạo lại cùng yêu cầu ra y hệt brief.
 - [ ] D4. (P2) Không có bước kiểm FLUX đã vẽ đủ câu / có vẽ sản phẩm khách tải (giới hạn model; chỉ ghi "missing").
@@ -181,7 +251,7 @@ P2 -- nhỏ / hiếm:
 
 ## AUDIT TỪNG TỆP 14/10 khuya (21 tệp textfix/ + server/; scripts/ là công cụ dev, chưa audit) -- phát hiện MỚI
 
-- [ ] `flux2/text_encoder.py` (+ `brief.py`): FLUX đọc prompt tối đa 512 TOKEN (cắt bớt). 4 / 272 prompt_en đã lưu dài hơn
+- [x] (15/10: brief cắt câu tả cho vừa, chữ thiếu chèn sau câu đầu) `flux2/text_encoder.py` (+ `brief.py`): FLUX đọc prompt tối đa 512 TOKEN (cắt bớt). 4 / 272 prompt_en đã lưu dài hơn
   (tới 642): câu khách nằm sau mốc đó FLUX không thấy, không vẽ ("GIẤC NGỦ NGON MỖI ĐÊM", "An Yoga"...). (P1) Hướng "code nối
   chữ vào cuối prompt" sẽ làm CHỮ bị cắt trước -- chữ phải đặt đầu, hoặc giới hạn độ dài phần tả cảnh.
 - [ ] `textfix/glyph.py`: màu / độ dày nét / hiệu ứng của dòng đo bằng k-means màu trong khung OCR, KHÔNG dùng mặt nạ nét
@@ -192,9 +262,9 @@ P2 -- nhỏ / hiếm:
 - [ ] `textfix/render.py` `render_units`: tập cùng vai co theo mục chật nhất KHÔNG có sàn (phần tử tập dựng `fit:"none"`, bỏ qua
   sàn 12 px) -- một mục ghép sai / chỗ quá ngắn kéo cả tập co (dev2 d26v0 tập liên hệ x0,15). Tràn khung của mục trong tập
   không được sửa (`autofix_units` bỏ qua tập). (P0, cùng nhóm A5)
-- [ ] `textfix/lonly.py` `_lama`: LaMa luôn chạy trên "cuda" (= card 0) cho mọi luồng thiết kế, chung card với một bản FLUX
+- [x] (15/10: `erase.inpaint` chạy trên card đã vẽ nháp, một bản + khoá mỗi card) `textfix/lonly.py` `_lama`: LaMa luôn chạy trên "cuda" (= card 0) cho mọi luồng thiết kế, chung card với một bản FLUX
   + Hi-SAM; nạp lần đầu không khoá (nhiều luồng cùng nạp). Rủi ro hết VRAM card 0 khi tải cao lúc demo. (P1)
-- [ ] `server/app.py` + `textfix/flux.py`: API nhận tỉ lệ "3:4" (brief có, LLM được dặn bố cục dọc) nhưng `flux.SIZES` không có ->
+- [x] (15/10) `server/app.py` + `textfix/flux.py`: API nhận tỉ lệ "3:4" (brief có, LLM được dặn bố cục dọc) nhưng `flux.SIZES` không có ->
   âm thầm vẽ vuông 1:1. UI chỉ có 4 tỉ lệ nên chỉ lộ qua API. (P2)
 - [ ] `textfix/render.py` `_el`: emoji bị xoá âm thầm (không font nào có hình emoji) -- câu khách có emoji mất ký tự. (P2)
 - [ ] `textfix/audit.py`: cờ cũ không còn kích hoạt ("-> câu khách", "không nối lại đúng câu khách") -- chỉ ảnh hưởng báo cáo. (P2)

@@ -7,11 +7,11 @@ giữ nguyên mọi điểm ảnh khác của nháp, gỡ chữ giun và viết 
 
 ```
 form / prompt
-  -> LLM: prompt FLUX.2 (theo hướng dẫn nâng prompt của BFL) + câu của khách          textfix/brief.py
+  -> LLM: prompt FLUX.2 (theo hướng dẫn nâng prompt của BFL) + câu của khách          textfix/brief/
   -> FLUX.2-klein vẽ nháp                                                            textfix/flux.py
   -> Hi-SAM tìm nét chữ của nháp (mặt nạ từng điểm ảnh)                             textfix/hisam.py
   -> đo DÒNG chữ: OCR + chữ cong + cụm nét OCR không đọc                              textfix/slots.py, geo.py
-  -> gỡ chữ: mặt nạ nét + quầng, LaMa lấp một lần                                     textfix/lonly.py
+  -> gỡ chữ: mặt nạ nét + quầng, LaMa lấp một lần                                     textfix/erase.py
   -> VLM designer điền chữ theo dòng: viết / giữ (chữ in trên sản phẩm) / xoá         textfix/lonly.py, slots.py
   -> rà lệnh, dựng chữ đúng khung dòng trên nền (Chromium), kiểm lỗi, sửa bằng code   textfix/render.py
   -> poster
@@ -38,10 +38,11 @@ Chạy trên máy chủ bằng ô notebook (`%run scripts/...`): kết quả t�
 | Đường dẫn | Việc |
 |---|---|
 | `textfix/engine.py` | Nối toàn bộ luồng: `Engine.brief`, `make` (vẽ + sửa), `fix` (sửa nháp có sẵn) |
-| `textfix/brief.py` | LLM đầu luồng: prompt FLUX + câu khách, code giữ cam kết không bịa chữ |
+| `textfix/brief/` | LLM đầu luồng: danh sách chữ + prompt FLUX; code kiểm theo bằng chứng (không số bịa, chữ khách luôn có, prompt vẽ đúng danh sách). Test: `pytest tests/test_brief.py` |
 | `textfix/flux.py` | FLUX.2-klein: vẽ nháp |
 | `textfix/hisam.py` | Hi-SAM: mặt nạ nét chữ của nháp |
-| `textfix/lonly.py` | Đường chỉ dòng chữ: gỡ chữ (mặt nạ + LaMa), lời dặn VLM, rà lệnh |
+| `textfix/erase.py` | Gỡ chữ giun: mặt nạ từ nét Hi-SAM (nét, dự phòng, quầng, dấu câu) + LaMa một lượt. Test: `pytest tests/test_erase.py` |
+| `textfix/lonly.py` | Chặng B phần VLM: ô dòng chữ, lời dặn VLM, gọi VLM |
 | `textfix/slots.py` | Đo dòng chữ (OCR, chữ cong, chữ dọc, cụm nét lạ), gọi VLM, chặn chữ sai |
 | `textfix/render.py` | Dựng HTML đúng khung dòng (thẻ font), kiểm lỗi |
 | `textfix/ocr.py`, `glyph.py`, `geo.py` | OCR dòng, đo nét (cỡ, màu), chữ cong |

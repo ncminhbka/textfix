@@ -18,7 +18,7 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, ".")
-from textfix import fill, hisam, lonly, render, slots   # noqa: E402
+from textfix import erase, fill, hisam, lonly, render, slots   # noqa: E402
 from textfix.browser import Browser   # noqa: E402
 from textfix.glyph import measure   # noqa: E402
 
@@ -78,7 +78,7 @@ with Browser() as B:
             if os.path.exists(cpath):
                 clean = np.asarray(Image.open(cpath).convert("RGB"))
             else:
-                clean = lonly.erase(D, ink, M)[0]
+                clean = erase.erase(D, ink, M)[0]
                 Image.fromarray(clean).save(cpath)
             # plan chặng B: câu trả lời VLM đã ở khuôn ghép; plan cũ: rút từ lệnh html
             A = {"assign": P["assign"], "styles": P.get("style") or {}, "accent": P.get("accent") or []} if P.get("assign") \
@@ -86,7 +86,7 @@ with Browser() as B:
             U, rlog, miss = fill.resolve(A, M, T, product=prod)
             U, llog = fill.layout(U, M, ink, A["styles"], A["accent"], T)
             elog = []
-            base, mask = lonly.settle(D, clean, ink, M, {"ops": U}, elog)
+            base, mask = erase.settle(D, clean, ink, M, {"ops": U}, elog)
             poster, res, dlog = render.render_units(B.page, base, U, M)
             errs = render.check_units(U, res)
             sev = lambda E: sum(e["type"] in render.SEVERE for e in E)   # noqa: E731

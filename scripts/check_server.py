@@ -380,10 +380,10 @@ def main() -> int:
         bad("không thấy text_encoder/config.json", "chép thư mục text_encoder/ (Qwen3-4B) của FLUX.2-klein")
 
     print("3b. Model gỡ chữ: Hi-SAM (tìm nét chữ) + LaMa (vẽ lại nền) -- BẮT BUỘC từ 14/10")
-    from textfix import hisam, lonly
+    from textfix import erase, hisam
     lost = hisam.missing()
     ok(f"Hi-SAM đủ tệp ở {hisam.HOME}") if not lost else bad("thiếu tệp Hi-SAM: " + "; ".join(lost), "docs/SERVER.md, mục Hi-SAM")
-    ok(f"LaMa: {lonly.LAMA_PATH}") if lonly.lama_ready() else bad(f"thiếu {lonly.LAMA_PATH}", "docs/SERVER.md, mục LaMa")
+    ok(f"LaMa: {erase.LAMA_PATH}") if erase.lama_ready() else bad(f"thiếu {erase.LAMA_PATH}", "docs/SERVER.md, mục LaMa")
     try:
         import einops  # noqa: F401
         ok("import einops được (Hi-SAM cần)")

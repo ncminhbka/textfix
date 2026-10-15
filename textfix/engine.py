@@ -91,7 +91,8 @@ def draw(flux, B: dict, W: int, H: int, seed: int, product: np.ndarray | None = 
         t0 = time.time()
         ink = hisam.strokes(draft, getattr(flux, "dev_dit", None))   # cùng card với bản FLUX của luồng vẽ này
         T["net_chu"] = time.time() - t0
-    out = {"draft": draft, "ink": np.asarray(ink, bool), "timing": T}
+    out = {"draft": draft, "ink": np.asarray(ink, bool), "timing": T,
+           "device": getattr(flux, "dev_dit", None)}   # card của luồng vẽ: LaMa ở trạm thiết kế chạy cùng card (chia tải hai card)
     if product is not None:   # chữ in trên sản phẩm khách tải: để bước thiết kế nhận ra các dòng đó trong nháp và GIỮ nguyên
         from .ocr import read_lines
         try:
@@ -105,7 +106,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     """TRẠM THIẾT KẾ (chặng B, 14/10): dòng (OCR + nét chữ) -> gỡ mọi dòng (LaMa, MỘT lần) -> VLM GHÉP câu khách <-> dòng + kiểu
     theo vai -> code chép nguyên văn, cỡ / lề / tập theo nháp (fill) -> trả điểm ảnh nháp cho dòng giữ -> dựng -> kiểm -> sửa
     bằng code. d = draw(...)."""
-    from . import fill, lonly, render, slots
+    from . import erase, fill, lonly, render, slots
     draft, ink, T = d["draft"], d["ink"], dict(d["timing"])
     texts = B["texts"]
     t0 = time.time()
@@ -120,11 +121,11 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     t0 = time.time()
     progress("gỡ chữ (LaMa)")
     elog = []
-    clean, mask_all = lonly.erase(draft, ink, M, log=elog)
+    clean, mask_all = erase.erase(draft, ink, M, device=d.get("device"), log=elog)
     T["go_chu"] = time.time() - t0
 
     def base_of(U_, log_=None):
-        return lonly.settle(draft, clean, ink, M, {"ops": U_}, log_)
+        return erase.settle(draft, clean, ink, M, {"ops": U_}, log_)
 
     def ask():
         return fill.parse(lonly.plan(draft, M, B["prompt_en"], texts, vlm, product=product, base=clean))
@@ -187,7 +188,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     if sorted(vlm_miss) != sorted(miss_i):
         log.append(f"câu khách không có trên poster: VLM khai {['T%d' % k for k in vlm_miss]}, đo bằng mã {['T%d' % k for k in miss_i]}")
     missing = [texts[i]["text"] for i in miss_i]
-    kept = lonly.kept_of({"ops": U})
+    kept = erase.kept_of({"ops": U})
     # DỰNG THẾ NÀO, từng phần tử (debug "chữ khó"): cỡ, co, nén ngang, xoay, theo đường cong
     rinfo = [{"id": r["id"], "unit": r.get("unit"), "fs": round(float(r.get("fs") or r.get("size") or 0), 1),
               "shrink": round(float(r.get("shrink") or 1), 2), "sx": r.get("sx", 1), "angle": round(float(r.get("angle") or 0), 1),
@@ -197,9 +198,9 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
             "errors_first": errs_first,
             "erase": {"mask_pct": round(100 * float(mask.mean()), 2), "ink_pct": round(100 * float(ink.mean()), 2),
                       "kept": sorted(kept), "orphans": [l["id"] for l in M["L"] if l.get("orphan")], "log": elog}}
-    ink_img = lonly.ink_image(draft, ink, mask, M, kept)
+    ink_img = erase.ink_image(draft, ink, mask, M, kept)
     steps = _row([draft, slots.marked_image(draft, M), ink_img, base, poster])
-    return {"draft": draft, "ink": ink, "ink_image": ink_img, "hisam_image": lonly.hisam_image(draft, ink), "clean": clean, "base": base, "mask": mask, "poster": poster,
+    return {"draft": draft, "ink": ink, "ink_image": ink_img, "hisam_image": erase.hisam_image(draft, ink), "clean": clean, "base": base, "mask": mask, "poster": poster,
             "poster_first": poster_first, "steps": steps, "plan": plan, "timing": {k: round(v, 1) for k, v in T.items()}}
 
 

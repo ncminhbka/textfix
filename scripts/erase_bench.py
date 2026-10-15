@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MÁY CÁ NHÂN: ĐO bước gỡ chữ (lonly.erase: nét chữ Hi-SAM + LaMa) bằng SỐ, trên các nháp đã lưu.
+"""MÁY CÁ NHÂN: ĐO bước gỡ chữ (erase.erase: nét chữ Hi-SAM + LaMa) bằng SỐ, trên các nháp đã lưu.
 
   python -X utf8 scripts/erase_bench.py <thư mục ra> accept2 [mix1c:mix1] [--step 2] [--recheck] [--sheet]
 
@@ -30,7 +30,7 @@ ap.add_argument("--only", default="")
 ap.add_argument("--recheck", action="store_true")
 ap.add_argument("--sheet", action="store_true")
 a = ap.parse_args()
-from textfix import hisam, lonly, ocr, slots   # noqa: E402
+from textfix import erase, hisam, lonly, ocr, slots   # noqa: E402
 
 os.makedirs(a.out, exist_ok=True)
 only = {x for x in a.only.split(",") if x}
@@ -63,16 +63,16 @@ for spec in a.sets:
                 l["angle"] = slots._line_angle(l)
         M = lonly.view({"L": L, "S": [], "I": [], "size": [W, H], "by": {}})
         keep = {"ops": [o | {"marks": o.get("slots") or o.get("marks") or []} for o in P["ops"] if o.get("kind") == "keep"]}
-        kept = lonly.kept_of(keep)
+        kept = erase.kept_of(keep)
         log = []
-        clean, _all = lonly.erase(D, ink, M)
-        base, mask = lonly.settle(D, clean, ink, M, keep, log=log)
+        clean, _all = erase.erase(D, ink, M)
+        base, mask = erase.settle(D, clean, ink, M, keep, log=log)
         zone = np.zeros((H, W), bool)
         gone = np.zeros((H, W), bool)
         for l in L:
-            zone |= lonly._region(l, H, W, 0.6)
+            zone |= erase.line_region(l, H, W, 0.6)
             if l["id"] not in kept:
-                gone |= lonly._region(l, H, W, 0.3)
+                gone |= erase.line_region(l, H, W, 0.3)
         left = 0
         for o in ocr.read_lines(base):
             b = o.get("box") or [min(p[0] for p in o["poly"]), min(p[1] for p in o["poly"]), max(p[0] for p in o["poly"]), max(p[1] for p in o["poly"])]
@@ -90,7 +90,7 @@ for spec in a.sets:
         print(f"{setn} {cid}: sót {left:3d}" + (f"  nét còn {row['ghost']:5.1f}%" if a.recheck else "") +
               f"  mặt nạ {row['mask']:5.2f}%  đổi {row['changed']:5.2f}%  ngoài {row['outside']:.3f}%", flush=True)
         if a.sheet:
-            im = Image.fromarray(np.hstack([D, lonly.ink_image(D, ink, mask, M, kept), base]))
+            im = Image.fromarray(np.hstack([D, erase.ink_image(D, ink, mask, M, kept), base]))
             im.thumbnail((2100, 1400))
             im.save(f"{a.out}/{setn}_{cid}.jpg", quality=84)
 n = max(1, len(rows))

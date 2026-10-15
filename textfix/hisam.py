@@ -3,7 +3,7 @@
   ink = strokes(draft)            # bool cỡ ảnh: điểm ảnh nào là NÉT CHỮ (kể cả chữ giun, chữ cong, chữ OCR không đọc ra)
 
 Từ 14/10 đây là nguồn DUY NHẤT cho biết chữ nằm ở đâu ở mức điểm ảnh -- thay bản xoá FLUX (đường cũ: nhánh git
-`legacy-flux-erase`). Nó chỉ thấy THÂN NÉT: viền dày, bóng đổ, quầng sáng quanh chữ do bước gỡ chữ (lonly.erase) tự nới.
+`legacy-flux-erase`). Nó chỉ thấy THÂN NÉT: viền dày, bóng đổ, quầng sáng quanh chữ do bước gỡ chữ (erase.erase) tự nới.
 Đo trên 2 x A30 (14/10, 30 nháp accept2): fp16 0,17 s / ảnh, mặt nạ trùng fp32 >= 0,997; model 1,3 GB, đỉnh VRAM 4,4 GB.
 
 Tệp (máy chủ không ra internet: docs/SERVER.md mục Hi-SAM), gốc ~/persistent-data/hisam, đổi bằng TEXTFIX_HISAM:

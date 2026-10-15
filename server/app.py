@@ -184,12 +184,10 @@ def gpu_worker(k: int, args, ready: threading.Event) -> None:
     try:
         torch.cuda.set_device(k)
         # NẠP LẦN LƯỢT từng card: transformers đổi kiểu số mặc định của torch (toàn cục, không theo luồng) khi nạp bộ mã hoá
-        # chữ -> hai card nạp cùng lúc giẫm nhau, một bản lẫn float32 (08/10: cuda:0 21.5 GB so với 14.9 GB, mọi ảnh vẽ trên
-        # cuda:0 lỗi "float != BFloat16"). Vẽ thì vẫn song song.
+        # chữ -> hai card nạp cùng lúc giẫm nhau, một bản lẫn float32 (Flux.load còn ép bf16 lần nữa). Vẽ thì vẫn song song.
         with LOAD_LOCK:
             t0 = time.time()
             F = Flux(args.model, steps=args.steps, weights_dir=args.weights_dir, device=f"cuda:{k}").load()
-            F.check_dtypes()
             from textfix import hisam
             hisam.load(f"cuda:{k}")   # nét chữ: cùng card, nạp sẵn để lỗi thiếu tệp lộ ra lúc khởi động
         STATE["flux"].append(F)
@@ -221,8 +219,8 @@ def init_models(args) -> None:
     from textfix.ocr import _engine
     if not os.environ.get("TEXTFIX_LLM_URL") or not os.environ.get("TEXTFIX_MODEL"):
         raise RuntimeError("chưa đặt TEXTFIX_LLM_URL / TEXTFIX_MODEL (export trong terminal, docs/SERVER.md)")
-    from textfix import hisam, lonly
-    lost = hisam.missing() + ([] if lonly.lama_ready() else [lonly.LAMA_PATH])
+    from textfix import erase, hisam
+    lost = hisam.missing() + ([] if erase.lama_ready() else [erase.LAMA_PATH])
     if lost:   # người dùng chốt 14/10: thiếu tệp thì báo rõ và dừng, không lùi về cách nào khác
         raise RuntimeError("thiếu tệp model gỡ chữ (docs/SERVER.md, mục Hi-SAM và LaMa): " + "; ".join(lost))
     m = config.models()

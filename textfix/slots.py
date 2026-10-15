@@ -24,12 +24,7 @@ LEADER_H = 0.3       # hàng chấm nối: cột có nét cao <= 0.3 cao dòng l
 GAP_MIN = 0.4        # khoảng không nét quanh chỗ OCR chèn dấu cách kép: >= 0.4 cao dòng (khoảng cách từ thường ~0.3)
 ICON_W = 1.6         # khối kẹp giữa hai khoảng không ở chỗ cắt, rộng <= 1.6 cao dòng = icon giữa hai mục
 INK_DE = 25.0        # điểm nét = khác màu nền khung dòng (trung vị viền khung) >= 25 ΔE
-def _lab(x):
-    import cv2
-    a = cv2.cvtColor(x, cv2.COLOR_RGB2LAB).astype(np.float32)
-    a[..., 0] *= 100 / 255
-    a[..., 1:] -= 128
-    return a
+from .color import hex_lab as _hex_lab, lab as _lab  # noqa: E402,F401
 
 
 def _png(im) -> bytes:
@@ -231,7 +226,7 @@ LEAD_GAP = (0.6, 4.0)   # khung OCR thừa bên trái nét chữ đầu tiên m�
 
 def _trim_lead(L: list, ink: np.ndarray) -> list[str]:
     """KHUNG DÒNG BẮT ĐẦU TỪ NÉT CHỮ ĐẦU TIÊN khi khung OCR ôm cả icon đứng trước dòng (accept2 q02: OCR lấy luôn chiếc lá).
-    Icon là của nháp, không gỡ (lonly.erase_mask), nên chữ mới không được dựng đè lên nó: mép trái khung dời tới nét đầu. Chỉ
+    Icon là của nháp, không gỡ (erase.erase_mask), nên chữ mới không được dựng đè lên nó: mép trái khung dời tới nét đầu. Chỉ
     dời khi Hi-SAM thấy rõ chữ ở dòng đó (>= 3 mảng nét) -- thấy ít thì không biết chữ bắt đầu ở đâu, giữ khung OCR."""
     import cv2
     H, W = ink.shape
@@ -457,11 +452,12 @@ def _orphans(L: list, draft: np.ndarray, ink: np.ndarray, masks: dict) -> tuple[
     """Mảng nét Hi-SAM không chạm vùng của dòng nào -> gom các mảng gần nhau (đóng hình thái 0,8 cao nét) -> ô L "orphan". Chữ đọc bằng bộ đọc
     của OCR (đọc không ra: để rỗng -- vẫn là ô, VLM nhìn ảnh mà quyết)."""
     import cv2
-    from . import lonly, ocr
+    from . import ocr
+    from .erase import line_region
     H, W = ink.shape
     zone = np.zeros((H, W), bool)
     for l in L:
-        zone |= masks[l["id"]] if l["id"] in masks else lonly._region(l, H, W, 0.3)
+        zone |= masks[l["id"]] if l["id"] in masks else line_region(l, H, W, 0.3)
     n, cc, st, _c = cv2.connectedComponentsWithStats(ink.astype(np.uint8), 8)
     taken = np.unique(cc[zone & ink])
     rest = ink & ~np.isin(cc, taken[taken > 0])
@@ -655,10 +651,6 @@ def mark_printed(M: dict, product_ocr: list | None) -> list[str]:
             l["printed"] = True
             out.append(l["id"])
     return out
-
-
-def _hex_lab(hx: str) -> np.ndarray:
-    return _lab(np.uint8([[[int(hx[i:i + 2], 16) for i in (1, 3, 5)]]]))[0, 0]
 
 
 def public(M: dict) -> dict:
