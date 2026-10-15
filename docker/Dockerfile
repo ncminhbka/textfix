@@ -19,8 +19,9 @@ USER 1000
 WORKDIR /opt/textfix
 
 # thư viện trước (đổi code không phải cài lại)
-COPY --chown=1000:100 requirements.txt /opt/textfix/requirements.txt
-RUN "${TEXTFIX_PY}" -m pip install -r requirements.txt
+# constraints.txt (build.sh sinh từ pip freeze của notebook): cài đúng bản đang chạy tốt trên notebook
+COPY --chown=1000:100 requirements.txt constraints.txt /opt/textfix/
+RUN "${TEXTFIX_PY}" -m pip install -r requirements.txt -c constraints.txt
 
 # trọng số + Chromium (lớp lớn, ít đổi), rồi code
 COPY --chown=1000:100 models /opt/textfix/models
