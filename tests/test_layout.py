@@ -64,3 +64,10 @@ def test_column_width_is_shared_by_the_set():
          {"set": "label#0", "align": "left", "size": 42.0, "els": [e("b", 167)]},
          {"set": None, "align": "left", "size": 42.0, "els": [e("c", 120)]}]
     assert column_want(T) == {"b": 266}
+
+
+def test_set_keeps_each_color_when_the_draft_colors_differ():
+    # final3 h31: ba giá FLUX tô đỏ / cam / vàng -> giữ màu từng dòng; cùng một màu (sai số đo) -> một màu
+    from textfix.compose.style import one_color
+    assert one_color(["#8a1017", "#e86f1a", "#fad611"]) is None
+    assert one_color(["#1a1a1a", "#1c1b1a", "#1a1a1a"]) == "#1a1a1a"

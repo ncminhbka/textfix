@@ -136,3 +136,14 @@ def test_empty_split_line_beside_its_row_stays():
     U, _, _ = resolve(A, M, texts)
     t = fate.table(U, M)
     assert t["L1"]["fate"] == "text" and t["L4"]["fate"] == "skip"
+
+
+def test_split_pieces_follow_the_text_not_the_reading_order():
+    # final3 h13: "Giảm đến" nhỏ nằm trên "70%" to; thứ tự đọc coi là cùng hàng và đặt "70%" trước -> mẩu xếp theo câu, giữ
+    M = page({**line(3, 0), "box": [291, 329, 468, 377], "size": 49.0}, {**line(4, 0), "box": [165, 342, 767, 592], "size": 251.0})
+    texts = [{"text": "Giảm đến 70%", "role": "offer"}]
+    A = parse({"lines": {"L3": L(client=["T0"], part="Giảm đến"), "L4": L(client=["T0"], part="70%")}}, M)
+    U, _, _ = resolve(A, M, texts)
+    u = next(u for u in U if u["kind"] == "text")
+    assert u["split_ok"] and dict(zip(u["marks"], u["split"])) == {"L3": "Giảm đến", "L4": "70%"}
+

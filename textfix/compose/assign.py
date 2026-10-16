@@ -23,7 +23,8 @@ INSIDE = 0.8        # dòng nằm >= 80% trong khung một dòng khác lớn hơ
 def resolve(A: dict, M: dict, texts: list[dict]) -> tuple[list[dict], list[str], list[int]]:
     """Đơn vị dựng từ phần ghép của VLM; số phận dòng theo compose.fate. -> (đơn vị, nhật ký, câu khách không có trên poster)."""
     by, log = M["by"], []
-    rof = rows.row_of(rows.lists(M))   # hàng của danh sách / bảng nháp vẽ (hình học): câu ghép hai lần về đúng hàng
+    G = rows.lists(M)   # danh sách / bảng nháp vẽ (hình học): câu ghép hai lần về đúng hàng, không gộp ô ở hai hàng
+    rof = rows.row_of(G)
     from difflib import SequenceMatcher
     sim = lambda a, b: SequenceMatcher(None, _flat(a), _flat(b)).ratio()  # noqa: E731
     U = []
@@ -87,9 +88,15 @@ def resolve(A: dict, M: dict, texts: list[dict]) -> tuple[list[dict], list[str],
             if out:
                 U.append({**u, "id": u["id"] + "x", "kind": "skip", "marks": out, "clients": [], "split": None, "text_vlm": "", "vlm_out": True})
                 log.append(f"{u['id']}: split để trống dòng {out} -> dòng đó rời đơn vị, xoá trống")
-        if u["split"] and not u.get("split_ok") and (len(u["clients"]) != 1
-                                                   or _flat("".join(u["split"])) != _flat(texts[u["clients"][0]]["text"])):
-            u["split"] = None
+        # MẨU VLM CHIA nối lại đúng câu (xếp theo chỗ của mẩu trong câu, không theo thứ tự đọc: final3 h13 "Giảm đến" nhỏ nằm trên
+        # "70%" to bị coi là cùng hàng, "70%" đứng trước) -> mỗi dòng đúng mẩu VLM đọc (split_ok); không nối lại đúng -> code ngắt
+        if u["split"] and not u.get("split_ok"):
+            if len(u["clients"]) == 1 and len(u["split"]) == len(u["marks"]):
+                u["marks"], u["split"] = _text_order(u["marks"], u["split"], texts[u["clients"][0]]["text"])
+            if len(u["clients"]) != 1 or _flat("".join(u["split"])) != _flat(texts[u["clients"][0]]["text"]):
+                u["split"] = None
+            elif len(u["split"]) == len(u["marks"]):
+                u["split_ok"] = True
     U = [u for u in U if u["marks"]]
     # MỘT CÂU Ở NHIỀU ĐƠN VỊ: đơn vị có chữ OCR giống câu nhất nhận câu; đơn vị kia: còn câu CÙNG VAI chưa có chỗ thì nhận câu đó
     # (FLUX vẽ lặp một hàng: 5f35 "Gội dưỡng" hai lần, "Đính đá" chưa có chỗ), không thì thành dòng lấp (chữ VLM đoán; không có
@@ -106,9 +113,9 @@ def resolve(A: dict, M: dict, texts: list[dict]) -> tuple[list[dict], list[str],
         if all(u["clients"] == [k] and u["kind"] == "text" for u in us) and not any(
                 not used[j] and texts[j]["role"] == texts[k]["role"] for j in range(len(texts))):
             Ls = sorted((by[m] for u in us for m in u["marks"]), key=lambda l: (l["box"][1], l["box"][0]))
-            # ... không gộp các dòng ở HAI HÀNG của một danh sách / bảng (giá ở hai hàng giá: hàng thừa, compose.rows)
+            # ... không gộp hai ô ở HAI HÀNG ĐỦ Ô của một bảng (giá ở hai hàng giá, compose.rows.across_table_rows)
             if (_stacked(Ls) and max(l["size"] for l in Ls) / min(l["size"] for l in Ls) <= SPLIT_RATIO
-                    and len({rof[l["id"]] for l in Ls if l["id"] in rof}) <= 1):
+                    and not rows.across_table_rows(G, [l["id"] for l in Ls])):
                 us[0].update(marks=[l["id"] for l in Ls], split=None)
                 U = [u for u in U if not any(u is x for x in us[1:])]
                 used[k] = 1
@@ -203,6 +210,16 @@ def inside(U: list[dict], M: dict) -> list[str]:
         log.append(f"{m}: nằm trong dòng {p['id']} -> {kind} theo dòng đó")
     U[:] = [u for u in U if u["marks"]]
     return log
+
+
+def _text_order(marks: list, pieces: list, text: str) -> tuple[list, list]:
+    """Cặp (dòng, mẩu) xếp theo chỗ của mẩu trong câu khách (bỏ dấu, chữ thường); có mẩu không nằm trong câu -> giữ nguyên."""
+    f = _flat(text)
+    at = [f.find(_flat(p)) for p in pieces]
+    if any(a < 0 for a in at):
+        return marks, pieces
+    order = sorted(range(len(pieces)), key=lambda i: at[i])
+    return [marks[i] for i in order], [pieces[i] for i in order]
 
 
 def _beside(a: list, b: list) -> bool:

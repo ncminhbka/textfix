@@ -884,3 +884,26 @@ bên dưới.
 1. `%run scripts/dev_batch.py bench/dev3.json` -- tập dev 3 (thay cho dev3_geo: dev3 đã gồm cả 16 ca hình học chữ).
 2. Để so trước / sau dev2 (prompt LLM / VLM mới, B2 hai lượt, cỡ / khung mới): xoá `output/dev/dev2_manifest.json` rồi
    `%run scripts/dev_batch.py` -- chạy lại cả 40 ca (seed cố định; d33-d40 là ca mới).
+
+## Bộ thi final3 (16/10, 32 ca, seed 16001-16032, mã d32b906) -- chấm theo nguồn lỗi
+
+Mã chạy: d32b906 (một lời gọi VLM, khuôn JSON theo dòng; CHƯA có 7506761 "câu FLUX vẽ lặp viết lặp theo nháp"). 32 / 32 xong,
+không lỗi chạy. Xem đủ 32 poster (nháp | poster) + plan.json các ca hỏng.
+
+**Mốc:** VLM theo khuôn tuyệt đối -- 0 dòng bỏ sót, 0 mục sai khuôn, MỘT lời gọi mỗi poster: vlm trung vị 9,7 s, max 14,4 s
+(final2 15/10: 16-25 s ở ảnh phải hỏi lại). Lỗi bộ kiểm cuối: too_small 11, overflow 3, low_contrast 1, content_overlap 1
+(too_small không tính mục của tập -- xem ROADMAP chặng 7). Câu khách thiếu 5 ca (đều do FLUX không vẽ). Đạt: 15 / 32
+(h01 h04 h05 h06 h07 h09 h10 h12 h14 h15 h16 h20 h27 h30 h32).
+
+| Nguồn | Ca | Lỗi | Sửa |
+|---|---|---|---|
+| code (chặng 7, lỗi của Claude) | h02, h22 | tên món dài viết hai lần, cột co 0,63; lời khen ba dòng dồn một dòng co 0,38 -- luật "không gộp dòng ở hai hàng của danh sách" coi đoạn văn / dòng xuống hàng là danh sách | [code] chỉ chặn gộp khi hai hàng đều ĐỦ Ô của bảng nhiều cột (`rows.across_table_rows`) |
+| code (chặng 7) | h13 | "Giảm đến 70%" đảo: thứ tự đọc coi "Giảm đến" nhỏ nằm trên "70%" to là cùng hàng -> mẩu không nối lại đúng câu -> bỏ split | [code] mẩu xếp theo chỗ trong câu khách (`assign._text_order`); nối lại đúng -> split_ok, mỗi dòng đúng mẩu VLM đọc |
+| code (brief) | h08 | giờ học "6:00" thành "00", "19:00" mất: luật gỡ số thứ tự coi "6:" là số thứ tự | [code] `brief.texts.ORDINAL` không khớp khi sau dấu là chữ số |
+| code (lines) | h17 | tiêu đề "Bia Sapppro" giữ chữ giun: giống "SAPPORO" trên lon 0,7 -> coi là chữ in trên sản phẩm | [code] `printed._foreign_words`: dòng có từ không giống từ nào trên sản phẩm (< 0,4) là chữ poster. 32 poster có ảnh sản phẩm: bắt 1, bỏ nhầm 0 (thử phủ ký tự >= 0,8: bỏ nhầm 9 dòng sản phẩm méo -> bỏ cách đó) |
+| code | h21 | nút CTA trống: câu VLM ghép hai lần, dòng thua bị gỡ | đã sửa ở 7506761 (viết lặp theo nháp) |
+| code (bám nháp) | h31 | ba giá FLUX tô đỏ / cam / vàng bị ép một màu vàng -> chìm nền | [code] tập chỉ một màu khi màu đo gần nhau (`style.one_color`, <= 25 ΔE) |
+| code (đo dòng) | h29 | chữ giun "2" cạnh "Mua" sót: OCR không thấy | theo dõi (một ca) |
+| VLM | h11 | một câu nhồi bốn dòng của hai hàng (LLM gộp tên + giá, FLUX vẽ hai cột 12 hàng) | -- |
+| VLM | h19, h24, h13 | hai câu một dòng (co 0,46); một câu chia hai chỗ xa nhau; tiêu đề font viết tay nhạt | -- |
+| FLUX | h03, h25, h26, h28, h18 | không vẽ câu khách ("Nha đam", hai bước, tên cửa hàng); hai dòng chồng nhau | chịu (bám nháp) |

@@ -14,10 +14,24 @@ def mark_printed(M: dict, product_ocr: list | None) -> list[str]:
     words = [{"text": w} for w in product_ocr or [] if w and w.strip()]
     out = []
     for l in M["L"] if words else []:
-        if _client_like(l.get("ocr") or "", words) is not None:
+        ocr = l.get("ocr") or ""
+        if _client_like(ocr, words) is not None and not _foreign_words(ocr, words):
             l["printed"] = True
             out.append(l["id"])
     return out
+
+
+FOREIGN_SIM = 0.4   # một từ (>= 3 ký tự) của dòng nháp không giống từ nào trên ảnh sản phẩm (bỏ dấu, chữ thường, < 0,4) = chữ của
+                    # poster: dòng CHỨA tên sản phẩm mà không phải chữ trên sản phẩm (final3 h17: tiêu đề "Bia Sapppro" cạnh "SAPPORO"
+                    # trên lon). Đo trên 32 poster có ảnh sản phẩm: bắt 1 (h17), không bỏ nhầm dòng sản phẩm nào; 0,5 bỏ nhầm "CEW"
+
+
+def _foreign_words(ocr: str, words: list[dict]) -> list[str]:
+    """Các từ của dòng nháp không giống từ nào đọc được trên ảnh sản phẩm."""
+    from difflib import SequenceMatcher
+    pw = [_flat(x) for w in words for x in w["text"].split() if len(_flat(x)) >= 2]
+    return [x for x in ocr.split() if len(_flat(x)) >= 3
+            and max((SequenceMatcher(None, _flat(x), p).ratio() for p in pw), default=0.0) < FOREIGN_SIM]
 
 
 CLIENT_LIKE = 0.6   # chữ OCR của ô giống câu khách >= 0.6 (bỏ dấu, chữ thường) = chữ poster chứa câu khách

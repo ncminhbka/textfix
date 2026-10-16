@@ -75,3 +75,12 @@ def test_duplicate_price_goes_to_the_row_of_its_dish():
     by = {m: u for u in U for m in u["marks"]}
     assert by["L6"]["clients"] == [5] and by["L6"]["marks"] == ["L6"]
     assert by["L7"]["text_vlm"] == "Chè đậu xanh" and not by["L8"]["clients"]
+
+
+def test_a_text_drawn_over_stacked_lines_is_one_block():
+    # final3 h22: lời khen FLUX vẽ ba dòng xếp chồng (trông như cột danh sách), VLM ghi câu cho cả ba -> một khối, không phải ba câu
+    M = page(line(1, [300, 100, 700, 134]), line(2, [310, 140, 690, 174]), line(3, [305, 180, 695, 214]))
+    A = parse({"assign": [entry(["L1"], "T0"), entry(["L2"], "T0"), entry(["L3"], "T0")]})
+    U, log, _ = resolve(A, M, [{"text": "Niềng răng 18 tháng, giờ tôi cười thoải mái trong mọi tấm ảnh", "role": "review_quote"}])
+    assert [(u["marks"], u["clients"]) for u in U if u["kind"] == "text"] == [(["L1", "L2", "L3"], [0])]
+

@@ -7,8 +7,8 @@ VLM chỉ hiểu NGHĨA (dòng nào là câu nào, mỗi vai trông ra sao); cod
   2. chỗ   = hình bao NÉT Hi-SAM của dòng, nới vào nền trống (compose.size); dòng nghiêng / cong theo render.geometry;
   3. cỡ    = cao nét nháp / tỉ lệ cao chữ của font đã chọn; màu = màu đo của dòng (compose.style); kiểu theo VAI;
   4. lề    = mép nét nháp; ngắt dòng = theo tỉ lệ số ký tự OCR các dòng nháp (compose.text);
-  5. TẬP   = cùng vai, cỡ nháp đôi một lệch <= SET_RATIO, thẳng lề / cùng hàng: một cỡ, một màu, một lề, một mức nén, một bề
-             rộng cột (compose.size, render);
+  5. TẬP   = cùng vai, cỡ nháp đôi một lệch <= SET_RATIO, thẳng lề / cùng hàng: một cỡ, một lề, một mức nén, một bề rộng cột
+             (compose.size, render); một màu khi nháp tô cùng màu (style.one_color);
   6. co    = nén ngang <= render.CONDENSE rồi co cỡ, theo đơn vị (dòng / khối / tập).
 Người dùng chốt 14/10: nhóm lấy từ vai câu khách (brief), không đoán từ ảnh; không cắt chữ, chỉ co; nháp thiếu câu thì chịu.
 """
@@ -23,7 +23,7 @@ import numpy as np
 
 from .geometry import SPLIT_RATIO, _gaps, _reading, _rows, _stacked, align_of, ink_box, lone_align, set_align
 from .size import _line_size, _rooms
-from .style import _sanitize, pick_color
+from .style import _sanitize, one_color, pick_color
 from .text import _caps, break_like
 
 SET_RATIO = 1.25    # tập cùng vai: cỡ nháp đôi một lệch <= 1,25 lần (probe 394b: trung vị +-1,4 gộp nhầm nhãn 22px với website 32px)
@@ -112,10 +112,10 @@ def layout(U: list[dict], M: dict, ink: np.ndarray, styles: dict, accent: list, 
                 sets[f"{role}#{len(sets)}"] = g
     for name, us in sets.items():
         s = float(np.median([l["size"] for u in us for l in u["Ls"]]))
-        col = Counter(u["color"] for u in us if u["color"]).most_common(1)
+        col = one_color([u["color"] for u in us])
         al = set_align([u["box"] for u in us], s)
         for u in us:
-            u.update(set=name, size=s, align=al, **({"color": col[0][0]} if col else {}))
+            u.update(set=name, size=s, align=al, **({"color": col} if col else {}))
         log.append(f"tập '{name}': {[u['id'] for u in us]} cỡ {s:.0f}px, lề {al}")
     allb = [(u["id"], b) for u in T for b in u["ib"]]
     for u in T:
@@ -140,10 +140,10 @@ def layout(U: list[dict], M: dict, ink: np.ndarray, styles: dict, accent: list, 
         if c and c != u["color"]:
             log.append(f"{u['id']}: màu {c} ({why})")
         u["color"] = c or u["color"]
-    for us in sets.values():   # một tập một màu: màu nhiều đơn vị chọn nhất
-        col = Counter(u["color"] for u in us if u["color"]).most_common(1)
+    for us in sets.values():   # một tập một màu khi nháp tô cùng màu (style.one_color); nháp tô mỗi mục một màu thì giữ
+        col = one_color([u["color"] for u in us])
         for u in us:
-            u["color"] = col[0][0] if col else u["color"]
+            u["color"] = col or u["color"]
     for u in T:
         st = styles.get(u["role"]) or {}
         wt = u["weight"]

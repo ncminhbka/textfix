@@ -208,7 +208,10 @@ riêng rồi GIỮ; CHO NỚI chữ vào nền trống cùng màu, không vượ
   - Replay trên câu trả lời VLM đã lưu (final2 + dev2, 69 poster, bản có gỡ hàng): phần tử co < 0,6 23 -> 16, câu khách thiếu
     26 -> 22, cỡ trong +-15% nháp 68 -> 71%. (too_small 45 -> 24 KHÔNG tin được: render.check_units không tính too_small cho
     mục nào của tập -- `evened` gắn cho cả mục chật nhất -- mà bỏ SET_FLOOR đưa thêm chữ co mạnh vào tập.)
-  - [ ] Đo trên máy chủ: `bench/final3.json` (32 ca mới, seed 16001-16032, nặng danh sách / bảng / pill / ảnh sản phẩm).
+  - [x] Máy chủ `bench/final3.json` (mã d32b906): VLM 0 dòng bỏ sót / 0 mục sai khuôn, một lời gọi, trung vị 9,7 s; 15 / 32 đạt.
+    Chấm theo nguồn: docs/TUNING.md mục "Bộ thi final3". Sửa sau chấm: gộp dòng chỉ bị chặn giữa hai hàng đủ ô của bảng (h02 /
+    h22, lỗi chặng 7), mẩu VLM chia xếp theo câu (h13), `brief.ORDINAL` không ăn giờ "6:00" (h08), dòng có từ lạ không phải
+    chữ sản phẩm (h17), tập chỉ một màu khi nháp tô cùng màu (h31).
 
 ## Bước 3: gỡ chữ giun (Hi-SAM + LaMa) -- chuẩn hoá 15/10
 

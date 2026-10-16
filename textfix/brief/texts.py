@@ -39,7 +39,8 @@ FIELD_ROLE = {"title": "headline", "discount": "offer", "applied_product": "subh
               "special_offer": "offer", "job_position": "headline", "job_desc": "body", "apply_deadline": "date",
               "apply_method": "contact", "guide_steps": "list_item", "store_name": "info", "phone": "contact",
               "address": "contact", "website_link": "contact"}
-ORDINAL = re.compile(r"^\s*(?:(?:bước|step)\s*)?\d{1,2}\s*[.):\-–]\s*", re.I)   # "Bước 1: ", "1. ", "2) " đầu câu
+# "Bước 1: ", "1. ", "2) " đầu câu -- không phải giờ / số / khoảng ("6:00", "1.500.000đ", "3 - 5 ngày", final3 h08: "6:00" thành "00")
+ORDINAL = re.compile(r"^\s*(?:(?:bước|step)\s*)?\d{1,2}\s*[.):\-–]\s*+(?!\d)", re.I)
 STAR_TEXT = re.compile(r"^\d+(?:[.,]\d+)?\s*(?:sao|stars?)$", re.I)   # câu chỉ ghi số sao ("5 sao")
 USER_QUOTES = re.compile(r'"([^"]+)"|“([^”]+)”')
 QUOTED = re.compile(r'"([^"]+)"')

@@ -1,9 +1,10 @@
 """HÀNG CỦA DANH SÁCH / BẢNG trong nháp, nhận bằng hình học thuần: cột dòng thẳng lề, cùng cỡ, đều nhịp; các cột có dòng cùng
-hàng ghép thành bảng. Dùng khi ghép câu (compose.assign): một câu VLM ghi cho hai dòng ở HAI HÀNG không gộp thành một khối, và
-hàng có câu liền kề (tên món của giá) nhận câu đó.
+hàng ghép thành bảng. Dùng khi ghép câu (compose.assign): một câu VLM ghi cho hai ô ở HAI HÀNG đủ ô của bảng không gộp thành một
+khối, và hàng có câu liền kề (tên món của giá) nhận câu đó.
 
-  G = lists(M)      # [{"rows": [[id dòng], ...], "cols": n, "lines": [...]}]
-  row_of(G)         # {id dòng: (danh sách, hàng)}
+  G = lists(M)                      # [{"rows": [[id dòng], ...], "cols": n, "lines": [...]}]
+  row_of(G)                         # {id dòng: (danh sách, hàng)}
+  across_table_rows(G, ["L14", "L16"])   # hai ô ở hai hàng đủ ô của bảng
 
 16/10: đã thử gỡ hàng thừa + dàn đều các hàng còn lại bằng điểm ảnh; người dùng bỏ (dàn đều chỉ được 1 / 5 danh sách, còn lại
 để chấm / icon trơ trọi): FLUX vẽ thừa hàng thì VLM viết chữ lấp theo.
@@ -122,3 +123,17 @@ def lists(M: dict) -> list[dict]:
 def row_of(G: list[dict]) -> dict:
     """{id dòng: (chỉ số danh sách, chỉ số hàng)}."""
     return {m: (gi, ri) for gi, g in enumerate(G) for ri, r in enumerate(g["rows"]) for m in r}
+
+
+def across_table_rows(G: list[dict], ids: list[str]) -> bool:
+    """Các dòng nằm ở >= 2 HÀNG ĐỦ Ô của một bảng nhiều cột (mỗi hàng đó có ô ở cột khác: tên món | giá) -- hai chỗ khác nhau, không
+    phải một câu xuống dòng. Đoạn văn một cột / dòng xuống hàng đứng riêng (không ô cạnh) không tính (final3 h02 tên món dài,
+    h22 lời khen ba dòng: trông như danh sách mà là một câu)."""
+    for g in G:
+        if g["cols"] < 2:
+            continue
+        hit = {ri for ri, r in enumerate(g["rows"]) for m in ids if m in r}
+        if len(hit) >= 2 and all(len(g["rows"][ri]) >= 2 for ri in hit):
+            return True
+    return False
+

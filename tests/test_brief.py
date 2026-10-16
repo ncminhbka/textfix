@@ -239,3 +239,10 @@ def test_variants_get_the_same_contract():
 def test_non_object_answer_raises():
     with pytest.raises(ValueError):
         make_brief(lambda s, p: ["not", "an", "object"], "poster")
+
+
+def test_ordinal_is_not_a_time_or_a_number():
+    # final3 h08: "6:00" / "17:30" bị coi là số thứ tự "6:" -> "00"; giá / khoảng cũng không phải số thứ tự
+    from textfix.brief.texts import ORDINAL
+    assert [ORDINAL.sub("", t) for t in ("Bước 1: Rửa tay", "1. Tráng phin", "2) Chọn món")] == ["Rửa tay", "Tráng phin", "Chọn món"]
+    assert not any(ORDINAL.match(t) for t in ("6:00", "17:30", "1.500.000đ", "3 - 5 ngày"))

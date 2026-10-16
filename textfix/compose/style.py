@@ -53,3 +53,21 @@ def pick_color(glyph: str | None, ink: str | None, vlm: str | None) -> tuple[str
         if c:
             return c, why + (" (ba nguồn lệch nhau)" if sum(bool(x) for x in (glyph, ink, vlm)) > 1 else "")
     return None, "không nguồn nào"
+
+
+def one_color(colors: list) -> str | None:
+    """MỘT MÀU CHO TẬP khi nháp tô các mục cùng một màu (lệch <= COLOR_AGREE: sai số đo) -> màu nhiều mục nhất; nháp cố ý tô mỗi
+    mục một màu (final3 h31: ba giá đỏ / cam / vàng) -> None, mỗi mục giữ màu của nó (bám nháp, 16/10)."""
+    from collections import Counter
+
+    from ..color import hex_lab
+    cs = [c for c in colors if c]
+    if not cs:
+        return None
+    top = Counter(cs).most_common(1)[0][0]
+    try:
+        ok = all(float(np.linalg.norm(hex_lab(c) - hex_lab(top))) <= COLOR_AGREE for c in cs)
+    except Exception:
+        ok = False
+    return top if ok else None
+
