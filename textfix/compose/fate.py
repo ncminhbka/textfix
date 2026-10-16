@@ -6,8 +6,8 @@ Luật, theo thứ tự (người dùng chốt 15/10; 16/10: không hỏi lại 
   2. chữ in trên sản phẩm khách tải (lines.mark_printed) -> keep, trừ khi VLM ghép câu khách (compose.assign.resolve);
      mẩu nằm trong khung một dòng khác theo số phận dòng đó (compose.assign.inside);
   3. VLM nói keep / skip -> theo VLM: TIN VLM khi nó xoá;
-  4. VLM CÓ nhắc dòng mà không còn chữ cho nó (câu đã có chỗ khác, chữ lấp bị bỏ) -> skip: chữ giun của dòng thừa không được ở
-     lại. Dòng đó là hàng của danh sách / bảng -> gỡ CẢ HÀNG, dàn đều các hàng còn lại (compose.rows);
+  4. VLM CÓ nhắc dòng mà không còn chữ cho nó -> skip: chữ giun không được ở lại. BÁM NHÁP (16/10): hiếm -- dòng FLUX vẽ thừa
+     có chữ VLM đoán, câu FLUX vẽ lặp được viết lặp (compose.assign.resolve); còn lại là mảnh split VLM nói không mang chữ;
   5. VLM KHÔNG nhắc dòng (khuôn JSON bắt buộc đủ dòng nên chỉ còn khi VLM không theo khuôn) -> keep: không biết dòng là gì thì
      không xoá.
 """

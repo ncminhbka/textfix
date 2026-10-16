@@ -92,7 +92,8 @@ def resolve(A: dict, M: dict, texts: list[dict]) -> tuple[list[dict], list[str],
             u["split"] = None
     U = [u for u in U if u["marks"]]
     # MỘT CÂU Ở NHIỀU ĐƠN VỊ: đơn vị có chữ OCR giống câu nhất nhận câu; đơn vị kia: còn câu CÙNG VAI chưa có chỗ thì nhận câu đó
-    # (FLUX vẽ lặp một hàng: 5f35 "Gội dưỡng" hai lần, "Đính đá" chưa có chỗ), không thì thành dòng lấp (chữ VLM nếu có)
+    # (FLUX vẽ lặp một hàng: 5f35 "Gội dưỡng" hai lần, "Đính đá" chưa có chỗ), không thì thành dòng lấp (chữ VLM đoán; không có
+    # thì viết lặp đúng câu đó theo nháp)
     used = Counter(k for u in U for k in u["clients"])
     ocr = lambda u: " ".join(by[m].get("ocr") or "" for m in u["marks"])  # noqa: E731
     for k, n in list(used.items()):
@@ -127,7 +128,12 @@ def resolve(A: dict, M: dict, texts: list[dict]) -> tuple[list[dict], list[str],
                 log.append(f"{u['id']}: câu T{k} đã ở {best['id']} -> nhận câu cùng vai chưa có chỗ T{free[0]}")
             else:
                 u["role_vlm"] = u["role_vlm"] or texts[k]["role"]
-                log.append(f"{u['id']}: câu T{k} đã ở {best['id']} -> dòng lấp" + (f" {u['text_vlm']!r}" if u["text_vlm"] else ""))
+                # BÁM NHÁP (người dùng chốt 16/10): FLUX vẽ lặp câu mà VLM không đoán chữ khác -> viết lặp đúng câu đó, không gỡ trống
+                if not u["clients"] and not u["text_vlm"]:
+                    u["text_vlm"] = texts[k]["text"]
+                    log.append(f"{u['id']}: câu T{k} đã ở {best['id']} -> FLUX vẽ lặp, viết lặp theo nháp")
+                else:
+                    log.append(f"{u['id']}: câu T{k} đã ở {best['id']} -> dòng lấp" + (f" {u['text_vlm']!r}" if u["text_vlm"] else ""))
     # DÒNG LẤP (VLM đoán FLUX định viết gì ở dòng vẽ thừa, kể cả hàng danh sách / bảng -- người dùng chốt 16/10: FLUX bịa thì
     # viết theo): compose.assign.filler -- là một câu khách chưa có chỗ thì viết câu đó; còn lại viết đúng chữ VLM đoán
     used = Counter(k for u in U for k in u["clients"])

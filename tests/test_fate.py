@@ -47,11 +47,14 @@ def test_omitted_line_is_kept():
     assert t["L2"]["fate"] == "keep" and "bỏ sót" in t["L2"]["why"]
 
 
-def test_mentioned_line_without_words_is_wiped():
-    # FLUX vẽ tiêu đề hai lần, VLM ghép cùng một câu vào cả hai: dòng thừa không còn chữ -> gỡ (không để chữ giun ở lại)
+def test_repeated_text_is_written_twice_as_drawn():
+    # FLUX vẽ tiêu đề hai lần (xa nhau), VLM ghép cùng một câu vào cả hai: BÁM NHÁP -- viết lặp, không gỡ trống (16/10)
     M = page(line(1, 100, ocr="Khai truong"), line(2, 300, ocr="Khoi trung"))
-    t = fates(M, [entry(["L1"], client="T0"), entry(["L2"], client="T0"), entry([], client="T1")])
-    assert {t["L1"]["fate"], t["L2"]["fate"]} == {"text", "skip"}
+    A = parse({"assign": [entry(["L1"], client="T0"), entry(["L2"], client="T0"), entry([], client="T1")], "styles": {}})
+    U, _, _ = resolve(A, M, TEXTS)
+    t = fate.table(U, M)
+    assert t["L1"]["fate"] == t["L2"]["fate"] == "text"
+    assert sorted(u["text_vlm"] or TEXTS[u["clients"][0]]["text"] for u in U if u["kind"] == "text") == ["Khai trương", "Khai trương"]
 
 
 def test_printed_line_is_kept_unless_client_text():

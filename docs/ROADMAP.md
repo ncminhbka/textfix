@@ -192,6 +192,9 @@ riêng rồi GIỮ; CHO NỚI chữ vào nền trống cùng màu, không vượ
   - [x] Dòng FLUX vẽ thừa (lời dặn mục 3): câu cùng vai chưa có chỗ, không còn thì VLM ĐOÁN FLUX định viết gì (đọc chữ giun +
     chữ OCR, hợp các hàng quanh nó) và viết theo, kể cả hàng danh sách / bảng, số / giá (người dùng: "FLUX bịa thì bịa theo").
     `compose.assign.filler`: chữ lấp là câu khách chưa có chỗ -> viết câu đó; không chặn chữ lấp nào nữa (bỏ luật chặn số).
+    Câu VLM ghép cho hai dòng (FLUX vẽ lặp), không còn câu cùng vai, VLM không đoán chữ khác -> viết lặp theo nháp (trước:
+    gỡ trống). Rà tinh thần "bám nháp" 16/10: mã chỉ còn gỡ trống dòng VLM nói skip, mảnh split VLM nói không mang chữ, mẩu
+    nằm trong khung dòng đang viết lại. Giữ (người dùng chốt 14/10): các bước theo thứ tự khách, số trước hàng viết lại.
   - [~] Đã thử rồi BỎ (người dùng 16/10): gỡ cả hàng thừa + dàn đều các hàng còn lại bằng điểm ảnh (bỏ trọn chu kỳ hàng, nhân
     bản nền ở chỗ cắt, chỉ làm khi đường nối không lộ). Replay final2 + dev2: dàn được 1 / 5 danh sách có hàng thừa (cơm tấm
     g01); 4 / 5 bị từ chối (vệt nước, quạt sát mép, icon hai bên hàng, bảng kẻ ô) để lại chấm / dấu tick / icon trơ trọi.
