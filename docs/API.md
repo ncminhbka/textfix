@@ -101,7 +101,7 @@ Mọi lỗi có **mã cố định**:
 | `lines_failed` | đo dòng chữ |
 | `erase_failed` | gỡ chữ (LaMa) |
 | `vlm_failed` | gọi VLM ghép câu (lỗi gọi / sai khuôn) |
-| `vlm_empty_plan` | VLM không ghép câu khách nào vào dòng nào, kể cả khi gọi lại — không trả nháp thay poster |
+| `vlm_empty_plan` | VLM không ghép câu khách nào vào dòng nào — không trả nháp thay poster |
 | `render_failed` | dựng chữ (Chromium) |
 | `design_failed` | lỗi khác trong bước thiết kế |
 | `internal_error` | lỗi không thuộc bước nào ở trên |

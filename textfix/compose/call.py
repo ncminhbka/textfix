@@ -54,17 +54,17 @@ PRODUCT_NOTE = ("The client uploaded a photo of their product and the image mode
 
 
 def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, system: str, desc: str, base: np.ndarray,
-         product: bool = False, meta: dict | None = None, fresh: bool = False) -> dict:
+         product: bool = False, meta: dict | None = None, schema: dict | None = None) -> dict:
     """Một lời gọi VLM: lời dặn (system), PROMPT của FLUX, câu khách, bảng mô tả dòng (desc), ba ảnh DRAFT / SLOTS / BASE.
-    meta: nhận số token / thời gian (llm.json_call). -> câu trả lời JSON (compose.parse đọc)."""
+    meta: nhận số token / thời gian (llm.json_call); schema: khuôn JSON của lời gọi. -> câu trả lời JSON (compose.parse đọc)."""
     mk = marked_image(draft, M)
     W, H = mk.size
     imgs = ["DRAFT:", _png(draft), "SLOTS (marked):", _png(mk),
             "BASE (the draft with the old letters wiped; your text is drawn on it):", _png(base)]
     user = (f"PROMPT given to the image model:\n{prompt}\n\nClient texts (exact words):\n{_texts(texts)}\n\nPoster size: {W}x{H}px.\n\n"
             + (PRODUCT_NOTE + "\n\n" if product else "") + desc)
-    args = (system, [user, *imgs]) + ((meta,) if meta is not None else ())
-    return _obj(call(*args, fresh=True) if fresh else call(*args))
+    kw = {"schema": schema} if schema else {}
+    return _obj(call(system, [user, *imgs], meta, **kw) if meta is not None else call(system, [user, *imgs], **kw))
 
 
 def _tid(c) -> int | None:

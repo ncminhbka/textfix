@@ -13,7 +13,7 @@ form / prompt
   2.  FLUX.2-klein vẽ nháp; Hi-SAM tìm nét chữ (mặt nạ từng điểm ảnh)              draw/
   4a. DÒNG chữ: OCR chia vùng dòng; hướng, cao chữ, màu, nét đo trên nét Hi-SAM     lines/
   4b. gỡ chữ: mảnh nét của từng dòng + quầng, LaMa lấp một lần                      erase/
-  4c. VLM đọc nháp: dòng nào là câu nào; số phận mỗi dòng viết / giữ / xoá          compose/ (vlm, fate, assign)
+  4c. VLM đọc nháp: dòng nào là câu nào; số phận mỗi dòng viết / giữ / xoá          compose/ (vlm, fate, assign, rows)
   4d. bố cục: cỡ theo font thật, nới vào nền trống, tập cùng vai, màu               compose/ (layout, size, style)
   5.  dựng chữ trên nền (Chromium), kiểm lỗi, sửa bằng code                         render/
   -> poster
@@ -48,7 +48,7 @@ Docker demo build ngay trên notebook (FLUX 9B / LLM / VLM ở máy khác): [doc
 | `textfix/draw/` | 2. `flux.py` FLUX tại chỗ, `remote.py` FLUX ở máy khác ([docs/DEPLOY.md](docs/DEPLOY.md)), `hisam.py` nét chữ của nháp. Test: `tests/test_flux*.py` |
 | `textfix/lines/` | 4a. Dòng chữ: `page.build` (điều phối), `detect` (dòng OCR + số đo nét), `split` (tách mục), `curve` (chữ cong), `orphans` (nét OCR không thấy), `order` (đánh số), `printed` (chữ trên sản phẩm), `view` (ảnh / JSON); hình học trên nét Hi-SAM: `ink`, `group`, `angle`, `measure`, `lead`, `runs`; `ocr`, `glyph`. Test: `tests/test_lines.py` |
 | `textfix/erase/` | 4b. Gỡ chữ giun: `mask` (nét, dự phòng, quầng, dấu câu), `lama` (một lượt LaMa), `view` (ảnh debug). Test: `tests/test_erase.py` |
-| `textfix/compose/` | 4c–4d. `call` + `vlm` (lời gọi VLM, hỏi lại dòng bỏ sót), `parse`, `fate` (một bảng số phận dòng), `assign` (câu ↔ dòng), `layout` (bố cục) với `geometry`, `size` (cỡ theo font, nới khung), `style` (màu), `text` (ngắt dòng). Test: `tests/test_fate.py`, `tests/test_layout.py` |
+| `textfix/compose/` | 4c–4d. `call` + `vlm` (MỘT lời gọi VLM, khuôn JSON mỗi dòng một mục), `parse`, `fate` (một bảng số phận dòng), `assign` (câu ↔ dòng, chữ lấp), `rows` (danh sách / bảng: hàng thừa gỡ cả hàng, dàn đều), `layout` (bố cục, tập cùng vai thẳng lề) với `geometry`, `size` (cỡ theo font, nới khung, bề rộng cột chung), `style` (màu), `text` (ngắt dòng). Test: `tests/test_fate.py`, `tests/test_rows.py`, `tests/test_layout.py` |
 | `textfix/render/` | 5. `page` (dựng trong Chromium; mã trang ở `js`), `check` (bộ kiểm, tương phản), `fix` (vòng sửa), `geometry`, `style`, `view`; `fonts` (bộ font OFL đủ dấu tiếng Việt), `browser` |
 | `textfix/tools/` | Không thuộc dây chuyền: `multigpu` (chạy hàng loạt trên mọi card), `ship` (zip < 24 MB tự tải về, JupyterLab), `audit` (cờ nghi hỏng) |
 | `textfix/config.py`, `llm.py`, `color.py` | Biến môi trường, gọi LLM / VLM (OpenAI-compatible), màu CIELAB |

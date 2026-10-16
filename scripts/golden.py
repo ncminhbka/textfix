@@ -62,7 +62,7 @@ def raw_answer(P: dict) -> dict:
 def fake_vlm(P: dict):
     calls = []
 
-    def call(system, parts, meta=None, fresh=False):
+    def call(system, parts, meta=None, fresh=False, schema=None):
         calls.append(1)
         return raw_answer(P) if len(calls) == 1 else {"assign": []}
     return call

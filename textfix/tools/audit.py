@@ -27,24 +27,25 @@ def flags(plan: dict) -> list[str]:
     miss = plan.get("missing") or []
     if miss:
         out.append("mất câu khách: " + " · ".join(miss)[:120])
-    # chặng B: chữ là nguyên văn câu khách; mã chỉ còn chặn chữ LẤP có số bịa và split không nối lại đúng câu
-    guard = [l for l in log if "có số không có trong câu khách" in l or "không nối lại đúng câu khách" in l]
+    # chặng B: chữ là nguyên văn câu khách; mã chỉ còn chặn chữ LẤP (compose.assign.filler) và split không nối lại đúng câu
+    guard = [l for l in log if ("chữ lấp" in l and l.endswith("-> bỏ")) or "không nối lại đúng câu khách" in l]
     if guard:
         out.append(f"mã chặn {len(guard)} chữ lấp / chỗ cắt câu sai của VLM")
-    if any("VẪN RỖNG" in l for l in log):
+    if any(e.get("type") == "empty_plan" for e in plan.get("errors") or []):
         out.append("VLM trả kế hoạch rỗng")
     # ---- đường chỉ dòng chữ (compose): những lần MÃ phải làm thay VLM, và bước gỡ chữ rơi về đường dự phòng
     blank = sum("không còn chữ cho dòng" in l for l in log)
     if blank:
         out.append(f"{blank} dòng nháp xoá trống (không còn câu nào để viết)")
-    kept = sum("hỏi lại vẫn không có" in l for l in log)
+    kept = sum("VLM bỏ sót ->" in l for l in log)
     if kept:
-        out.append(f"{kept} dòng VLM bỏ sót cả khi hỏi lại -> giữ nguyên")
+        out.append(f"{kept} dòng VLM bỏ sót (không theo khuôn JSON) -> giữ nguyên")
     own = sum("-> dòng lấp" in l for l in log)
     if own:
         out.append(f"{own} dòng ghép trùng câu đã có -> thành dòng lấp")
-    if any("-> hỏi lại:" in l for l in log):
-        out.append("VLM bỏ sót dòng, đã hỏi lại")
+    gone = sum("-> gỡ cả hàng" in l for l in log)
+    if gone:
+        out.append(f"{gone} danh sách có hàng thừa -> gỡ cả hàng" + (", đã dàn đều" if any(": dàn đều" in l for l in log) else ""))
     er = plan.get("erase") or {}
     if er.get("orphans"):
         out.append(f"{len(er['orphans'])} cụm nét OCR không đọc (VLM quyết giữ / xoá)")

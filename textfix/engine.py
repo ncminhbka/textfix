@@ -107,7 +107,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     theo vai -> code chép nguyên văn, cỡ / lề / tập theo nháp (compose.layout) -> trả điểm ảnh nháp cho dòng giữ -> dựng -> kiểm -> sửa
     bằng code. d = draw(...)."""
     from . import erase, lines, render
-    from .compose import fate
+    from .compose import fate, rows
     from .compose import vlm as cvlm
     from .compose.assign import resolve
     from .compose.layout import layout, public
@@ -132,39 +132,17 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     def base_of(U_, log_=None):
         return erase.settle(draft, clean, ink, M, {"ops": U_}, log_)
 
-    def ask(fresh=False):
-        return cvlm.ask(draft, M, B["prompt_en"], texts, vlm, product=product, base=clean, fresh=fresh)
     t0 = time.time()
     progress("VLM ghép câu")
-    A = ask()
-    # GHÉP RỖNG (13/10 accept1 f03: VLM trả về không một lệnh nào -> poster không chữ): có dòng, có câu khách mà không đơn vị nào
-    # viết -> gọi lại một lần; vẫn rỗng thì lỗi nặng "empty_plan"
-    wrote = lambda a: any(u["kind"] == "text" and (u["clients"] or u["text_vlm"]) for u in a.get("assign") or [])   # noqa: E731
-    empty = bool(M["L"] and texts) and not wrote(A)
-    if empty:
-        progress("VLM trả ghép rỗng, gọi lại")
-        A = ask(fresh=True)
+    # MỘT lời gọi, khuôn JSON bắt buộc mỗi dòng một mục (compose.vlm.schema): không hỏi lại dòng bỏ sót / dòng không còn chữ /
+    # ghép rỗng (người dùng chốt 16/10). Ghép rỗng -> lỗi nặng "empty_plan".
+    A = cvlm.ask(draft, M, B["prompt_en"], texts, vlm, product=product, base=clean)
+    wrote = any(u["kind"] == "text" and (u["clients"] or u["text_vlm"]) for u in A.get("assign") or [])
+    empty = bool(M["L"] and texts) and not wrote
     llog = []
-    if empty:
-        llog.append("VLM trả ghép rỗng -> gọi lại: " + ("được" if wrote(A) else "VẪN RỖNG"))
-    # DÒNG VLM BỎ SÓT (không nhắc tới): hỏi lại RIÊNG các dòng đó một lần; vẫn không có thì compose.fate giữ nguyên
-    left = fate.omitted(A, M)
-    if left and not (empty and not wrote(A)):
-        progress(f"VLM bỏ sót {len(left)} dòng, hỏi lại")
-        A2 = cvlm.reask(draft, M, B["prompt_en"], texts, vlm, left, product=product, base=clean)
-        A["assign"] += A2["assign"]
-        llog.append(f"VLM bỏ sót {left} -> hỏi lại: có {sorted(fate.mentioned(A2))}")
     if A.get("dropped"):
         llog.append(f"bỏ mục ghép sai khuôn: {A['dropped']}")
     U, rlog0, miss_i = resolve(A, M, texts)
-    # DÒNG CHỮ POSTER KHÔNG CÒN CHỮ (câu VLM ghép đã có chỗ khác): xin câu cùng vai còn thiếu / chữ lấp trước khi gỡ trống
-    empty_l = fate.no_words(U)
-    if empty_l:
-        progress(f"{len(empty_l)} dòng không còn chữ, hỏi lại")
-        A2 = cvlm.reask(draft, M, B["prompt_en"], texts, vlm, empty_l, product=product, base=clean, ask=cvlm.REFILL)
-        fate.merge(A, A2, empty_l)
-        llog.append(f"dòng không còn chữ {empty_l} -> hỏi lại xin chữ: {[(u['marks'], u['kind'], u['clients'] or u['text_vlm']) for u in A2['assign']]}")
-        U, rlog0, miss_i = resolve(A, M, texts)
     U, llay = layout(U, M, ink, A["styles"], A["accent"], texts, base=clean)
     log = geo_log + llog + rlog0 + llay
     if product:
@@ -173,9 +151,11 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     t0 = time.time()
     progress("dựng + kiểm")
     base, mask = base_of(U, log)
+    base, slog = rows.respace(base, U, M)   # danh sách có hàng thừa: dàn đều các hàng còn lại (dời dải nền + khung chữ)
+    log += slog
     poster, res, rlog = render.render_units(page, base, U, M)
     errs = render.check_units(U, res)
-    if empty and not wrote(A):
+    if empty:
         errs.append({"type": "empty_plan", "ops": []})
     log += rlog + [f"LỖI: {e}" for e in errs]
     poster_first, errs_first = poster, errs   # bản lượt đầu (debug: so trước / sau khi mã sửa lỗi)

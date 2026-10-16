@@ -15,9 +15,6 @@ from .js import RENDER_JS
 CONDENSE = 0.85   # chữ dài hơn ô theo chiều ngang: nén ngang (scaleX) tới 0.85 TRƯỚC khi co cỡ -- chữ giữ chiều cao như nháp
 
 
-SET_FLOOR = 0.8   # tập cùng vai: mục mà CỠ phải co dưới 0,8 (sau khi đã nén ngang hết mức) rời tập, tự co riêng
-
-
 EMOJI = re.compile("[\U0001F000-\U0001FAFF️‍]")   # emoji (không có font emoji trong bộ font)
 
 
@@ -94,14 +91,9 @@ def render_units(page, plate: np.ndarray, U: list[dict], M: dict, floor: float |
             # (hệ số cỡ: đủ thấp cho bề cao -- 0,98: đo ở cỡ gốc, co xong làm tròn px lệch 1-2 px; phần ngang còn thiếu nén tới
             # CONDENSE; rw)
             return min(1.0, 0.98 * rh if rh < 1 else 1.0, rw / CONDENSE), rw
+        # CÙNG TẬP CÙNG CỠ (người dùng chốt 16/10): cả tập co theo mục chật nhất -- không mục nào rời tập. Mục lạc chỗ đã bị loại khi
+        # lập tập (compose.layout.aligned_groups), bề rộng cột đã chia đều (compose.size.column_want)
         fits = {u["id"]: fit_of(u) for u in us}
-        # SÀN CỦA TẬP: mục phải co cỡ dưới SET_FLOOR không kéo cả tập co theo -- nó rời tập, tự co riêng
-        out = [u for u in us if fits[u["id"]][0] < SET_FLOOR]
-        if out and len(out) < len(us):
-            log.append(f"tập '{name}': {[u['id'] for u in out]} phải co cỡ dưới {SET_FLOOR} -> rời tập, tự co riêng")
-            for u in out:
-                u["set"] = None
-            us = [u for u in us if u not in out]
         kk = min(fits[u["id"]][0] for u in us)
         sx = max(CONDENSE, min(1.0, min(fits[u["id"]][1] for u in us) / kk))   # nén ngang ở cỡ chung
         for u in us:

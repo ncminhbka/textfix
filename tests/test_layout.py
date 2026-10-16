@@ -42,3 +42,25 @@ def test_row_of_mixed_sizes_reads_left_to_right():
     giam, big = [100, 120, 180, 160], [190, 60, 420, 165]   # "Giảm" nhỏ | "50%" to, cùng hàng: mép trên của chữ to cao hơn
     under = [100, 200, 420, 240]
     assert _reading([big, under, giam]) == [2, 0, 1]
+
+
+def test_set_keeps_only_units_drawn_as_one_list():
+    # final2 d63e: ba hàng danh sách thẳng lề trái + mẩu chữ cùng vai ở giữa lon (x 477): mẩu lạc chỗ không thuộc tập
+    from textfix.compose.layout import aligned_groups
+    u = lambda i, b: {"id": i, "box": b, "size": 36.0}   # noqa: E731
+    rows = [u("u3", [100, 294, 337, 329]), u("u4", [101, 344, 301, 383]), u("u5", [99, 391, 292, 431])]
+    G = aligned_groups(rows + [u("u6", [477, 553, 494, 576])])
+    assert [[x["id"] for x in g] for g in G] == [["u3", "u4", "u5"]]
+    # các thẻ đứng ngang một hàng (không thẳng lề nào) vẫn là một tập
+    cards = [u("a", [50, 500, 200, 540]), u("b", [300, 505, 420, 545]), u("c", [520, 500, 700, 540])]
+    assert len(aligned_groups(cards)) == 1
+
+
+def test_column_width_is_shared_by_the_set():
+    # cơm tấm f1cf: chữ giun "Trá" 67px cạnh "Cồm sũron bí chà" 333px, cùng cột lề trái -> mỗi tên món được nới tới 333px
+    from textfix.compose.size import column_want
+    e = lambda i, x1: {"id": i, "box": [100, 0, x1, 40], "path": None, "angle": 0.0, "multi": False}   # noqa: E731
+    T = [{"set": "label#0", "align": "left", "size": 42.0, "els": [e("a", 433)]},
+         {"set": "label#0", "align": "left", "size": 42.0, "els": [e("b", 167)]},
+         {"set": None, "align": "left", "size": 42.0, "els": [e("c", 120)]}]
+    assert column_want(T) == {"b": 266}

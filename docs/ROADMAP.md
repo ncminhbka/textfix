@@ -152,7 +152,7 @@ riêng rồi GIỮ; CHO NỚI chữ vào nền trống cùng màu, không vượ
     em, hằng chung cũ 0,72 / 0,53); `fill.letter_em` chọn hoa / thường theo CÂU KHÁCH; cỡ = `ink.h_cap` / letter_em.
   - [x] Nới khung vào nền trống (`fill.room`): theo lề, cột cùng màu nền trong khung (ΔE <= 15, >= 97% điểm), không vào vùng dòng
     khác, trần 1,25.
-  - [x] Sàn tập (`render.SET_FLOOR` 0,8): mục phải co cỡ dưới 0,8 rời tập, tự co riêng (sửa A5).
+  - [x] Sàn tập (`render.SET_FLOOR` 0,8): mục phải co cỡ dưới 0,8 rời tập, tự co riêng (sửa A5). Gỡ 16/10 (chặng 7).
   - [x] Hàng nhiều cỡ: `_rows` không gộp dòng cùng hàng lệch cỡ >= 1,4 (d03 "Giảm" | "30%" | "tất" mỗi dòng cỡ của nó);
     `accent` của VLM bỏ "scale" (chỉ màu).
   - [x] Màu: hai trong ba nguồn đồng ý (`fill.pick_color`: đo khung / lõi nét / VLM theo vai); soát 14 dòng ba nguồn lệch: VLM sai
@@ -180,6 +180,30 @@ riêng rồi GIỮ; CHO NỚI chữ vào nền trống cùng màu, không vượ
   đơn vị (g18 "Giảm 50%" co 0,32). Còn (giới hạn đã biết, không vá theo ca): bảng nhiều cột (g08 lịch bơi), VLM coi phần nhỏ của
   giá là rác (g14 "đ/thùng"), VLM bỏ cột giá của bảng (dev2 d05).
 
+- [x] Chặng 7 (16/10, người dùng chốt): KHÔNG gọi lại VLM; hàng thừa của danh sách gỡ cả hàng + dàn đều; cùng danh sách cùng cỡ.
+  Lý do (final2 15/10): REFILL chạy 4 / 32 ảnh, +8-15 s mỗi lần, 2 / 4 có hại (giá bịa "3.000đ" cho món bịa, dòng lịch trùng);
+  REASK / ghép rỗng 0 / 32; tập list lệch cỡ do `SET_FLOOR` (Coca, cơm tấm).
+  - [x] `compose/vlm.schema`: khuôn JSON strict dựng theo từng poster -- "lines" có khoá BẮT BUỘC cho mọi L#, câu khách chỉ trỏ
+    T# có thật, kiểu theo đúng các vai, font trong danh mục; `llm.json_call` nhận schema theo từng lời gọi. Câu chia nhiều dòng:
+    mỗi dòng ghi câu + "part" (`compose.parse.from_lines` gộp; khối cùng cỡ xếp chồng bỏ split, code tự ngắt). Gỡ `reask`,
+    `REASK`, `REFILL`, gọi lại khi ghép rỗng (`empty_plan` vẫn là lỗi nặng), `fate.omitted / no_words / merge`.
+  - [x] `compose/rows.py`: danh sách / bảng nhận bằng hình học (cột thẳng lề, cỡ gần nhau, đều nhịp; cột cùng hàng -> bảng);
+    hàng không câu khách / dòng giữ nào -> gỡ CẢ HÀNG (tên lẫn giá); `respace` bỏ trọn CHU KỲ hàng (giữa khe trên -> giữa khe
+    dưới: cả pill / chấm đầu dòng của nó), nhân bản dòng nền ở chỗ cắt cho các hàng còn lại cách đều trên khoảng nháp; chỉ
+    làm khi không đường nối nào lộ (hai mép chỗ gỡ khớp, dòng nhân bản là nền ngoài danh sách, mép trái / phải nối liền), không
+    thì chỉ gỡ chữ hàng thừa.
+  - [x] Chữ lấp (`compose.assign.filler`): là câu khách chưa có chỗ -> viết câu đó; hàng danh sách, có số / tiền / liên kết,
+    cam kết, dài, trùng câu đã có chỗ -> bỏ. Câu ghép hai lần: hàng bảng có câu liền kề (tên món của giá) thắng; không gộp
+    dòng ở hai hàng của một danh sách.
+  - [x] `compose.assign.inside`: dòng không mang câu khách nằm >= 80% trong khung một dòng lớn hơn theo số phận dòng đó (mẩu
+    logo trên lon Coca -> giữ).
+  - [x] Tập cùng vai = cùng vai + cỡ gần + THẲNG LỀ / CÙNG HÀNG (`layout.aligned_groups`); gỡ `render.SET_FLOOR`: cả tập một cỡ.
+    Bề rộng cột chung (`size.column_want`); vùng cấm khi nới khung = khung dòng thẳng nới ngang (vùng gỡ chữ nới dọc lấn hàng
+    liền kề), bỏ dòng đã gỡ, nới lần lượt (tên món và giá không nới vào chung một khe).
+  - [x] Test: `tests/test_rows.py` (bảng, hàng thừa, giá về đúng hàng, 4 pill cho 3 món, pill sát nhau), `tests/test_fate.py`
+    (khuôn, mẩu câu, chữ lấp, mẩu logo), `tests/test_layout.py` (tập thẳng lề, cột chung).
+  - [ ] Đo trên máy chủ: `bench/final3.json` (32 ca mới, seed 16001-16032, nặng danh sách / bảng / pill / ảnh sản phẩm).
+
 ## Bước 3: gỡ chữ giun (Hi-SAM + LaMa) -- chuẩn hoá 15/10
 
 - [x] Tách khỏi `lonly.py` thành `textfix/erase.py` (một việc): `erase_mask` 120 dòng -> các bước có tên `_window` (cao dòng
@@ -204,7 +228,10 @@ riêng rồi GIỮ; CHO NỚI chữ vào nền trống cùng màu, không vượ
 
 ## Chặng C -- Thi
 
-- [ ] `bench/final2.json` (32 ca mới, người dùng chọn thi bộ này), một lượt, chấm; so cùng seed với nhánh `legacy-ops-html`.
+- [x] `bench/final2.json` (32 ca, chạy 15/10; soát ở chặng 6 / 7).
+- [ ] `bench/final3.json` (32 ca mới 16/10, seed 16001-16032): menu / bảng giá nhiều hàng, pill xếp dọc, chấm đầu dòng, bảng kẻ ô,
+  thẻ ngang, ba ảnh sản phẩm mới (dầu gội, lon bia, hũ cà phê), đủ 6 loại form, prompt + form. Một lượt, chấm theo nguồn lỗi,
+  không sửa mã theo ca của bộ này.
 - [ ] (cũ) `bench/final1.json`, một lượt, chấm. Ngưỡng: hỏng <= 10%, không mất chữ sản phẩm, không số / giá / liên hệ bịa.
 
 ## Bước LLM đầu luồng (brief) -- LÀM LẠI 15/10, chờ đo trên máy chủ

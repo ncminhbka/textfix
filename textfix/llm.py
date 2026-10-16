@@ -3,6 +3,7 @@
   call = json_call(url, model, key_env, tag="designer", schema=None)
   out = call(system, [text | png_bytes, ...])   # -> dict
   out = call(system, parts, meta := {})         # meta nhận: prompt_tokens, completion_tokens, s (giây), cached, images
+  out = call(system, parts, schema=S)           # khuôn JSON riêng cho lời gọi này (VLM ghép câu: khuôn dựng theo từng poster)
 """
 
 from __future__ import annotations
@@ -30,14 +31,17 @@ def extra_body() -> dict:
 
 
 def json_call(base_url: str, model: str, key_env: str = "TEXTFIX_LLM_API_KEY", tag: str = "llm", schema: dict | None = None):
+    schema0 = schema
     if not base_url or not model:
         raise RuntimeError("chưa đặt LLM / VLM: export TEXTFIX_LLM_URL và TEXTFIX_MODEL (docs/SERVER.md)")
     cache = Path.home() / ".cache" / "textfix" / tag
     cl = None
 
-    def call(system: str, parts: list, meta: dict | None = None, fresh: bool = False) -> dict:
-        """fresh: không đọc cache (vẫn ghi) -- gọi lại để lấy câu trả lời KHÁC cho cùng đầu vào."""
+    def call(system: str, parts: list, meta: dict | None = None, fresh: bool = False, schema: dict | None = None) -> dict:
+        """fresh: không đọc cache (vẫn ghi) -- gọi lại để lấy câu trả lời KHÁC cho cùng đầu vào. schema: khuôn JSON của riêng
+        lời gọi này (thay khuôn chung của json_call)."""
         nonlocal cl
+        schema = schema or schema0
         if meta is not None:
             meta.update(images=sum(isinstance(p, bytes) for p in parts), cached=False)
         cache.mkdir(parents=True, exist_ok=True)

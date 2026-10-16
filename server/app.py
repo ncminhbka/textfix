@@ -107,8 +107,7 @@ def draw_error(e: BaseException, stage: str) -> dict:
 
 
 # bước thiết kế (engine.design báo qua progress) -> mã lỗi khi hỏng ở bước đó
-DESIGN_STAGES = (("đo dòng", "lines_failed"), ("gỡ chữ", "erase_failed"), ("VLM", "vlm_failed"),
-                 ("dòng không còn chữ", "vlm_failed"), ("dựng", "render_failed"))
+DESIGN_STAGES = (("đo dòng", "lines_failed"), ("gỡ chữ", "erase_failed"), ("VLM", "vlm_failed"), ("dựng", "render_failed"))
 COMMON = ["store_name", "phone", "address", "website_link"]
 
 
@@ -368,9 +367,9 @@ def design_one(job: dict, v: dict, d: dict, Bv: dict, product: bool, vd: Path, u
                  slots_url=f"{url}/slots.jpg", plan_url=f"{url}/plan.json", hisam_url=f"{url}/hisam.jpg", ink_url=f"{url}/ink.jpg", clean_url=f"{url}/clean.jpg", base_url=f"{url}/base.jpg", timing=timing, missing=P["missing"],
                  errors=len(P["errors"]), ops=sum(o.get("kind") not in ("skip", "keep") for o in P["ops"]),
                  **({"poster_first_url": f"{url}/poster_first.png"} if first else {}))
-        if any(e.get("type") == "empty_plan" for e in P["errors"]):   # D1: VLM không ghép được gì (đã gọi lại) -> lỗi, không trả nháp
+        if any(e.get("type") == "empty_plan" for e in P["errors"]):   # D1: VLM không ghép được gì -> lỗi, không trả nháp
             v.update(status="error", error={"code": "vlm_empty_plan", "stage": "VLM ghép câu",
-                                            "message": "VLM không ghép câu khách nào vào dòng nào (đã gọi lại)"})
+                                            "message": "VLM không ghép câu khách nào vào dòng nào"})
         log.info("%s v%d xong (gpu %s) %s", job["run_id"], v["index"], v.get("gpu"), timing)
     except Exception as e:
         log.error("%s v%d lỗi thiết kế: %s", job["run_id"], v["index"], traceback.format_exc())

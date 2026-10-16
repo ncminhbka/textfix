@@ -1,7 +1,6 @@
 """BƯỚC 4b: VLM ĐỌC nháp -- dòng nào là câu khách nào, dòng nào giữ / xoá, mỗi vai trông thế nào.
 
-  A = ask(draft, M, prompt, texts, call, base=clean)                  # một lời gọi cho mọi dòng
-  A2 = reask(draft, M, prompt, texts, call, ["L5", "L7"], base=clean)  # chỉ các dòng câu trả lời đầu bỏ sót
+  A = ask(draft, M, prompt, texts, call, base=clean)   # MỘT lời gọi cho mọi dòng, khuôn JSON bắt buộc mỗi L# một mục
 VLM không đưa toạ độ, chỉ trỏ id dòng; mọi thứ ngoài dòng chữ (vỏ, icon, hoạ tiết) là điểm ảnh của nháp. Số phận cuối cùng của
 mỗi dòng: compose/fate.py. Lời dặn có ba số phận: text (chữ poster), keep (chữ trên vật trong ảnh), skip (rác đứng riêng).
 """
@@ -39,20 +38,25 @@ wiped the old letters (BASE) and will set the CLIENT TEXTS there itself, word fo
 draft shows. YOUR JOB IS TO READ, NOT TO WRITE: say which client text each drawn line was meant to be, and how each kind of \
 text looks in the draft.
 
-1. ASSIGN EVERY LINE. Look at the DRAFT and SLOTS and read what each marked line was meant to say (the drawn letters are \
-garbled: "Hỏ mây ầm" is "Hồ nước ấm"). Every L# goes in exactly \
-one "assign" entry. A client text the model broke over several stacked lines is ONE entry with all those lines (["L3","L4","L5"]). \
-One drawn line holding two client texts (a dish name and its price) is one entry with both ("client": ["T5","T6"]), in \
-reading order. Never assign a client text twice.
-2. ONE TEXT, LINES OF CLEARLY DIFFERENT SIZE OR IN SEPARATE PLACES (a small "THANH TOÁN" over a huge "NHANH CHÓNG"; "NGÀY" and \
-"HỘI" in two boxes): one entry with all those lines and "split": the client text cut into one piece per line, in line order \
--- the pieces joined must give the client text exactly.
-3. EXTRA LINES (the model drew more lines than the client has texts, or repeated one): fill them in this order: (a) a \
-repeated row of a list gets a client text OF THE SAME ROLE that has no line yet -- never move a text of another role into it; \
-(b) "client": null with "text": a short phrase of the same kind as the rows around it (another benefit beside benefits) that \
-is true of that business, no fact, no number, no promise, never words of another client text. Steps, name / price rows, dates and contacts are never invented. Give a filled line the "role" it plays (the role \
-of the row it repeats).
-4. EVERY LINE GETS ONE KIND. "text": poster lettering -- titles, offers, buttons, badges, stickers, list rows, captions, also an extra line on a pill or beside its peers, and ANY line that says one of the client texts wherever it is drawn (on a sign a character holds, a board, a banner, a ribbon, a badge): it gets a client text or a filler as above. "keep": only the own lettering of a depicted product or object -- brand and label on a package, logo, screen interface, seal -- even when garbled: its pixels stay as drawn; never the poster's message. "skip": only junk standing alone, neither poster lettering nor on an object: it is wiped. Unsure between "keep" and "skip": "keep".
+1. EVERY LINE HAS ITS OWN ENTRY. Look at the DRAFT and SLOTS and read what each marked line was meant to say (the drawn \
+letters are garbled: "Hỏ mây ầm" is "Hồ nước ấm"). "lines" holds one entry for every L#. One drawn line holding two client \
+texts (a dish name and its price) gets both ("client": ["T5","T6"]), in reading order. Never give one client text to two \
+lines, except as parts (rule 2).
+2. ONE TEXT OVER SEVERAL LINES (the model broke it over stacked lines, drew a small "THANH TOÁN" over a huge "NHANH CHÓNG", or \
+"NGÀY" and "HỘI" in two boxes): each of those lines gets that client text and in "part" the words of it that line shows -- the \
+parts in reading order joined must give the client text exactly. A line that shows a whole text has "part": null.
+3. EXTRA LINES (the model drew more lines than the client has texts, or repeated one): (a) a repeated row of a list or table \
+gets a client text OF THE SAME ROLE that has no line yet -- never move a text of another role into it; none left: "client": \
+[], "text": null -- code removes that row and spaces the list again: never invent a list row, a dish, a price, a step, a date \
+or a contact; (b) an extra line standing alone (on a pill, a badge, a button): "client": [] with "text": a short phrase of the \
+same kind as the lettering around it that is true of that business, no fact, no number, no promise, never words of another \
+client text. Give a filled line the "role" it plays.
+4. EVERY LINE GETS ONE KIND. "text": poster lettering -- titles, offers, buttons, badges, stickers, list rows, captions, also \
+an extra line on a pill or beside its peers, and ANY line that says one of the client texts wherever it is drawn (on a sign a \
+character holds, a board, a banner, a ribbon, a badge): it gets a client text, a filler or nothing as above. "keep": only the \
+own lettering of a depicted product or object -- brand and label on a package, logo, screen interface, seal -- even when \
+garbled: its pixels stay as drawn; never the poster's message. "skip": only junk standing alone, neither poster lettering nor \
+on an object: it is wiped. Unsure between "keep" and "skip": "keep".
 5. Client texts the model drew no line for go in "missing". Never cram them into another line.
 6. Bullets, ticks, icons, numbers and pictures before a line stay on the BASE as drawn: never mention them.
 
@@ -72,9 +76,9 @@ IMAGES: DRAFT = what the model drew. SLOTS = the draft with every text line mark
 letters wiped. The list after the images gives each line's machine reading of the garbled letters (often wrong, but numbers, \
 dates and short words usually come out right -- use it to tell which L# is which line), measured size, color and look.
 
-OUTPUT: one JSON object
-{"assign": [{"lines": ["L1"], "client": "T0" | ["T5","T6"] | null, "split": ["..."] | null, "text": "..." | null,
-             "role": "<role, for a filled line>" | null, "kind": "text" | "keep" | "skip", "why": "a few words"}],
+OUTPUT: one JSON object, "lines" with an entry for EVERY L#
+{"lines": {"L1": {"kind": "text" | "keep" | "skip", "client": ["T0"] | ["T5","T6"] | [], "part": "..." | null,
+                  "text": "..." | null, "role": "<role of a filled line>" | null, "why": "a few words"}, "L2": {...}},
  "styles": {"<role>": {"font": "<key>", "weight": 700, "italic": false, "case": "none", "tracking": null, "color": "#hex", "effect": ""}},
  "accent": [], "missing": ["T5"], "notes": "..."}
 
@@ -82,30 +86,39 @@ FONT CATALOG (key: family, class): {fonts}"""
 
 
 def ask(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, product: bool = False, base: np.ndarray | None = None,
-        fresh: bool = False, meta: dict | None = None) -> dict:
-    """Một lời gọi cho mọi dòng -> câu trả lời đã đọc (parse). fresh: bỏ qua bộ đệm (gọi lại sau câu trả lời rỗng)."""
-    return parse(plan(draft, M, prompt, texts, call, _system(SYSTEM), describe(M), base, product=product,
-                                 meta=meta, fresh=fresh))
+        meta: dict | None = None) -> dict:
+    """MỘT lời gọi cho mọi dòng, ép theo khuôn của poster này (schema: mỗi L# một mục bắt buộc -- VLM không bỏ sót dòng được,
+    không cần hỏi lại; người dùng chốt 16/10) -> câu trả lời đã đọc (parse)."""
+    raw = plan(draft, M, prompt, texts, call, _system(SYSTEM), describe(M), base, product=product, meta=meta,
+               schema=schema(M, texts))
+    return parse(raw, M)
 
 
-REASK = ("YOUR PREVIOUS ANSWER LEFT OUT LINES {ids}. Every other line is done. Answer with \"assign\" entries for exactly these "
-         "lines -- each gets a kind (text / keep / skip) as in rule 4; \"styles\", \"accent\" and \"missing\" may stay empty.")
-REFILL = ("LINES {ids} ARE POSTER LETTERING WITH NO WORDS LEFT: the client text you gave them is already set on another line. "
-          "Answer with \"assign\" entries for exactly these lines: \"client\": a client text of the same role that has no line yet, "
-          "else \"client\": null with \"text\": a short filler of the same kind as the lettering around it (rule 3b); \"skip\" only "
-          "when nothing fits. \"styles\", \"accent\" and \"missing\" may stay empty.")
-
-
-def reask(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, lines: list[str], product: bool = False,
-          base: np.ndarray | None = None, ask: str = REASK) -> dict:
-    """Hỏi lại RIÊNG một số dòng (fresh): REASK -- dòng câu trả lời đầu bỏ sót (người dùng chốt 15/10: bỏ sót -> hỏi lại; vẫn
-    không -> giữ); REFILL -- dòng chữ poster không còn chữ (câu VLM ghép đã có chỗ khác): xin câu cùng vai còn thiếu / chữ lấp
-    trước khi gỡ trống. -> câu trả lời đã đọc, chỉ còn mục chạm các dòng đó."""
-    desc = describe(M) + "\n\n" + ask.format(ids=", ".join(lines))
-    A = parse(plan(draft, M, prompt, texts, call, _system(SYSTEM), desc, base, product=product, fresh=True))
-    want = set(lines)
-    A["assign"] = [{**u, "marks": [m for m in u["marks"] if m in want]} for u in A["assign"] if want & set(u["marks"])]
-    return A
+def schema(M: dict, texts: list[dict]) -> dict:
+    """Khuôn JSON của câu trả lời cho MỘT poster: "lines" có đúng các khoá L# của poster, mục nào cũng bắt buộc; câu khách chỉ
+    trỏ được T# có thật; kiểu theo đúng các vai của câu khách, font trong danh mục."""
+    from ..render.fonts import CATALOG
+    tids = [f"T{i}" for i in range(len(texts))]
+    tid = {"type": "string", "enum": tids} if tids else {"type": "string", "maxLength": 0}
+    S = lambda t: {"type": [t, "null"]}   # noqa: E731
+    line = {"type": "object", "additionalProperties": False, "required": ["kind", "client", "part", "text", "role", "why"],
+            "properties": {"kind": {"type": "string", "enum": ["text", "keep", "skip"]},
+                           "client": {"type": "array", "items": tid, **({} if tids else {"maxItems": 0})},
+                           "part": S("string"), "text": S("string"), "role": S("string"), "why": {"type": "string"}}}
+    style = {"type": "object", "additionalProperties": False,
+             "required": ["font", "weight", "italic", "case", "tracking", "color", "effect"],
+             "properties": {"font": {"type": "string", "enum": list(CATALOG)}, "weight": {"type": "integer"},
+                            "italic": {"type": "boolean"}, "case": {"type": "string", "enum": ["upper", "none"]},
+                            "tracking": S("number"), "color": {"type": "string"}, "effect": {"type": "string"}}}
+    roles = list(dict.fromkeys(str(t.get("role") or "") for t in texts if t.get("role")))
+    ids = [l["id"] for l in M["L"]]
+    return {"type": "object", "additionalProperties": False, "required": ["lines", "styles", "accent", "missing", "notes"],
+            "properties": {
+                "lines": {"type": "object", "additionalProperties": False, "required": ids, "properties": {i: line for i in ids}},
+                "styles": {"type": "object", "additionalProperties": False, "required": roles, "properties": {r: style for r in roles}},
+                "accent": {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["client", "text", "color"],
+                                                      "properties": {"client": tid, "text": {"type": "string"}, "color": {"type": "string"}}}},
+                "missing": {"type": "array", "items": tid}, "notes": {"type": "string"}}}
 
 
 def _look(m: dict) -> str:

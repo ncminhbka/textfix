@@ -1,8 +1,10 @@
-"""Số phận dòng (compose.fate) và hỏi lại dòng bỏ sót (compose.vlm.reask) với VLM giả: mỗi test là một luật."""
+"""Số phận dòng (compose.fate), khuôn trả lời mỗi dòng một mục (compose.vlm.schema / compose.parse) và chữ lấp
+(compose.assign.filler) với VLM giả: mỗi test là một luật. 16/10: không còn hỏi lại VLM."""
 
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from textfix.compose.parse import parse
 
@@ -39,6 +41,7 @@ def test_vlm_skip_is_trusted():
 
 
 def test_omitted_line_is_kept():
+    # VLM không theo khuôn (khuôn JSON bắt buộc đủ dòng): dòng không nhắc tới -> giữ, không hỏi lại
     M = page(line(1, 100), line(2, 200))
     t = fates(M, [entry(["L1"], client="T0")])
     assert t["L2"]["fate"] == "keep" and "bỏ sót" in t["L2"]["why"]
@@ -57,37 +60,82 @@ def test_printed_line_is_kept_unless_client_text():
     assert t["L1"]["fate"] == "keep" and t["L2"]["fate"] == "text"
 
 
-def test_omitted_lists_unmentioned_lines():
-    M = page(line(1, 100), line(2, 200), line(3, 300))
-    A = parse({"assign": [entry(["L1"], client="T0"), entry(["L3"], kind="skip")]})
-    assert fate.omitted(A, M) == ["L2"]
-
-
-def test_reask_asks_fresh_and_keeps_only_asked_lines(monkeypatch):
+def test_ask_is_one_call_with_a_schema_requiring_every_line(monkeypatch):
     calls = []
 
-    def call(system, parts, meta=None, fresh=False):
-        calls.append((parts[0], fresh))
-        return {"assign": [entry(["L2"], kind="keep"), entry(["L1"], client="T1")]}
+    def call(system, parts, meta=None, fresh=False, schema=None):
+        calls.append(schema)
+        return {"lines": {"L1": {"kind": "text", "client": ["T0"], "part": None, "text": None, "role": None, "why": ""},
+                          "L2": {"kind": "keep", "client": [], "part": None, "text": None, "role": None, "why": ""}}}
     monkeypatch.setattr("textfix.compose.call.marked_image", lambda img, M: __import__("PIL.Image").Image.fromarray(img))
     M = page(line(1, 100), line(2, 200))
     img = np.zeros((64, 64, 3), np.uint8)
-    A = vlm.reask(img, M, "prompt", TEXTS, call, ["L2"], base=img)
-    assert [u["marks"] for u in A["assign"]] == [["L2"]] and A["assign"][0]["kind"] == "keep"
-    assert calls[0][1] is True and "LEFT OUT LINES L2" in calls[0][0]
+    A = vlm.ask(img, M, "prompt", TEXTS, call, base=img)
+    S = calls[0]["properties"]
+    assert len(calls) == 1 and S["lines"]["required"] == ["L1", "L2"]
+    assert S["lines"]["properties"]["L1"]["properties"]["client"]["items"]["enum"] == ["T0", "T1"]
+    assert sorted(S["styles"]["required"]) == ["headline", "offer"]
+    assert [(u["marks"], u["kind"], u["clients"]) for u in A["assign"]] == [(["L1"], "text", [0]), (["L2"], "keep", [])]
 
 
-def test_line_without_words_is_asked_again_before_wiping():
-    # pill thừa: VLM ghép câu T0 vào cả L1 lẫn L2; L2 không còn chữ -> hỏi lại (REFILL), VLM đưa chữ lấp -> viết, không xoá trống
-    M = page(line(1, 100, ocr="Khai truong"), line(2, 300, ocr="Khoi trung"))
-    A = parse({"assign": [entry(["L1"], client="T0"), entry(["L2"], client="T0")], "styles": {}})
-    U, _, _ = resolve(A, M, TEXTS)
-    empty = fate.no_words(U)
-    assert empty and empty[0] in ("L1", "L2")
-    fate.merge(A, parse({"assign": [entry(empty, text="Ưu đãi hấp dẫn")]}), empty)
-    U, _, _ = resolve(A, M, TEXTS)
-    t = fate.table(U, M)
-    assert t["L1"]["fate"] == "text" and t["L2"]["fate"] == "text"
+def L(kind="text", client=(), part=None, text=None) -> dict:
+    return {"kind": kind, "client": list(client), "part": part, "text": text, "role": None, "why": ""}
+
+
+def test_parts_of_a_stacked_text_become_one_unit_and_code_breaks_it():
+    # câu khách FLUX vẽ hai dòng cùng cỡ xếp chồng: một đơn vị, không split (code ngắt câu theo sức chứa)
+    M = page(line(1, 100), line(2, 145))
+    A = parse({"lines": {"L1": L(client=["T0"], part="Khai"), "L2": L(client=["T0"], part="trương")}}, M)
+    assert [(u["marks"], u["split"]) for u in A["assign"]] == [(["L1", "L2"], None)]
+
+
+def test_parts_of_different_size_keep_the_split():
+    # "Giảm" nhỏ trên "30%" to: một đơn vị, mỗi dòng mẩu của nó
+    M = page({**line(1, 100), "size": 20.0, "box": [100, 100, 200, 120]}, {**line(2, 125), "size": 80.0, "box": [100, 125, 400, 205]})
+    A = parse({"lines": {"L2": L(client=["T1"], part="30%"), "L1": L(client=["T1"], part="Giảm")}}, M)
+    assert [(u["marks"], u["split"]) for u in A["assign"]] == [(["L1", "L2"], ["Giảm", "30%"])]
+
+
+def test_same_text_on_two_lines_without_parts_is_a_repeat():
+    # cùng câu cho hai dòng mà không có mẩu: dòng lặp -> hai mục, compose.assign xử câu ghép hai lần
+    M = page(line(1, 100), line(2, 300))
+    A = parse({"lines": {"L1": L(client=["T0"]), "L2": L(client=["T0"])}}, M)
+    assert [u["marks"] for u in A["assign"]] == [["L1"], ["L2"]]
+
+
+@pytest.mark.parametrize("filler, want", [
+    ("Giảm 30%", ("client", 1)),                 # chữ lấp chính là câu khách chưa có chỗ -> viết câu đó
+    ("Khai trương", ("drop", "trùng")),          # trùng câu đã có chỗ (dòng lặp)
+    ("Mở cửa 7:00", ("drop", "số")),             # số bịa
+    ("Miễn phí giao hàng", ("drop", "cam kết")),  # lời hứa / ưu đãi
+    ("Không gian ấm cúng", ("keep", None)),      # chữ lấp hợp lệ cho dòng đứng riêng (pill)
+])
+def test_filler_rules(filler, want):
+    from collections import Counter
+
+    from textfix.compose.assign import filler as verdict
+    k, why = verdict(filler, TEXTS, Counter({0: 1}), in_list=False)
+    if want[0] == "client":
+        assert k == want[1]
+    elif want[0] == "drop":
+        assert k is None and want[1] in why
+    else:
+        assert k is None and why is None
+
+
+def test_filler_in_a_list_row_is_dropped():
+    from collections import Counter
+
+    from textfix.compose.assign import filler as verdict
+    assert "danh sách" in verdict("Không gian ấm cúng", TEXTS, Counter(), in_list=True)[1]
+
+
+def test_fragment_inside_a_kept_logo_is_kept():
+    # final2 d63e: Hi-SAM tách mẩu logo trên lon (OCR không đọc) thành dòng riêng; VLM ghép chữ lấp -> theo dòng logo: giữ
+    M = page({**line(7, 0), "box": [469, 394, 576, 748], "printed": True, "angle": -85.0},
+             {**line(6, 0), "box": [477, 553, 494, 576], "orphan": True, "ocr": ""}, line(1, 100))
+    t = fates(M, [entry(["L1"], client="T0"), entry(["L7"], kind="keep"), entry(["L6"], text="Hàng thật")])
+    assert t["L6"]["fate"] == "keep" and t["L7"]["fate"] == "keep"
 
 
 def test_empty_split_line_beside_its_row_stays():

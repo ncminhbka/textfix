@@ -7,7 +7,8 @@ VLM chỉ hiểu NGHĨA (dòng nào là câu nào, mỗi vai trông ra sao); cod
   2. chỗ   = hình bao NÉT Hi-SAM của dòng, nới vào nền trống (compose.size); dòng nghiêng / cong theo render.geometry;
   3. cỡ    = cao nét nháp / tỉ lệ cao chữ của font đã chọn; màu = màu đo của dòng (compose.style); kiểu theo VAI;
   4. lề    = mép nét nháp; ngắt dòng = theo tỉ lệ số ký tự OCR các dòng nháp (compose.text);
-  5. TẬP   = cùng vai, cỡ nháp đôi một lệch <= SET_RATIO: một cỡ, một màu, một lề, một mức nén (render);
+  5. TẬP   = cùng vai, cỡ nháp đôi một lệch <= SET_RATIO, thẳng lề / cùng hàng: một cỡ, một màu, một lề, một mức nén, một bề
+             rộng cột (compose.size, render);
   6. co    = nén ngang <= render.CONDENSE rồi co cỡ, theo đơn vị (dòng / khối / tập).
 Người dùng chốt 14/10: nhóm lấy từ vai câu khách (brief), không đoán từ ảnh; không cắt chữ, chỉ co; nháp thiếu câu thì chịu.
 """
@@ -91,20 +92,24 @@ def layout(U: list[dict], M: dict, ink: np.ndarray, styles: dict, accent: list, 
         U[U.index(u):U.index(u) + 1] = subs
         T[T.index(u):T.index(u) + 1] = subs
         log.append(f"{u['id']}: một dòng {len(subs)} câu -> cắt tại khe nét x={[round(c) for c in cuts]}")
-    # TẬP CÙNG VAI: cỡ nháp đôi một lệch <= SET_RATIO (gom theo cỡ tăng dần); dòng lấp có vai VLM ghi thì cũng vào tập
+    # TẬP CÙNG VAI: cỡ nháp đôi một lệch <= SET_RATIO (gom theo cỡ tăng dần), VÀ vẽ thành một danh sách: thẳng một lề với nhau
+    # hoặc cùng hàng (compose.layout.aligned_groups) -- mục lạc chỗ (mẩu chữ ở chỗ khác cùng vai) không thuộc tập, thay cho luật
+    # "rời tập khi phải co nhiều" (render.SET_FLOOR, gỡ 16/10: người dùng chốt cùng danh sách thì cùng cỡ, chữ giống hoàn toàn);
+    # dòng lấp có vai VLM ghi thì cũng vào tập
     sets = {}
     for role in dict.fromkeys(u["role"] for u in T if u["role"] != "fill"):   # thứ tự gặp (set chuỗi: mỗi lần chạy một thứ tự)
         us = sorted((u for u in T if u["role"] == role and u["mode"] in ("line", "block")), key=lambda u: u["size"])
-        grp = []
+        grps, grp = [], []
         for u in us:
             if grp and u["size"] / grp[0]["size"] <= SET_RATIO:
                 grp.append(u)
             else:
-                if len(grp) >= 2:
-                    sets[f"{role}#{len(sets)}"] = grp
+                grps.append(grp)
                 grp = [u]
-        if len(grp) >= 2:
-            sets[f"{role}#{len(sets)}"] = grp
+        grps.append(grp)
+        for grp in grps:
+            for g in aligned_groups(grp):
+                sets[f"{role}#{len(sets)}"] = g
     for name, us in sets.items():
         s = float(np.median([l["size"] for u in us for l in u["Ls"]]))
         col = Counter(u["color"] for u in us if u["color"]).most_common(1)
@@ -225,8 +230,34 @@ def layout(U: list[dict], M: dict, ink: np.ndarray, styles: dict, accent: list, 
             e["html"] = "<br>".join(_markup(x, u, texts) for x in e["lines"])
         u.pop("meas", None)
     if base is not None:
-        _rooms(T, M, base, log)
+        _rooms(T, M, base, log, {m for u in U if u["kind"] == "skip" for m in u["marks"]})
     return U, log
+
+
+def aligned_groups(us: list[dict]) -> list[list[dict]]:
+    """Các nhóm >= 2 đơn vị nối nhau bằng quan hệ "cùng danh sách": hai khung thẳng một lề (trái / phải lệch <= EDGE_TOL cỡ, tâm
+    lệch <= CENTER_TOL cỡ) hoặc cùng hàng (chồng dọc >= nửa cao khung thấp hơn: các thẻ / nút đứng ngang nhau)."""
+    from .geometry import CENTER_TOL, EDGE_TOL
+
+    def linked(a, b):
+        A, B, sz = a["box"], b["box"], max(a["size"], b["size"])
+        row = min(A[3], B[3]) - max(A[1], B[1]) >= 0.5 * min(A[3] - A[1], B[3] - B[1])
+        return (row or abs(A[0] - B[0]) <= EDGE_TOL * sz or abs(A[2] - B[2]) <= EDGE_TOL * sz
+                or abs((A[0] + A[2]) / 2 - (B[0] + B[2]) / 2) <= CENTER_TOL * sz)
+    comp = list(range(len(us)))
+
+    def root(i):
+        while comp[i] != i:
+            i = comp[i]
+        return i
+    for i in range(len(us)):
+        for j in range(i + 1, len(us)):
+            if linked(us[i], us[j]):
+                comp[root(j)] = root(i)
+    out = {}
+    for i, u in enumerate(us):
+        out.setdefault(root(i), []).append(u)
+    return [g for g in out.values() if len(g) >= 2]
 
 
 def _markup(text: str, u: dict, texts: list[dict]) -> str:
