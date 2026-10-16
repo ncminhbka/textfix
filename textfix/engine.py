@@ -107,7 +107,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     theo vai -> code chép nguyên văn, cỡ / lề / tập theo nháp (compose.layout) -> trả điểm ảnh nháp cho dòng giữ -> dựng -> kiểm -> sửa
     bằng code. d = draw(...)."""
     from . import erase, lines, render
-    from .compose import fate, rows
+    from .compose import fate
     from .compose import vlm as cvlm
     from .compose.assign import resolve
     from .compose.layout import layout, public
@@ -151,8 +151,6 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     t0 = time.time()
     progress("dựng + kiểm")
     base, mask = base_of(U, log)
-    base, slog = rows.respace(base, U, M)   # danh sách có hàng thừa: dàn đều các hàng còn lại (dời dải nền + khung chữ)
-    log += slog
     poster, res, rlog = render.render_units(page, base, U, M)
     errs = render.check_units(U, res)
     if empty:

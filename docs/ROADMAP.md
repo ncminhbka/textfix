@@ -180,28 +180,30 @@ riêng rồi GIỮ; CHO NỚI chữ vào nền trống cùng màu, không vượ
   đơn vị (g18 "Giảm 50%" co 0,32). Còn (giới hạn đã biết, không vá theo ca): bảng nhiều cột (g08 lịch bơi), VLM coi phần nhỏ của
   giá là rác (g14 "đ/thùng"), VLM bỏ cột giá của bảng (dev2 d05).
 
-- [x] Chặng 7 (16/10, người dùng chốt): KHÔNG gọi lại VLM; hàng thừa của danh sách gỡ cả hàng + dàn đều; cùng danh sách cùng cỡ.
+- [x] Chặng 7 (16/10, người dùng chốt): KHÔNG gọi lại VLM; dòng FLUX vẽ thừa -> VLM đoán ý và viết theo; cùng danh sách cùng cỡ.
   Lý do (final2 15/10): REFILL chạy 4 / 32 ảnh, +8-15 s mỗi lần, 2 / 4 có hại (giá bịa "3.000đ" cho món bịa, dòng lịch trùng);
   REASK / ghép rỗng 0 / 32; tập list lệch cỡ do `SET_FLOOR` (Coca, cơm tấm).
   - [x] `compose/vlm.schema`: khuôn JSON strict dựng theo từng poster -- "lines" có khoá BẮT BUỘC cho mọi L#, câu khách chỉ trỏ
     T# có thật, kiểu theo đúng các vai, font trong danh mục; `llm.json_call` nhận schema theo từng lời gọi. Câu chia nhiều dòng:
     mỗi dòng ghi câu + "part" (`compose.parse.from_lines` gộp; khối cùng cỡ xếp chồng bỏ split, code tự ngắt). Gỡ `reask`,
     `REASK`, `REFILL`, gọi lại khi ghép rỗng (`empty_plan` vẫn là lỗi nặng), `fate.omitted / no_words / merge`.
-  - [x] `compose/rows.py`: danh sách / bảng nhận bằng hình học (cột thẳng lề, cỡ gần nhau, đều nhịp; cột cùng hàng -> bảng);
-    hàng không câu khách / dòng giữ nào -> gỡ CẢ HÀNG (tên lẫn giá); `respace` bỏ trọn CHU KỲ hàng (giữa khe trên -> giữa khe
-    dưới: cả pill / chấm đầu dòng của nó), nhân bản dòng nền ở chỗ cắt cho các hàng còn lại cách đều trên khoảng nháp; chỉ
-    làm khi không đường nối nào lộ (hai mép chỗ gỡ khớp, dòng nhân bản là nền ngoài danh sách, mép trái / phải nối liền), không
-    thì chỉ gỡ chữ hàng thừa.
-  - [x] Chữ lấp (`compose.assign.filler`): là câu khách chưa có chỗ -> viết câu đó; hàng danh sách, có số / tiền / liên kết,
-    cam kết, dài, trùng câu đã có chỗ -> bỏ. Câu ghép hai lần: hàng bảng có câu liền kề (tên món của giá) thắng; không gộp
-    dòng ở hai hàng của một danh sách.
+  - [x] `compose/rows.py`: danh sách / bảng nhận bằng hình học (cột thẳng lề, cỡ gần nhau, đều nhịp; cột cùng hàng -> bảng).
+    Câu ghép hai lần: hàng bảng có câu liền kề (tên món của giá) thắng; không gộp dòng ở hai hàng của một danh sách.
+  - [x] Dòng FLUX vẽ thừa (lời dặn mục 3): câu cùng vai chưa có chỗ, không còn thì VLM ĐOÁN FLUX định viết gì (đọc chữ giun +
+    chữ OCR, hợp các hàng quanh nó) và viết theo, kể cả hàng danh sách / bảng, số / giá (người dùng: "FLUX bịa thì bịa theo").
+    `compose.assign.filler`: chữ lấp là câu khách chưa có chỗ -> viết câu đó; không chặn chữ lấp nào nữa (bỏ luật chặn số).
+  - [~] Đã thử rồi BỎ (người dùng 16/10): gỡ cả hàng thừa + dàn đều các hàng còn lại bằng điểm ảnh (bỏ trọn chu kỳ hàng, nhân
+    bản nền ở chỗ cắt, chỉ làm khi đường nối không lộ). Replay final2 + dev2: dàn được 1 / 5 danh sách có hàng thừa (cơm tấm
+    g01); 4 / 5 bị từ chối (vệt nước, quạt sát mép, icon hai bên hàng, bảng kẻ ô) để lại chấm / dấu tick / icon trơ trọi.
   - [x] `compose.assign.inside`: dòng không mang câu khách nằm >= 80% trong khung một dòng lớn hơn theo số phận dòng đó (mẩu
     logo trên lon Coca -> giữ).
   - [x] Tập cùng vai = cùng vai + cỡ gần + THẲNG LỀ / CÙNG HÀNG (`layout.aligned_groups`); gỡ `render.SET_FLOOR`: cả tập một cỡ.
     Bề rộng cột chung (`size.column_want`); vùng cấm khi nới khung = khung dòng thẳng nới ngang (vùng gỡ chữ nới dọc lấn hàng
     liền kề), bỏ dòng đã gỡ, nới lần lượt (tên món và giá không nới vào chung một khe).
-  - [x] Test: `tests/test_rows.py` (bảng, hàng thừa, giá về đúng hàng, 4 pill cho 3 món, pill sát nhau), `tests/test_fate.py`
-    (khuôn, mẩu câu, chữ lấp, mẩu logo), `tests/test_layout.py` (tập thẳng lề, cột chung).
+  - [x] Test: `tests/test_rows.py` (bảng, hàng thừa viết chữ đoán, giá về đúng hàng), `tests/test_fate.py` (khuôn, mẩu câu,
+    chữ lấp, mẩu logo), `tests/test_layout.py` (tập thẳng lề, cột chung).
+  - Replay trên câu trả lời VLM đã lưu (final2 + dev2, 69 poster, bản có gỡ hàng): too_small 45 -> 24, poster còn lỗi 33 -> 26,
+    phần tử co < 0,6 23 -> 16, câu khách thiếu 26 -> 22, cỡ trong +-15% nháp 68 -> 71%.
   - [ ] Đo trên máy chủ: `bench/final3.json` (32 ca mới, seed 16001-16032, nặng danh sách / bảng / pill / ảnh sản phẩm).
 
 ## Bước 3: gỡ chữ giun (Hi-SAM + LaMa) -- chuẩn hoá 15/10

@@ -23,8 +23,7 @@ INSIDE = 0.8        # dòng nằm >= 80% trong khung một dòng khác lớn hơ
 def resolve(A: dict, M: dict, texts: list[dict]) -> tuple[list[dict], list[str], list[int]]:
     """Đơn vị dựng từ phần ghép của VLM; số phận dòng theo compose.fate. -> (đơn vị, nhật ký, câu khách không có trên poster)."""
     by, log = M["by"], []
-    G = M["lists"] = rows.lists(M)   # danh sách / bảng nháp vẽ (hình học): hàng thừa gỡ cả hàng (compose.rows)
-    rof = rows.row_of(G)
+    rof = rows.row_of(rows.lists(M))   # hàng của danh sách / bảng nháp vẽ (hình học): câu ghép hai lần về đúng hàng
     from difflib import SequenceMatcher
     sim = lambda a, b: SequenceMatcher(None, _flat(a), _flat(b)).ratio()  # noqa: E731
     U = []
@@ -129,18 +128,15 @@ def resolve(A: dict, M: dict, texts: list[dict]) -> tuple[list[dict], list[str],
             else:
                 u["role_vlm"] = u["role_vlm"] or texts[k]["role"]
                 log.append(f"{u['id']}: câu T{k} đã ở {best['id']} -> dòng lấp" + (f" {u['text_vlm']!r}" if u["text_vlm"] else ""))
-    # DÒNG LẤP (VLM tự viết, không câu khách): compose.assign.filler -- là một câu khách chưa có chỗ thì viết câu đó; hàng danh
-    # sách, có số / cam kết, dài, trùng câu đã có chỗ -> bỏ
+    # DÒNG LẤP (VLM đoán FLUX định viết gì ở dòng vẽ thừa, kể cả hàng danh sách / bảng -- người dùng chốt 16/10: FLUX bịa thì
+    # viết theo): compose.assign.filler -- là một câu khách chưa có chỗ thì viết câu đó; còn lại viết đúng chữ VLM đoán
     used = Counter(k for u in U for k in u["clients"])
     for u in U:
         if u["kind"] == "text" and not u["clients"] and u["text_vlm"]:
-            k, why = filler(u["text_vlm"], texts, used, any(m in rof for m in u["marks"]))
+            k = filler(u["text_vlm"], texts, used)
             if k is not None:
                 u["clients"], used[k] = [k], used[k] + 1
                 log.append(f"{u['id']}: chữ lấp {u['text_vlm']!r} là câu khách chưa có chỗ T{k} -> viết câu đó")
-            elif why:
-                log.append(f"{u['id']}: chữ lấp {u['text_vlm']!r} {why} -> bỏ")
-                u["text_vlm"] = ""
     # đơn vị "text" không còn chữ (câu đã có chỗ khác, chữ lấp bị bỏ): dòng của nó về luật 4 của compose.fate (skip)
     U = [u for u in U if not (u["kind"] == "text" and not u["clients"] and not u["text_vlm"])]
     log += inside(U, M)
@@ -148,7 +144,6 @@ def resolve(A: dict, M: dict, texts: list[dict]) -> tuple[list[dict], list[str],
     extra, flog = fate.leftovers(U, M, fate.mentioned(A))
     U += extra
     log += flog
-    log += rows.surplus(U, M, G)
     log += order(U, M, texts)
     log += _markers(U, M, texts)
     used = Counter(k for u in U for k in u["clients"])
@@ -156,29 +151,14 @@ def resolve(A: dict, M: dict, texts: list[dict]) -> tuple[list[dict], list[str],
     return U, log, missing
 
 
-def filler(text: str, texts: list[dict], used: Counter, in_list: bool) -> tuple[int | None, str | None]:
-    """Chữ lấp VLM viết cho một dòng thừa -> (câu khách k khi chữ lấp chính là câu khách chưa có chỗ, lý do bỏ | None).
-    Bỏ: dòng là hàng danh sách / bảng (người dùng chốt 16/10: hàng thừa gỡ cả hàng, không bịa món / giá / bước); có số, tiền,
-    liên kết, chữ cam kết / ưu đãi, dài quá (luật câu phụ trợ của brief); trùng một câu khách đã có chỗ (dòng lặp)."""
+def filler(text: str, texts: list[dict], used: Counter) -> int | None:
+    """Chữ lấp VLM đoán cho một dòng FLUX vẽ thừa -> câu khách k khi chữ lấp chính là câu khách chưa có chỗ, không thì None. Không
+    bỏ chữ lấp nào (người dùng chốt 16/10: FLUX bịa thì viết theo, kể cả số / giá FLUX vẽ)."""
     from difflib import SequenceMatcher
-
-    from ..brief.texts import AI_BAN, AI_MAX_CHARS, promise_word
     f = _flat(text)
-    near = [j for j, t in enumerate(texts) if f and (SequenceMatcher(None, f, _flat(t["text"])).ratio() >= FILL_SIM
-                                                     or (len(f) >= 4 and f in _flat(t["text"])))]
-    free = [j for j in near if not used[j]]
-    if free:
-        return free[0], None
-    if near:
-        return None, f"trùng câu khách đã có chỗ T{near[0]}"
-    if in_list:
-        return None, "là hàng danh sách / bảng (hàng thừa gỡ cả hàng)"
-    if AI_BAN.search(text):
-        return None, "có số / tiền / liên kết"
-    if len(text) > AI_MAX_CHARS:
-        return None, "dài"
-    w = promise_word(text)
-    return None, (f"có chữ cam kết / ưu đãi '{w}'" if w else None)
+    near = [j for j, t in enumerate(texts) if not used[j] and f and (SequenceMatcher(None, f, _flat(t["text"])).ratio() >= FILL_SIM
+                                                                     or (len(f) >= 4 and f in _flat(t["text"])))]
+    return near[0] if near else None
 
 
 def _paired(u: dict, k: int, U: list[dict], rof: dict) -> bool:

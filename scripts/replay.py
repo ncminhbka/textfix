@@ -51,7 +51,6 @@ from textfix.compose.assign import resolve
 from textfix.lines.printed import _flat
 from textfix.lines.detect import reorient   # noqa: E402
 from textfix.compose import vlm as cvlm   # noqa: E402
-from textfix.compose import rows as crows   # noqa: E402
 from textfix.render.browser import Browser   # noqa: E402
 from textfix.lines.glyph import measure   # noqa: E402
 
@@ -113,8 +112,6 @@ with Browser() as B:
             U, llog = layout(U, M, ink, A["styles"], A["accent"], T, base=clean)
             elog = []
             base, mask = erase.settle(D, clean, ink, M, {"ops": U}, elog)
-            base, slog = crows.respace(base, U, M)
-            llog += slog
             poster, res, dlog = render.render_units(B.page, base, U, M)
             errs = render.check_units(U, res)
             sev = lambda E: sum(e["type"] in render.SEVERE for e in E)   # noqa: E731

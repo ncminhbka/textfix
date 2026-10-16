@@ -45,12 +45,7 @@ lines, except as parts (rule 2).
 2. ONE TEXT OVER SEVERAL LINES (the model broke it over stacked lines, drew a small "THANH TOÁN" over a huge "NHANH CHÓNG", or \
 "NGÀY" and "HỘI" in two boxes): each of those lines gets that client text and in "part" the words of it that line shows -- the \
 parts in reading order joined must give the client text exactly. A line that shows a whole text has "part": null.
-3. EXTRA LINES (the model drew more lines than the client has texts, or repeated one): (a) a repeated row of a list or table \
-gets a client text OF THE SAME ROLE that has no line yet -- never move a text of another role into it; none left: "client": \
-[], "text": null -- code removes that row and spaces the list again: never invent a list row, a dish, a price, a step, a date \
-or a contact; (b) an extra line standing alone (on a pill, a badge, a button): "client": [] with "text": a short phrase of the \
-same kind as the lettering around it that is true of that business, no fact, no number, no promise, never words of another \
-client text. Give a filled line the "role" it plays.
+3. EXTRA LINES (the model drew more lines than the client has texts, or repeated one): every drawn line of poster lettering gets words. (a) A repeated row of a list or table gets a client text OF THE SAME ROLE that has no line yet -- never move a text of another role into it; (b) none left: "client": [] with "text": GUESS WHAT THE MODEL MEANT TO WRITE THERE and write it -- read the garbled letters and the machine reading (numbers, prices and short words usually come out right), fit it to the lines around it (another benefit beside benefits, another dish and its price beside dishes) and to that business, in the language and length of the lettering around it; unreadable: a short phrase of the same kind. Give a filled line the "role" it plays (the role of the row it repeats).
 4. EVERY LINE GETS ONE KIND. "text": poster lettering -- titles, offers, buttons, badges, stickers, list rows, captions, also \
 an extra line on a pill or beside its peers, and ANY line that says one of the client texts wherever it is drawn (on a sign a \
 character holds, a board, a banner, a ribbon, a badge): it gets a client text, a filler or nothing as above. "keep": only the \

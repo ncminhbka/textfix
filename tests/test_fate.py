@@ -1,5 +1,5 @@
 """Số phận dòng (compose.fate), khuôn trả lời mỗi dòng một mục (compose.vlm.schema / compose.parse) và chữ lấp
-(compose.assign.filler) với VLM giả: mỗi test là một luật. 16/10: không còn hỏi lại VLM."""
+(compose.assign.filler) với VLM giả: mỗi test là một luật. 16/10: không còn hỏi lại VLM; dòng FLUX vẽ thừa viết chữ VLM đoán."""
 
 from __future__ import annotations
 
@@ -104,30 +104,15 @@ def test_same_text_on_two_lines_without_parts_is_a_repeat():
 
 
 @pytest.mark.parametrize("filler, want", [
-    ("Giảm 30%", ("client", 1)),                 # chữ lấp chính là câu khách chưa có chỗ -> viết câu đó
-    ("Khai trương", ("drop", "trùng")),          # trùng câu đã có chỗ (dòng lặp)
-    ("Mở cửa 7:00", ("drop", "số")),             # số bịa
-    ("Miễn phí giao hàng", ("drop", "cam kết")),  # lời hứa / ưu đãi
-    ("Không gian ấm cúng", ("keep", None)),      # chữ lấp hợp lệ cho dòng đứng riêng (pill)
+    ("Giảm 30%", 1),                 # chữ lấp chính là câu khách chưa có chỗ -> viết câu đó
+    ("Khai trương", None),           # FLUX vẽ lặp tiêu đề: viết theo
+    ("Mở cửa 7:00", None),           # VLM đọc giờ trên nháp: viết theo (FLUX bịa thì viết theo, 16/10)
 ])
-def test_filler_rules(filler, want):
+def test_filler_becomes_a_missing_client_text_else_is_written(filler, want):
     from collections import Counter
 
     from textfix.compose.assign import filler as verdict
-    k, why = verdict(filler, TEXTS, Counter({0: 1}), in_list=False)
-    if want[0] == "client":
-        assert k == want[1]
-    elif want[0] == "drop":
-        assert k is None and want[1] in why
-    else:
-        assert k is None and why is None
-
-
-def test_filler_in_a_list_row_is_dropped():
-    from collections import Counter
-
-    from textfix.compose.assign import filler as verdict
-    assert "danh sách" in verdict("Không gian ấm cúng", TEXTS, Counter(), in_list=True)[1]
+    assert verdict(filler, TEXTS, Counter({0: 1})) == want
 
 
 def test_fragment_inside_a_kept_logo_is_kept():
