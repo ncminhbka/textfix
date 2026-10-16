@@ -202,8 +202,9 @@ riêng rồi GIỮ; CHO NỚI chữ vào nền trống cùng màu, không vượ
     liền kề), bỏ dòng đã gỡ, nới lần lượt (tên món và giá không nới vào chung một khe).
   - [x] Test: `tests/test_rows.py` (bảng, hàng thừa viết chữ đoán, giá về đúng hàng), `tests/test_fate.py` (khuôn, mẩu câu,
     chữ lấp, mẩu logo), `tests/test_layout.py` (tập thẳng lề, cột chung).
-  - Replay trên câu trả lời VLM đã lưu (final2 + dev2, 69 poster, bản có gỡ hàng): too_small 45 -> 24, poster còn lỗi 33 -> 26,
-    phần tử co < 0,6 23 -> 16, câu khách thiếu 26 -> 22, cỡ trong +-15% nháp 68 -> 71%.
+  - Replay trên câu trả lời VLM đã lưu (final2 + dev2, 69 poster, bản có gỡ hàng): phần tử co < 0,6 23 -> 16, câu khách thiếu
+    26 -> 22, cỡ trong +-15% nháp 68 -> 71%. (too_small 45 -> 24 KHÔNG tin được: render.check_units không tính too_small cho
+    mục nào của tập -- `evened` gắn cho cả mục chật nhất -- mà bỏ SET_FLOOR đưa thêm chữ co mạnh vào tập.)
   - [ ] Đo trên máy chủ: `bench/final3.json` (32 ca mới, seed 16001-16032, nặng danh sách / bảng / pill / ảnh sản phẩm).
 
 ## Bước 3: gỡ chữ giun (Hi-SAM + LaMa) -- chuẩn hoá 15/10
