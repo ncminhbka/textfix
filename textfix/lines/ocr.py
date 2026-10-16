@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import os
 import threading
 
 import numpy as np
@@ -14,8 +15,27 @@ _LOCK = threading.Lock()     # bộ nhớ đệm dùng chung
 def _engine():
     if getattr(_LOCAL, "ocr", None) is None:
         import rapidocr_onnxruntime as ro
+        _limit_threads()
         _LOCAL.ocr = ro.RapidOCR()
     return _LOCAL.ocr
+
+
+def _limit_threads() -> None:
+    """TEXTFIX_THREADS (docker/run.sh đặt theo hạn mức CPU của container): số luồng của onnxruntime. onnxruntime không đọc
+    OMP_NUM_THREADS mà lấy số lõi cả máy, còn rapidocr 1.2.3 không có tuỳ chọn số luồng -> thay SessionOptions nó dùng."""
+    n = int(os.environ.get("TEXTFIX_THREADS") or 0)
+    from rapidocr_onnxruntime import utils as ru
+    if n <= 0 or getattr(ru.SessionOptions, "textfix_threads", None) == n:
+        return
+    base = getattr(ru.SessionOptions, "textfix_base", ru.SessionOptions)
+
+    def options():
+        o = base()
+        o.intra_op_num_threads = n
+        o.inter_op_num_threads = 1
+        return o
+    options.textfix_threads, options.textfix_base = n, base
+    ru.SessionOptions = options
 
 
 MULTI_SCALE = 0.5   # lượt dò thứ hai ở ảnh thu nhỏ: chữ RẤT TO / chữ trang trí bị sót ở cỡ gốc

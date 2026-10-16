@@ -66,3 +66,64 @@ def test_flux_moderation_has_its_own_code():
     from textfix.draw.remote import FluxError, FluxModerated
     assert server.draw_error(FluxModerated("Content Moderated"), "FLUX vẽ nháp")["code"] == "draw_moderated"
     assert server.draw_error(FluxError("HTTP 500"), "FLUX vẽ nháp")["code"] == "draw_failed"
+
+
+# ---------------------------------------------------------------------------------------------- lấy ảnh: /api/jobs/{id}/poster
+def fake_job(monkeypatch, tmp_path, status="done", posters=("done",)):
+    """Job giả trong bộ nhớ máy chủ + tệp poster thật trong thư mục lượt chạy tạm."""
+    import io
+
+    from PIL import Image
+    monkeypatch.setattr(server, "RUNS", tmp_path)
+    P = []
+    for i, st in enumerate(posters):
+        p = {"index": i, "status": st}
+        if st == "done":
+            (tmp_path / "run_x" / f"v{i}").mkdir(parents=True)
+            buf = io.BytesIO()
+            Image.new("RGB", (8, 6), (10 * i, 0, 0)).save(buf, "PNG")
+            (tmp_path / "run_x" / f"v{i}" / "poster.png").write_bytes(buf.getvalue())
+            p["poster_url"] = f"outputs/run_x/v{i}/poster.png"
+        if st == "error":
+            p["error"] = {"code": "vlm_failed", "stage": "VLM", "message": "x"}
+        P.append(p)
+    job = {"id": "j1", "run_id": "run_x", "status": status, "progress": "", "created": 0, "error": None,
+           "result": {"job_id": "j1", "width": 8, "height": 6, "posters": P}}
+    monkeypatch.setitem(server.JOBS, "j1", job)
+    return job
+
+
+def test_poster_is_one_get_with_the_job_id(monkeypatch, tmp_path):
+    fake_job(monkeypatch, tmp_path, posters=("done", "done"))
+    assert client.get("/api/jobs/j1").json()["poster"] == "/api/jobs/j1/poster"
+    r = client.get("/api/jobs/j1/poster")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png" and r.content[:4] == b"\x89PNG"
+    b = client.get("/api/jobs/j1/poster", params={"index": 1, "format": "base64"}).json()
+    assert (b["index"], b["width"], b["mime"]) == (1, 8, "image/png") and len(b["image_base64"]) > 20
+
+
+def test_poster_not_ready_failed_and_missing(monkeypatch, tmp_path):
+    fake_job(monkeypatch, tmp_path, status="running", posters=("drawing",))
+    assert client.get("/api/jobs/j1/poster").json()["detail"]["code"] == "not_ready"
+    assert "poster" not in client.get("/api/jobs/j1").json()
+    fake_job(monkeypatch, tmp_path / "b", posters=("done", "error"))
+    r = client.get("/api/jobs/j1/poster", params={"index": 1})
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "poster_failed"
+    assert client.get("/api/jobs/j1/poster", params={"index": 5}).json()["detail"]["code"] == "poster_not_found"
+    assert client.get("/api/jobs/nope/poster").status_code == 404
+    (tmp_path / "b" / "run_x" / "v0" / "poster.png").unlink()
+    assert client.get("/api/jobs/j1/poster").status_code == 410
+
+
+def test_ocr_threads_follow_container_cpu_limit(monkeypatch):
+    # docker/run.sh đặt TEXTFIX_THREADS theo hạn mức CPU -> onnxruntime của OCR mở đúng ngần ấy luồng (không theo số lõi cả máy)
+    pytest.importorskip("rapidocr_onnxruntime")
+    from rapidocr_onnxruntime import utils as ru
+
+    from textfix.lines import ocr
+    monkeypatch.setattr(ru, "SessionOptions", ru.SessionOptions)   # trả lại như cũ sau test
+    monkeypatch.setenv("TEXTFIX_THREADS", "3")
+    ocr._limit_threads()
+    ocr._limit_threads()   # gọi lại không bọc chồng
+    o = ru.SessionOptions()
+    assert o.intra_op_num_threads == 3 and ru.SessionOptions.textfix_base.__name__ == "SessionOptions"

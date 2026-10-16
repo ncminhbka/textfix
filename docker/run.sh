@@ -12,6 +12,30 @@ if [ -z "${TEXTFIX_FLUX_URL:-}" ]; then
     echo "LỖI: chưa đặt TEXTFIX_FLUX_URL (image không chứa FLUX; xem docker/textfix.env.example)" >&2
     exit 1
 fi
+# HẠN MỨC CPU của container (Kubernetes limits.cpu, docker --cpus): numpy / OpenCV / torch / onnxruntime (OCR) mặc định mở luồng
+# theo số lõi CẢ MÁY -> vượt hạn mức, bị bóp liên tục: bước đo dòng chậm ~10 lần (16/10, pod trên máy L40S). Đặt số luồng = hạn
+# mức. TEXTFIX_THREADS đặt tay thì thắng; biến *_NUM_THREADS người deploy đã đặt thì giữ.
+if [ -z "${TEXTFIX_THREADS:-}" ]; then
+    q=""; p=""
+    # "|| true": đọc hỏng (tệp lạ, không xuống dòng) không được làm dừng script (set -e) -> coi như không giới hạn
+    if [ -r /sys/fs/cgroup/cpu.max ]; then read -r q p < /sys/fs/cgroup/cpu.max || true
+    elif [ -r /sys/fs/cgroup/cpu/cpu.cfs_quota_us ]; then
+        q=$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us 2>/dev/null || true)
+        p=$(cat /sys/fs/cgroup/cpu/cpu.cfs_period_us 2>/dev/null || true)
+    fi
+    if [[ "$q" =~ ^[0-9]+$ ]] && [[ "$p" =~ ^[0-9]+$ ]] && [ "$q" -gt 0 ] && [ "$p" -gt 0 ]; then
+        TEXTFIX_THREADS=$(( (q + p - 1) / p ))
+    fi
+fi
+if [ -n "${TEXTFIX_THREADS:-}" ]; then
+    export TEXTFIX_THREADS
+    for v in OMP_NUM_THREADS OPENBLAS_NUM_THREADS MKL_NUM_THREADS NUMEXPR_NUM_THREADS OPENCV_FOR_THREADS_NUM; do
+        export "$v=${!v:-$TEXTFIX_THREADS}"
+    done
+    echo "[textfix] CPU: hạn mức $TEXTFIX_THREADS lõi (máy có $(nproc --all)) -> số luồng thư viện = $TEXTFIX_THREADS"
+else
+    echo "[textfix] CPU: không giới hạn ($(nproc) lõi)"
+fi
 # máy lạ: in ngay torch / CUDA / driver / từng card để biết máy có hợp không (GPU không dùng được thì Hi-SAM + LaMa chạy CPU)
 "$PY" - <<'EOF' || true
 import subprocess, torch
@@ -43,5 +67,11 @@ for k in ("TEXTFIX_FLUX_URL", "TEXTFIX_LLM_URL", "TEXTFIX_VLM_URL"):
     except OSError as e:
         print(f"[textfix] LỖI {k}: không phân giải được {host} ({e}) -- docker run thêm --add-host {host}:<IP> hoặc --dns <máy DNS>")
 EOF
-mkdir -p "${TEXTFIX_RUNS:-/data/runs}"
+# thư mục mount vào /data phải cho uid 1000 (người chạy máy chủ trong container) ghi được; docker tự tạo thư mục mount -> chủ root
+RUNS="${TEXTFIX_RUNS:-/data/runs}"
+if ! mkdir -p "$RUNS" 2>/dev/null || [ ! -w "$RUNS" ]; then
+    echo "LỖI: không ghi được $RUNS (container chạy uid $(id -u)). Trên máy thật: sudo chown -R 1000:100 <thư mục mount vào /data>" >&2
+    echo "     (không có sudo: docker run --rm --user root --entrypoint chown -v <thư mục>:/data <image> -R 1000:100 /data)" >&2
+    exit 1
+fi
 exec "$PY" server/app.py --port "${TEXTFIX_PORT:-8004}" "$@"

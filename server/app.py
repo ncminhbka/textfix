@@ -425,7 +425,7 @@ def run_job(job: dict, req: GenerateRequest) -> dict:
     base_seed = req.seed if req.seed is not None else int(time.time()) % 100000
     directions = [{"name": "chính", "prompt_en": B["prompt_en"]}] + B.get("variants", [])
     posters = []
-    job["result"] = {"status": "running", "run_id": run_id, "mode": B.get("mode", "poster"), "width": W, "height": H, "posters": posters,
+    job["result"] = {"status": "running", "job_id": job["id"], "run_id": run_id, "mode": B.get("mode", "poster"), "width": W, "height": H, "posters": posters,
                      "ignored_fields": ignored_fields(req), "debug_zip_url": f"api/runs/{run_id}/zip",
                      "brief": {"prompt_en": B["prompt_en"], "texts": B["texts"], "variants": B.get("variants", []), "log": B["log"]}}
     futs = []
@@ -465,7 +465,8 @@ def run_job(job: dict, req: GenerateRequest) -> dict:
         e = posters[0].get("error") or failure("internal_error", "", None)
         raise ApiError(e["code"], e["stage"], e["message"])
     prune()
-    job["result"].update(status="success", elapsed_seconds=round(time.time() - t_all, 1), final_poster_url=ok[0]["poster_url"])
+    job["result"].update(status="success", elapsed_seconds=round(time.time() - t_all, 1), final_poster_url=ok[0]["poster_url"],
+                         poster=f"/api/jobs/{job['id']}/poster")
     return job["result"]
 
 
@@ -558,8 +559,45 @@ async def get_job(jid: str):
     if job is None:
         raise HTTPException(404, "không có job này (máy chủ đã khởi động lại?)")
     pos = ORDER.index(jid) if jid in ORDER else None
-    return {k: job[k] for k in ("id", "run_id", "status", "progress", "result", "error")} | \
+    out = {k: job[k] for k in ("id", "run_id", "status", "progress", "result", "error")} | \
         {"position": pos, "elapsed": round(time.time() - job.get("started", job["created"]), 1)}
+    if job["status"] == "done":   # lấy ảnh: không phải ghép đường dẫn tương đối, chỉ cần job_id
+        out["poster"] = f"/api/jobs/{jid}/poster"
+    return out
+
+
+@app.get("/api/jobs/{jid}/poster")
+def get_poster(jid: str, index: Optional[int] = None, format: str = "png"):
+    """Ảnh poster của job: PNG (mặc định) hoặc JSON base64 (format=base64). index: poster thứ mấy (num_images > 1); bỏ trống =
+    poster xong đầu tiên. Chưa xong -> 409 not_ready; poster lỗi -> 409 poster_failed (kèm error); tệp đã bị dọn -> 410."""
+    job = JOBS.get(jid)
+    if job is None:
+        raise HTTPException(404, {"code": "job_not_found", "message": "không có job này (máy chủ đã khởi động lại?)"})
+    if format not in ("png", "base64"):
+        raise HTTPException(422, {"code": "invalid_format", "value": format, "allowed": ["png", "base64"]})
+    if job["status"] == "error":
+        raise HTTPException(409, {"code": "job_failed", "error": job["error"]})
+    posters = (job.get("result") or {}).get("posters") or []
+    if index is None:
+        p = next((p for p in posters if p.get("status") == "done"), None)
+        if p is None:
+            raise HTTPException(409, {"code": "not_ready", "status": job["status"], "progress": job["progress"]})
+    else:
+        if job["status"] == "done" and not 0 <= index < len(posters):
+            raise HTTPException(404, {"code": "poster_not_found", "index": index, "count": len(posters)})
+        p = posters[index] if 0 <= index < len(posters) else None
+        if p is None or p.get("status") not in ("done", "error"):
+            raise HTTPException(409, {"code": "not_ready", "status": job["status"], "progress": job["progress"]})
+        if p["status"] == "error":
+            raise HTTPException(409, {"code": "poster_failed", "index": index, "error": p.get("error")})
+    f = RUNS / p["poster_url"].split("/", 1)[1]   # "outputs/<run_id>/v<i>/poster.png" -> RUNS/<run_id>/v<i>/poster.png
+    if not f.is_file():
+        raise HTTPException(410, {"code": "poster_expired", "message": "ảnh đã bị dọn (máy chủ chỉ giữ các lượt gần nhất)"})
+    if format == "base64":
+        r = job["result"]
+        return {"job_id": jid, "index": p["index"], "width": r["width"], "height": r["height"], "mime": "image/png",
+                "image_base64": base64.b64encode(f.read_bytes()).decode()}
+    return FileResponse(f, media_type="image/png", filename=f"{jid}_{p['index']}.png")
 
 
 ZIP_LIMIT = int(float(os.environ.get("TEXTFIX_ZIP_MB", "22")) * 1024 * 1024)   # < 24 MB (như textfix/ship.py)

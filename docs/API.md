@@ -8,6 +8,7 @@ tiếng Việt, kèm đủ ảnh và số liệu debug của từng bước.
 ```
 POST /api/jobs            -> {"job_id", "run_id", "queue"}            gửi yêu cầu (trả ngay)
 GET  /api/jobs/{job_id}   -> {"status", "progress", "result", "error", "position", "elapsed"}   hỏi mỗi 1-2 s
+GET  /api/jobs/{job_id}/poster                                         ảnh poster PNG khi status = "done" (?index=i, ?format=base64)
 GET  /api/runs/{run_id}/zip                                           mọi tệp debug của lượt chạy (zip)
 GET  /api/health          -> {"ready", "error", "queue", ...}          máy chủ đã nạp model chưa
 POST /api/generate        cùng thân như /api/jobs, chờ tới khi xong (đồng bộ; dùng cho thử nhanh)
@@ -61,10 +62,15 @@ run_id, status ("running" | "success"), mode ("poster" | "image": không chữ n
 width, height, final_poster_url, elapsed_seconds, ignored_fields, debug_zip_url,
 brief: {prompt_en, texts: [{text, role, source}], variants, log}      bước 1: LLM viết prompt + danh sách chữ
 posters: [ {index, seed, direction, status ("drawing" | "designing" | "done" | "error"), stage, error,
-            poster_url, ... các ảnh debug, timing, missing, errors} ]
+            poster_url, plan_url, ... các ảnh debug, timing, missing, errors} ]
 ```
 
-Đường dẫn ảnh là tương đối với gốc máy chủ (`outputs/<run_id>/v<i>/...`).
+**Lấy poster**: `GET /api/jobs/{job_id}/poster` -> PNG (poster xong đầu tiên); `?index=i` poster thứ i; `?format=base64` ->
+JSON `{job_id, index, width, height, mime, image_base64}`. Khi xong, `GET /api/jobs/{job_id}` có thêm `"poster"` (đường dẫn này),
+`result` có `job_id` (cho `/api/generate`). Lỗi: 409 `not_ready` (chưa xong) / `job_failed` / `poster_failed` (kèm `error`),
+404 `job_not_found` / `poster_not_found`, 410 `poster_expired` (đã bị dọn), 422 `invalid_format`.
+
+Các trường `*_url` khác (ảnh debug, `final_poster_url`) là đường dẫn tương đối với gốc máy chủ (`outputs/<run_id>/v<i>/...`).
 
 ## Debug từng bước (mỗi poster)
 
@@ -75,7 +81,7 @@ posters: [ {index, seed, direction, status ("drawing" | "designing" | "done" | "
 | 3. Hi-SAM | `hisam_url` (`hisam.jpg`), `ink.png` | nét chữ tìm được (hồng) |
 | 4a. Dòng | `slots_url` (`slots.jpg`), `plan.json` → `slots.L` | mỗi dòng: khung, kiểu (ngang / nghiêng / cong / dọc), số đo nét (`ink`: cao chữ, màu, đường chân...), hàng nhiều cỡ (`row`) |
 | 4b. Gỡ chữ | `ink_url` (`ink.jpg`), `clean_url` (`clean.jpg`), `base_url` (`base.jpg`), `plan.json` → `erase` | mặt nạ gỡ (xanh lá = nét bị gỡ, vàng = quầng, xanh dương = dòng giữ), nền đã gỡ, nền dựng |
-| 4c. VLM | `plan.json` → `assign`, `style`, `accent`, `fates` | câu nào vào dòng nào; **số phận từng dòng** (viết / giữ / xoá + lý do) |
+| 4c. VLM | `plan.json` → `assign`, `style`, `accent`, `fates` | câu nào vào dòng nào (một lời gọi, khuôn JSON strict: mọi dòng có mục riêng); **số phận từng dòng** (viết / giữ / xoá + lý do). Dòng FLUX vẽ thừa (không câu khách nào hợp) được viết bằng chữ VLM đoán theo ý nháp: trong `ops` là mục `text` không có `client` |
 | 4d. Bố cục | `ops_url` (`ops.jpg`), `plan.json` → `ops` | đơn vị chữ, tập cùng vai, cỡ, lề, font |
 | 5. Dựng | `poster_url`, `poster_first_url` (khi vòng sửa chạy), `plan.json` → `render`, `errors`, `errors_first` | cỡ / co / nén từng phần tử, lỗi bộ kiểm lượt đầu và lượt cuối |
 | Tổng | `steps_url` (`steps.jpg`), `plan.json` → `log`, `timing` | ảnh ghép nháp → dòng → mặt nạ → nền → poster; nhật ký; thời gian từng bước |

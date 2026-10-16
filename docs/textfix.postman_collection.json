@@ -1,0 +1,366 @@
+{
+  "info": {
+    "name": "TextFix API",
+    "description": "Gọi máy chủ TextFix sinh poster tiếng Việt. Đổi biến baseUrl (tab Variables của collection) thành địa chỉ máy chủ. Hướng dẫn: docs/POSTMAN.md.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8004"
+    },
+    {
+      "key": "job_id",
+      "value": ""
+    },
+    {
+      "key": "run_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Kiểm máy chủ (health)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/health"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const r = pm.response.json();",
+              "pm.test('máy chủ sẵn sàng (ready = true)', () => pm.expect(r.ready).to.eql(true));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Gửi yêu cầu",
+      "item": [
+        {
+          "name": "Khuyến mại (promo)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/jobs",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"promo\",\n  \"title\": \"Siêu sale cuối tuần\",\n  \"discount\": \"Giảm 30%\",\n  \"applied_product\": \"Toàn bộ trà sữa\",\n  \"date_start\": \"20/10/2026\",\n  \"date_end\": \"22/10/2026\",\n  \"store_name\": \"Mây Coffee\",\n  \"phone\": \"0901 234 567\",\n  \"aspect_ratio\": \"4:5\",\n  \"num_images\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('job_id', pm.response.json().job_id);",
+                  "pm.collectionVariables.set('run_id', pm.response.json().run_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Giới thiệu sản phẩm (product_intro, có ảnh)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/jobs",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"product_intro\",\n  \"product_name\": \"Nồi chiên không dầu AirPro 5L\",\n  \"product_desc\": \"Chiên giòn không cần dầu, tiết kiệm điện\",\n  \"highlights\": \"Dung tích 5 lít; 8 chế độ nấu; Bảo hành 24 tháng\",\n  \"price\": \"1.290.000đ\",\n  \"image_base64\": \"<dán chuỗi base64 của ảnh sản phẩm vào đây, hoặc xoá dòng này>\",\n  \"aspect_ratio\": \"1:1\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('job_id', pm.response.json().job_id);",
+                  "pm.collectionVariables.set('run_id', pm.response.json().run_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Khai trương (opening)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/jobs",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"opening\",\n  \"title\": \"Khai trương chi nhánh mới\",\n  \"opening_date\": \"01/11/2026\",\n  \"opening_promo\": \"Mua 1 tặng 1 trong 3 ngày đầu\",\n  \"booking_contact\": \"Hotline 1900 1234\",\n  \"store_name\": \"Bếp Nhà Mây\",\n  \"address\": \"12 Lý Thường Kiệt, Hà Nội\",\n  \"style_pref\": \"le_hoi\",\n  \"aspect_ratio\": \"9:16\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('job_id', pm.response.json().job_id);",
+                  "pm.collectionVariables.set('run_id', pm.response.json().run_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Feedback khách hàng (feedback)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/jobs",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"feedback\",\n  \"feedback_target\": \"Dịch vụ spa thư giãn\",\n  \"feedback_quote\": \"Nhân viên nhẹ nhàng, không gian rất thư thái\",\n  \"feedback_highlights\": \"5 sao; Quay lại lần thứ 3\",\n  \"special_offer\": \"Giảm 15% cho khách quay lại\",\n  \"store_name\": \"Lotus Spa\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('job_id', pm.response.json().job_id);",
+                  "pm.collectionVariables.set('run_id', pm.response.json().run_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tuyển dụng (recruitment)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/jobs",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"recruitment\",\n  \"title\": \"Tuyển nhân viên pha chế\",\n  \"job_position\": \"Nhân viên pha chế\",\n  \"apply_deadline\": \"30/11/2026\",\n  \"apply_method\": \"Gửi CV về hr@maycoffee.vn\",\n  \"store_name\": \"Mây Coffee\",\n  \"style_pref\": \"hien_dai\",\n  \"aspect_ratio\": \"4:5\",\n  \"num_images\": 2\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('job_id', pm.response.json().job_id);",
+                  "pm.collectionVariables.set('run_id', pm.response.json().run_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hướng dẫn (guide)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/jobs",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"guide\",\n  \"title\": \"Cách đặt hàng online\",\n  \"guide_steps\": [\"Chọn món trên app\", \"Nhập địa chỉ giao hàng\", \"Thanh toán\", \"Nhận hàng sau 30 phút\"],\n  \"store_name\": \"Mây Coffee\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('job_id', pm.response.json().job_id);",
+                  "pm.collectionVariables.set('run_id', pm.response.json().run_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Chỉ prompt tự do",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/jobs",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"promo\",\n  \"prompt\": \"Poster Black Friday cho shop giày, giảm đến 50%, tông đen vàng\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('job_id', pm.response.json().job_id);",
+                  "pm.collectionVariables.set('run_id', pm.response.json().run_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lỗi cố ý: thiếu trường bắt buộc (mong 422)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/jobs",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"recruitment\",\n  \"title\": \"Tuyển dụng\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('422 missing_required_fields', () => { pm.response.to.have.status(422); pm.expect(pm.response.json().detail.code).to.eql('missing_required_fields'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lỗi cố ý: loại form sai (mong 422)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/jobs",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"abc\",\n  \"prompt\": \"poster\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('422 invalid_category', () => { pm.response.to.have.status(422); pm.expect(pm.response.json().detail.code).to.eql('invalid_category'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Hỏi kết quả (bấm lại tới khi status = done)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/jobs/{{job_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const r = pm.response.json();",
+              "console.log('status', r.status, 'progress', r.progress, 'elapsed', r.elapsed);",
+              "if (r.status === 'done') pm.test('xong: chạy lệnh 3 để lấy poster', () => pm.expect(r.poster).to.be.a('string'));",
+              "if (r.status === 'error') pm.test('job lỗi: ' + JSON.stringify(r.error), () => pm.expect.fail());"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Lấy poster (PNG)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/jobs/{{job_id}}/poster"
+      }
+    },
+    {
+      "name": "3b. Lấy poster dạng base64 (JSON)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/jobs/{{job_id}}/poster?format=base64"
+      }
+    },
+    {
+      "name": "4. Tải zip debug của lượt chạy",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/runs/{{run_id}}/zip"
+      }
+    },
+    {
+      "name": "Gọi một lần, chờ tới khi xong (generate, 1-3 phút)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/generate",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"category\": \"promo\",\n  \"title\": \"Siêu sale cuối tuần\",\n  \"discount\": \"Giảm 30%\",\n  \"store_name\": \"Mây Coffee\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const r = pm.response.json();",
+              "if (r.run_id) pm.collectionVariables.set('run_id', r.run_id);",
+              "if (r.job_id) pm.collectionVariables.set('job_id', r.job_id);   // rồi chạy lệnh 3 để lấy poster"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

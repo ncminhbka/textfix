@@ -88,6 +88,10 @@ Mỗi phiên bản poster đi qua hai trạm:
 - **VẼ**: gọi FLUX (máy khác), rồi Hi-SAM trên card của máy deploy. Số luồng = `TEXTFIX_FLUX_CONCURRENCY`, chia vòng lên các card.
 - **THIẾT KẾ**: OCR, LaMa, gọi VLM, dựng Chromium, kiểm. Số luồng = `TEXTFIX_DESIGN_WORKERS`.
 
+**CPU** (OCR, đo dòng, Chromium chạy CPU): container tự đọc hạn mức CPU (Kubernetes `limits.cpu`, `docker --cpus`) và đặt số
+luồng thư viện bằng hạn mức (`docker/run.sh`, in ra dòng `[textfix] CPU: ...`). Hạn mức nên >= 8 lõi; quá nhỏ thì bước đo dòng
+chậm. Đặt tay: `TEXTFIX_THREADS`.
+
 Đặt `TEXTFIX_FLUX_CONCURRENCY` bằng số yêu cầu máy FLUX chịu được cùng lúc, `TEXTFIX_DESIGN_WORKERS` theo số lời gọi VLM
 song song máy VLM chịu được và RAM (mỗi luồng một Chromium).
 
