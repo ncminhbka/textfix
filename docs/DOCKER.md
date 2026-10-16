@@ -20,6 +20,10 @@ bash docker/build.sh          # kiểm trọng số + Chromium trong ~/persisten
 Image gốc là image của chính notebook (đã có torch CUDA và thư viện Chromium cần); pip qua Nexus nội bộ. Trọng số được CHÉP
 vào thư mục build (không link), kiểm đúng kích thước trước khi build.
 
+Image gốc nặng ~17 GB, trong đó CUDA toolkit + Nsight ~8 GB textfix không dùng (torch bản pip có thư viện CUDA riêng).
+Dockerfile gọt phần đó rồi dồn lại thành một lớp (`FROM scratch`); build.sh chép lại ENV / ENTRYPOINT của image gốc.
+Lần build đầu sau khi đổi image gốc chép ~9 GB (vài phút); các lần sau dùng lại lớp này.
+
 ## 2. Cấu hình
 
 ```bash
@@ -93,7 +97,8 @@ Chuyển image: qua kho nội bộ (cần quyền đẩy vào namespace đích)
 docker tag textfix:demo registry.kcntt.net/<namespace>/textfix:demo
 docker push registry.kcntt.net/<namespace>/textfix:demo        # máy chạy: docker pull ... cùng tên
 ```
-hoặc tệp: `docker save textfix:demo | gzip > textfix-demo.tar.gz` (~8-10 GB), máy chạy: `gunzip -c textfix-demo.tar.gz | docker load`.
+hoặc tệp: `bash docker/save.sh` -> `~/work/textfix-demo.tar.gz` (~4-5 GB), tải về từ cây thư mục JupyterLab; máy chạy:
+`docker load -i textfix-demo.tar.gz`.
 
 Lệnh `docker run` như mục 3, đổi thư mục mount (`-v <thư mục bất kỳ>:/data`) và tên image nếu kéo từ kho.
 Tự kiểm trong container: `docker exec textfix-demo bash -c '"$TEXTFIX_PY" scripts/check_server.py'`.

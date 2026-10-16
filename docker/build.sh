@@ -23,7 +23,8 @@ size_is "$HISAM/Hi-SAM/pretrained_checkpoint/sam_vit_l_0b3195.pth" 1249524607
 size_is "$HISAM/sam_tss_l_textseg.pth" 122756163
 size_is "$LAMA" 205669692
 [ -x "$CHROME_DIR/chrome" ] || die "thiếu Chromium: $CHROME_DIR/chrome (python scripts/check_server.py --fix giải nén zip trong persistent-data)"
-docker image inspect "$(sed -n 's/^ARG BASE=//p' docker/Dockerfile)" >/dev/null 2>&1 || die "docker không thấy image gốc (sửa ARG BASE trong docker/Dockerfile)"
+BASE="$(sed -n 's/^ARG BASE=//p' docker/Dockerfile)"
+docker image inspect "$BASE" >/dev/null 2>&1 || die "docker không thấy image gốc (sửa ARG BASE trong docker/Dockerfile)"
 PY="$(command -v python)"
 case "$PY" in "$HOME"/*) die "python của notebook ($PY) nằm trong thư mục nhà, không có trong image gốc";; esac
 echo "   python: $PY"
@@ -44,7 +45,23 @@ rm -rf "$CTX/app"
 mkdir -p "$CTX/app/scripts"
 cp -r textfix server assets docker "$CTX/app/"
 cp scripts/check_server.py scripts/start_server.sh "$CTX/app/scripts/"
-cp docker/Dockerfile "$CTX/Dockerfile"
+# Dockerfile dồn image gốc thành một lớp (FROM scratch) -> mất ENV / SHELL / ENTRYPOINT của image gốc: chép lại từ inspect
+docker image inspect "$BASE" > "$CTX/base.json"
+"$PY" - "$CTX/base.json" docker/Dockerfile "$CTX/Dockerfile" <<'EOF'
+import json, sys
+c = json.load(open(sys.argv[1]))[0]["Config"]
+q = lambda v: json.dumps(v).replace("$", "\\$")          # Dockerfile thay $X trong ENV: giữ nguyên giá trị gốc
+out = [f"ENV {e.split('=', 1)[0]}={q(e.split('=', 1)[1])}" for e in c.get("Env") or []]
+if c.get("Shell"):
+    out.append("SHELL " + json.dumps(c["Shell"]))
+if c.get("Entrypoint"):
+    out.append("ENTRYPOINT " + json.dumps(c["Entrypoint"]))
+src = open(sys.argv[2], encoding="utf-8").read()
+assert "# @BASE_CONFIG@" in src
+open(sys.argv[3], "w", encoding="utf-8").write(src.replace("# @BASE_CONFIG@", "\n".join(out)))
+print(f"   cấu hình image gốc: {len(c.get('Env') or [])} biến môi trường, entrypoint {c.get('Entrypoint')}")
+EOF
+rm -f "$CTX/base.json"
 cp docker/requirements.txt "$CTX/requirements.txt"
 # GHIM đúng bản đang chạy tốt trên notebook (pip trong docker không có ràng buộc thì lấy bản mới nhất: playwright lệch đời
 # Chromium, openai / opencv lên bản lớn mới) -> constraints.txt cho pip trong Dockerfile
