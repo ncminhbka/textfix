@@ -335,7 +335,8 @@ def check_remote_flux(no_call: bool) -> None:
     """FLUX ở máy khác (textfix/flux_api.py): có địa chỉ + khoá; gọi thử một ảnh nhỏ (tốn một lượt vẽ) trừ khi --no-call."""
     from textfix.draw import remote
     F = remote.RemoteFlux()
-    print(f"3. FLUX ở máy khác: {F.url} (gửi cùng lúc {remote.concurrency()}, safety_tolerance {F.safety})")
+    extra = f"model {F.model}, {F.steps} bước" if F.api == "chat" else f"safety_tolerance {F.safety}"
+    print(f"3. FLUX ở máy khác, khuôn {F.api}: {F.url} (gửi cùng lúc {remote.concurrency()}, {extra})")
     if F.url.rstrip("/").endswith("-preview"):
         warn("điểm cuối -preview đổi model theo thời gian: cùng seed có thể ra ảnh khác -- nên dùng bản cố định")
     if not F.key:

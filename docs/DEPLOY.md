@@ -93,7 +93,16 @@ song song máy VLM chịu được và RAM (mỗi luồng một Chromium).
 
 ## Máy FLUX tự host
 
-Lớp nối (`textfix/draw/remote.py`) nói theo khuôn API của Black Forest Labs. Máy FLUX tự host cần nhận đúng khuôn đó:
+Lớp nối (`textfix/draw/remote.py`) nói hai khuôn, tự chọn theo URL (hoặc đặt `TEXTFIX_FLUX_API=chat|bfl`).
+
+**Khuôn chat** (máy tự host kiểu vLLM-Omni, OpenAI-compatible) khi `TEXTFIX_FLUX_URL` tận cùng `/v1/chat/completions`:
+- `POST`, header `Authorization: Bearer <TEXTFIX_FLUX_API_KEY>`, thân JSON `{model, messages: [{role: "user", content: [{type:
+  "text", text: <prompt>}, {type: "image_url", image_url: {url: "data:image/png;base64,..."}} ...]}], extra_body: {width, height,
+  seed, num_inference_steps, guidance_scale}}` (ảnh tham chiếu là các phần `image_url`, tối đa 4);
+- trả `choices[0].message.content` chứa phần `image_url` (data URL PNG, hoặc URL ảnh). Đồng bộ: đợi vẽ xong mới trả;
+- `TEXTFIX_FLUX_MODEL` (mặc định `black-forest-labs/FLUX.2-klein-9B`), `TEXTFIX_FLUX_STEPS` (4), `TEXTFIX_FLUX_GUIDANCE` (1).
+
+**Khuôn BFL** (còn lại):
 - `POST <TEXTFIX_FLUX_URL>`, header `x-key`, thân JSON `{prompt, width, height, seed, output_format: "png", safety_tolerance,
   input_image, input_image_2..4}` (ảnh tham chiếu là base64 PNG) -> `{id, polling_url}`;
 - `GET polling_url` (không có thì `<gốc>/v1/get_result?id=`) -> `{status, result: {sample: <URL ảnh>}}`; `status` là `Pending` /

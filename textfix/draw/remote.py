@@ -1,9 +1,14 @@
-"""FLUX ở MÁY KHÁC (API của Black Forest Labs, khuôn api.bfl.ai): thay cho flux.Flux khi máy chủ không tự nạp FLUX.
+"""FLUX ở MÁY KHÁC: thay cho flux.Flux khi máy chủ không tự nạp FLUX. Hai khuôn API, chọn theo TEXTFIX_FLUX_API
+(mặc định: URL tận cùng /chat/completions -> "chat", còn lại -> "bfl"):
 
-  F = RemoteFlux(device="cuda:0")                       # TEXTFIX_FLUX_URL, TEXTFIX_FLUX_API_KEY (docs/SERVER.md)
+  F = RemoteFlux(device="cuda:0")                       # TEXTFIX_FLUX_URL, TEXTFIX_FLUX_API_KEY (docs/DEPLOY.md)
   draft = F.generate(prompt_en, W, H, seed, refs=[product])   # cùng chữ ký với flux.Flux.generate
 
-Một lời gọi: POST {prompt, width, height, seed, output_format: png, input_image (base64)} kèm header x-key -> {id, polling_url};
+"chat" (máy tự host kiểu vLLM-Omni, OpenAI-compatible): POST {model, messages: [{role: user, content: [text, image_url
+(ảnh tham chiếu, data URL)...]}], extra_body: {width, height, seed, num_inference_steps, guidance_scale}} kèm Bearer khoá
+-> choices[0].message.content[*].image_url.url (data URL PNG, hoặc URL ảnh). Một lời gọi đồng bộ, không hỏi lại.
+
+"bfl" (Black Forest Labs, khuôn api.bfl.ai): POST {prompt, width, height, seed, output_format: png, input_image (base64)} kèm header x-key -> {id, polling_url};
 hỏi polling_url tới khi status "Ready" -> result.sample (URL ký, sống 10 phút) -> tải ảnh. Mặc định nên dùng điểm cuối cố định
 `/v1/flux-2-klein-9b` (không phải `-preview`): cùng seed -> cùng ảnh, chạy lại được.
 `device`: card chạy Hi-SAM / LaMa cho nháp này (FLUX ở xa nên đây chỉ là chỗ đặt hai model gỡ chữ, engine.draw đọc dev_dit).
@@ -50,6 +55,13 @@ class RemoteFlux:
         self.key = key if key is not None else os.environ.get("TEXTFIX_FLUX_API_KEY", "")
         self.timeout = timeout or float(os.environ.get("TEXTFIX_FLUX_TIMEOUT", "120"))
         self.safety = safety if safety is not None else int(os.environ.get("TEXTFIX_FLUX_SAFETY", "2"))
+        self.api = os.environ.get("TEXTFIX_FLUX_API") or ("chat" if self.url.rstrip("/").endswith("/chat/completions") else "bfl")
+        if self.api not in ("chat", "bfl"):
+            raise FluxError(f"TEXTFIX_FLUX_API phải là chat hoặc bfl, không phải {self.api!r}")
+        # khuôn chat: tên model + tham số vẽ của klein bản distill (4 bước, không CFG) như máy tự host đang dùng
+        self.model = os.environ.get("TEXTFIX_FLUX_MODEL", "black-forest-labs/FLUX.2-klein-9B")
+        self.steps = int(os.environ.get("TEXTFIX_FLUX_STEPS", "4"))
+        self.guidance = float(os.environ.get("TEXTFIX_FLUX_GUIDANCE", "1"))
         self.dev_dit = device   # tên giữ như flux.Flux: engine.draw / LaMa đặt model gỡ chữ theo trường này
         if not self.url:
             raise FluxError("chưa đặt TEXTFIX_FLUX_URL")
@@ -58,13 +70,18 @@ class RemoteFlux:
         return self
 
     def info(self) -> dict:
-        return {"variant": "remote", "model": self.url.rstrip("/").rsplit("/", 1)[-1], "url": self.url,
+        if self.api == "chat":
+            return {"variant": "remote", "api": "chat", "model": self.model, "url": self.url, "steps": self.steps,
+                    "guidance": self.guidance, "devices": {"hisam_lama": self.dev_dit}}
+        return {"variant": "remote", "api": "bfl", "model": self.url.rstrip("/").rsplit("/", 1)[-1], "url": self.url,
                 "safety_tolerance": self.safety, "devices": {"hisam_lama": self.dev_dit}}
 
     def generate(self, prompt: str, w: int, h: int, seed: int, refs: list[np.ndarray] | None = None) -> np.ndarray:
         """Vẽ một ảnh w x h (bội số 16) -> RGB uint8 (h, w, 3)."""
         if w % 16 or h % 16:
             raise ValueError(f"cỡ ảnh phải là bội số 16: {w}x{h}")
+        if self.api == "chat":
+            return _fit(self._chat(prompt, w, h, seed, refs or []), w, h)
         body = {"prompt": prompt, "width": w, "height": h, "seed": int(seed), "output_format": "png",
                 "safety_tolerance": self.safety}
         for k, im in enumerate((refs or [])[:4]):   # klein nhận tối đa 4 ảnh: input_image, input_image_2..4
@@ -73,6 +90,30 @@ class RemoteFlux:
         task = self._submit(body, t0)
         sample = self._wait(task, t0)
         return _fit(_decode(self._get(sample, raw=True)), w, h)
+
+    # ------------------------------------------------------------------------------------------------ khuôn chat
+    def _chat(self, prompt: str, w: int, h: int, seed: int, refs: list[np.ndarray]) -> np.ndarray:
+        content = [{"type": "text", "text": prompt}]
+        content += [{"type": "image_url", "image_url": {"url": "data:image/png;base64," + _b64(im)}} for im in refs[:4]]
+        body = {"model": self.model, "messages": [{"role": "user", "content": content}],
+                "extra_body": {"width": w, "height": h, "seed": int(seed), "num_inference_steps": self.steps,
+                               "guidance_scale": self.guidance}}
+        t0 = time.time()
+        while True:
+            try:
+                r = self._post(self.url, body, timeout=self.timeout)
+                break
+            except urllib.error.HTTPError as e:
+                if e.code in (429, 503) and time.time() - t0 < self.timeout:   # máy bận / hàng đợi đầy: chờ rồi gửi lại
+                    time.sleep(BUSY_WAIT)
+                    continue
+                raise FluxError(f"FLUX từ chối yêu cầu (HTTP {e.code}): {_reason(e)}") from e
+            except urllib.error.URLError as e:
+                raise FluxError(f"không gọi được FLUX {self.url}: {e.reason}") from e
+            except TimeoutError as e:
+                raise FluxError(f"FLUX quá {self.timeout:.0f} s chưa vẽ xong") from e
+        url = _chat_image(r)
+        return _decode(base64.b64decode(url.split(",", 1)[1]) if url.startswith("data:") else self._get(url, raw=True))
 
     # ------------------------------------------------------------------------------------------------ HTTP
     def _submit(self, body: dict, t0: float) -> dict:
@@ -102,11 +143,16 @@ class RemoteFlux:
         raise FluxError(f"FLUX quá {self.timeout:.0f} s chưa vẽ xong (việc {task.get('id')})")
 
     def _headers(self) -> dict:
-        return {"accept": "application/json", "x-key": self.key, "Content-Type": "application/json"}
+        h = {"accept": "application/json", "Content-Type": "application/json"}
+        if self.api == "bfl":
+            h["x-key"] = self.key
+        elif self.key:
+            h["Authorization"] = f"Bearer {self.key}"
+        return h
 
-    def _post(self, url: str, body: dict) -> dict:
+    def _post(self, url: str, body: dict, timeout: float = 60) -> dict:
         req = urllib.request.Request(url, json.dumps(body).encode(), self._headers(), method="POST")
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read())
 
     def _get(self, url: str, raw: bool = False):
@@ -119,6 +165,31 @@ class RemoteFlux:
         except urllib.error.URLError as e:
             raise FluxError(f"mất kết nối FLUX: {e.reason}") from e
         return data if raw else json.loads(data)
+
+
+def _chat_image(r: dict) -> str:
+    """Ảnh trong câu trả lời khuôn chat: phần image_url đầu tiên của message.content (hoặc content là chuỗi data URL / URL)."""
+    try:
+        content = r["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        raise FluxError(f"FLUX trả câu trả lời lạ (không có choices[0].message): {_brief(r)}") from None
+    parts = content if isinstance(content, list) else [content]
+    for p in parts:
+        url = p if isinstance(p, str) else (p.get("image_url") or {}).get("url") if isinstance(p, dict) else None
+        if isinstance(url, str) and url.startswith(("data:image", "http://", "https://")):
+            return url
+    raise FluxError(f"FLUX không trả ảnh: {_brief(r)}")
+
+
+def _brief(r) -> str:
+    """Câu trả lời rút gọn cho thông báo lỗi (cắt chuỗi base64 dài)."""
+    def cut(x):
+        if isinstance(x, dict):
+            return {k: cut(v) for k, v in x.items()}
+        if isinstance(x, list):
+            return [cut(v) for v in x]
+        return x[:80] + "..." if isinstance(x, str) and len(x) > 80 else x
+    return json.dumps(cut(r), ensure_ascii=False)[:400]
 
 
 def _result_url(url: str, task_id: str) -> str:

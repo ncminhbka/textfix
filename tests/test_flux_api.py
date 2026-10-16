@@ -118,3 +118,80 @@ def test_gateway_speaks_the_same_api_as_the_client(monkeypatch):
     img = F.generate("x", 64, 48, 5, refs=[np.zeros((8, 8, 3), np.uint8)])
     srv.should_exit = True
     assert img.shape == (48, 64, 3) and img[0, 0, 0] == 16
+
+
+# ---------------------------------------------------------------------------------------------- khuôn chat (vLLM-Omni)
+class FakeChat:
+    """Thay urlopen: POST /chat/completions trả ảnh trong choices[0].message.content (data URL), hoặc lỗi / bận."""
+
+    def __init__(self, content=None, busy=0, size=(64, 48)):
+        self.busy, self.size, self.content = busy, size, content
+        self.posts, self.headers = [], []
+
+    def __call__(self, req, timeout=None):
+        self.headers.append(dict(req.header_items()))
+        if self.busy:
+            self.busy -= 1
+            raise urllib.error.HTTPError(req.full_url, 503, "busy", {}, io.BytesIO(b"queue full"))
+        self.posts.append(json.loads(req.data))
+        import base64
+        url = "data:image/png;base64," + base64.b64encode(png(*self.size)).decode()
+        content = self.content if self.content is not None else [{"type": "image_url", "image_url": {"url": url}}]
+        return io.BytesIO(json.dumps({"choices": [{"message": {"role": "assistant", "content": content}}]}).encode())
+
+
+def chat_client(monkeypatch, f):
+    monkeypatch.setattr(remote, "BUSY_WAIT", 0)
+    monkeypatch.setattr(remote.urllib.request, "urlopen", f)
+    monkeypatch.delenv("TEXTFIX_FLUX_API", raising=False)
+    return remote.RemoteFlux(url="http://flux.test:8007/v1/chat/completions", key="k", device="cpu", timeout=5)
+
+
+def test_chat_api_is_picked_from_the_url_and_sends_size_seed_refs(monkeypatch):
+    f = FakeChat(size=(70, 50))
+    F = chat_client(monkeypatch, f)
+    assert F.api == "chat" and F.info()["model"] == "black-forest-labs/FLUX.2-klein-9B"
+    img = F.generate("a poster", 64, 48, 7, refs=[np.zeros((10, 10, 3), np.uint8)])
+    assert img.shape == (48, 64, 3) and img[0, 0].tolist() == [200, 30, 30]   # lệch cỡ -> đưa về cỡ đã hẹn
+    b = f.posts[0]
+    parts = b["messages"][0]["content"]
+    assert parts[0] == {"type": "text", "text": "a poster"}
+    assert parts[1]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert {k: b["extra_body"][k] for k in ("width", "height", "seed")} == {"width": 64, "height": 48, "seed": 7}
+    assert f.headers[0].get("Authorization") == "Bearer k" and "X-key" not in f.headers[0]
+
+
+def test_chat_api_busy_then_ok_and_no_image_is_an_error(monkeypatch):
+    f = FakeChat(busy=2)
+    assert chat_client(monkeypatch, f).generate("x", 64, 48, 0).shape == (48, 64, 3) and len(f.posts) == 1
+    with pytest.raises(remote.FluxError, match="không trả ảnh"):
+        chat_client(monkeypatch, FakeChat(content="xin lỗi, tôi không vẽ được")).generate("x", 64, 48, 0)
+
+
+def test_gateway_speaks_the_chat_api_too(monkeypatch):
+    import importlib.util
+    import socket
+    import threading
+    import time
+
+    import uvicorn
+    spec = importlib.util.spec_from_file_location("flux_gateway", "scripts/flux_gateway.py")
+    gw = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gw)
+
+    class Fake:
+        def generate(self, prompt, w, h, seed, refs=None):
+            return np.full((h, w, 3), 10 + seed % 200 + (len(refs) if refs else 0), np.uint8)
+    threading.Thread(target=gw.worker, args=(Fake(),), daemon=True).start()
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    srv = uvicorn.Server(uvicorn.Config(gw.app, host="127.0.0.1", port=port, log_level="error"))
+    threading.Thread(target=srv.run, daemon=True).start()
+    while not srv.started:
+        time.sleep(0.05)
+    monkeypatch.delenv("TEXTFIX_FLUX_API", raising=False)
+    F = remote.RemoteFlux(url=f"http://127.0.0.1:{port}/v1/chat/completions", key="", device="cpu", timeout=20)
+    img = F.generate("x", 64, 48, 5, refs=[np.zeros((8, 8, 3), np.uint8)])
+    srv.should_exit = True
+    assert img.shape == (48, 64, 3) and img[0, 0, 0] == 16

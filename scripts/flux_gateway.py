@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""MÁY FLUX GIẢ theo khuôn API của BFL (api.bfl.ai), vẽ bằng FLUX.2-klein 4B tại chỗ -- để chạy thử bản docker (FLUX ở máy
+"""MÁY FLUX GIẢ nói cả hai khuôn API của textfix/draw/remote.py (BFL api.bfl.ai, và chat kiểu vLLM-Omni), vẽ bằng
+FLUX.2-klein 4B tại chỗ -- để chạy thử bản docker (FLUX ở máy
 khác, textfix/draw/remote.py) ngay trên notebook khi chưa nối được tới FLUX 9B thật.
 
   python scripts/flux_gateway.py --port 8010 --device cuda:0
@@ -8,11 +9,14 @@ khác, textfix/draw/remote.py) ngay trên notebook khi chưa nối được tớ
   POST /v1/<tên model>        {prompt, width, height, seed, input_image[, input_image_2..4]} -> {id, polling_url}
   GET  /v1/get_result?id=...  {id, status: Pending | Ready | Error, result: {sample}}
   GET  /v1/sample/<id>.png    ảnh
+  POST /v1/chat/completions   {model, messages: [{content: [text, image_url...]}], extra_body: {width, height, seed}}
+                              -> choices[0].message.content[0].image_url.url (data URL PNG); đợi vẽ xong mới trả
 Một bản FLUX, vẽ lần lượt (hàng đợi); kết quả giữ trong bộ nhớ 30 phút.
 """
 from __future__ import annotations
 
 import argparse
+import asyncio
 import base64
 import io
 import os
@@ -75,6 +79,32 @@ async def submit(model: str, req: Request):
     return {"id": tid, "polling_url": f"{base}/v1/get_result?id={tid}"}
 
 
+@app.post("/v1/chat/completions")
+async def chat(req: Request):
+    body = await req.json()
+    parts = (body.get("messages") or [{}])[-1].get("content")
+    parts = parts if isinstance(parts, list) else [{"type": "text", "text": parts or ""}]
+    prompt = " ".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
+    refs = [(p.get("image_url") or {}).get("url", "") for p in parts if p.get("type") == "image_url"]
+    x = body.get("extra_body") or {}
+    if not prompt:
+        raise HTTPException(422, "cần một phần text trong messages")
+    task = {"prompt": prompt, "width": int(x.get("width") or 1024), "height": int(x.get("height") or 1024), "seed": x.get("seed")}
+    task.update({("input_image" if k == 0 else f"input_image_{k + 1}"): u for k, u in enumerate(refs[:4])})
+    tid = uuid.uuid4().hex[:12]
+    TASKS[tid] = {"status": "Pending", "body": task, "t": time.time()}
+    Q.put(tid)
+    while TASKS[tid]["status"] in ("Pending", "Generating"):
+        await asyncio.sleep(0.2)
+    t = TASKS.pop(tid)
+    if t["status"] != "Ready":
+        raise HTTPException(500, t.get("details") or "lỗi vẽ")
+    url = "data:image/png;base64," + base64.b64encode(t["png"]).decode()
+    return {"id": tid, "object": "chat.completion", "model": body.get("model"),
+            "choices": [{"index": 0, "finish_reason": "stop",
+                         "message": {"role": "assistant", "content": [{"type": "image_url", "image_url": {"url": url}}]}}]}
+
+
 @app.get("/v1/get_result")
 async def result(id: str, req: Request):
     t = TASKS.get(id)
@@ -111,7 +141,8 @@ def main() -> None:
     print(f"nạp FLUX {a.model} lên {a.device} ...", flush=True)
     F = Flux(a.model, weights_dir=a.weights_dir, device=a.device).load()
     threading.Thread(target=worker, args=(F,), daemon=True).start()
-    print(f"sẵn sàng: http://localhost:{a.port}/v1/flux-2-klein-4b", flush=True)
+    print(f"sẵn sàng: http://localhost:{a.port}/v1/flux-2-klein-4b (BFL) | http://localhost:{a.port}/v1/chat/completions (chat)",
+          flush=True)
     uvicorn.run(app, host=a.host, port=a.port, log_level="warning")
 
 
