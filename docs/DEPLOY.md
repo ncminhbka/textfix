@@ -36,8 +36,8 @@ python server/app.py --port 8088
 curl -s localhost:8088/api/health        # "ready": true, "flux": {"variant": "remote", ...}
 ```
 
-`flux2/` và `requirements` phần FLUX (`transformers`, `accelerate`, `safetensors`) không dùng khi FLUX ở máy khác; để nguyên
-cũng không sao. `bench/`, `scripts/` (trừ `check_server.py`), `tests/` không cần để chạy.
+Gói `flux2` (mã BFL, không đi kèm repo) và `requirements` phần FLUX (`transformers`, `accelerate`, `safetensors`) không dùng
+khi FLUX ở máy khác; cài `requirements` nguyên vẹn cũng không sao. `bench/`, `scripts/` (trừ `check_server.py`), `tests/` không cần để chạy.
 
 ### Hi-SAM và LaMa
 

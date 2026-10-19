@@ -27,3 +27,18 @@ Thumbs.db
 # ảnh sản phẩm tham chiếu của bộ thử (nhỏ, có giấy phép: bench/refs/SOURCES.md)
 !bench/refs/*.jpg
 build/
+
+# mã suy luận FLUX.2 của Black Forest Labs: cài riêng, không đi kèm repo (docs/SERVER.md)
+flux2/
+
+# tài liệu cá nhân / báo cáo / bản ghi demo: không vào repo
+*.7z
+*.7z.*
+TextFix - SFive video/
+docs/*.docx
+docs/*.doc
+docs/*.pdf
+docs/*.pptx
+docs/*.xlsx
+~$*
+prompt_test.txt

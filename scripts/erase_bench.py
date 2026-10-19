@@ -30,9 +30,9 @@ ap.add_argument("--only", default="")
 ap.add_argument("--recheck", action="store_true")
 ap.add_argument("--sheet", action="store_true")
 a = ap.parse_args()
-from textfix import erase
-from textfix.draw import hisam
-from textfix.lines import ocr
+from textfix import erase  # noqa: E402
+from textfix.draw import hisam  # noqa: E402
+from textfix.lines import ocr  # noqa: E402
 from textfix.lines.detect import reorient   # noqa: E402
 from textfix.compose import vlm as cvlm   # noqa: E402
 

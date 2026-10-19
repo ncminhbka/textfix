@@ -38,7 +38,7 @@ def build(draft: np.ndarray, ink: np.ndarray, product: bool = False) -> dict:
         l["ocr_box"] = list(l["box"])
     I: list = []
     glog, masks = [], {}
-    L, I, glog, masks = _geo_lines(L, I, draft, A, ink, [])
+    L, I, glog, masks = _geo_lines(L, I, draft, A, ink)
     L, olog = _orphans(L, draft, ink, masks)
     L, glog = _renumber(L, [], [], glog + olog)
     for l in L:

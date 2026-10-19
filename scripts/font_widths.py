@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """ĐO ĐỘ RỘNG CHỮ của từng font trong fonts.CATALOG (Chromium, đúng renderer): em / ký tự, chữ thường lẫn hoa và chữ IN HOA,
-ở độ đậm đậm nhất <= 800 font có -> in bảng WIDTH để dán vào textfix/fonts.py. Chạy lại khi thêm font.
+ở độ đậm đậm nhất <= 800 font có -> in bảng WIDTH để dán vào textfix/render/fonts.py. Chạy lại khi thêm font.
 
   python scripts/font_widths.py
 """

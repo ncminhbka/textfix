@@ -18,6 +18,17 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, ".")
+from textfix import erase, render  # noqa: E402
+from textfix.compose import vlm as cvlm  # noqa: E402
+from textfix.compose.assign import resolve  # noqa: E402
+from textfix.compose.layout import layout, public  # noqa: E402
+from textfix.draw import hisam  # noqa: E402
+from textfix.lines.detect import reorient  # noqa: E402
+from textfix.lines.glyph import measure  # noqa: E402
+from textfix.lines.printed import _flat  # noqa: E402
+from textfix.render.browser import Browser  # noqa: E402
+
+_EM = {}   # font -> (cao chữ H, cao chữ x) theo em
 
 
 def letter_em(font, text, upper):
@@ -42,17 +53,6 @@ def letter_em(font, text, upper):
     tall = upper or any(c.isupper() or c.isdigit() or c in "bdfhkltgjpqy" for c in base)
     return _EM[font][0 if tall else 1]
 
-
-_EM = {}
-from textfix import erase, render
-from textfix.draw import hisam
-from textfix.compose.layout import layout, public
-from textfix.compose.assign import resolve
-from textfix.lines.printed import _flat
-from textfix.lines.detect import reorient   # noqa: E402
-from textfix.compose import vlm as cvlm   # noqa: E402
-from textfix.render.browser import Browser   # noqa: E402
-from textfix.lines.glyph import measure   # noqa: E402
 
 ap = argparse.ArgumentParser()
 ap.add_argument("out")

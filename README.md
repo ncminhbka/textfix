@@ -28,6 +28,7 @@ Máy chủ GPU (2x A30, JupyterLab): [docs/SERVER.md](docs/SERVER.md).
 ```bash
 pip install -r requirements.txt
 export TEXTFIX_LLM_URL=http://<host>:<port>/v1 TEXTFIX_MODEL=<model nhìn được ảnh> TEXTFIX_LLM_API_KEY=<khoá>
+ruff check . && python -m pytest            # kiểm mã + test (không cần GPU / model)
 python scripts/check_server.py --fix        # kiểm môi trường, phải in "SẴN SÀNG."
 bash scripts/start_server.sh                # giao diện ở cổng 8088
 python scripts/dev_batch.py bench/accept2.json   # chạy một tập qua máy chủ đang bật, báo cáo + một zip
@@ -52,12 +53,11 @@ Docker demo build ngay trên notebook (FLUX 9B / LLM / VLM ở máy khác): [doc
 | `textfix/render/` | 5. `page` (dựng trong Chromium; mã trang ở `js`), `check` (bộ kiểm, tương phản), `fix` (vòng sửa), `geometry`, `style`, `view`; `fonts` (bộ font OFL đủ dấu tiếng Việt), `browser` |
 | `textfix/tools/` | Không thuộc dây chuyền: `multigpu` (chạy hàng loạt trên mọi card), `ship` (zip < 24 MB tự tải về, JupyterLab), `audit` (cờ nghi hỏng) |
 | `textfix/config.py`, `llm.py`, `color.py` | Biến môi trường, gọi LLM / VLM (OpenAI-compatible), màu CIELAB |
-| `server/` | Máy chủ FastAPI ([docs/API.md](docs/API.md)) + giao diện demo (form như app, xem debug từng bước). Test: `tests/test_api.py` |
+| `server/` | Máy chủ FastAPI ([docs/API.md](docs/API.md)): `app` (dây chuyền, HTTP), `contract` (form từng loại, kiểm đầu vào, mã lỗi), `ui.html` (giao diện demo: form như app, xem debug từng bước). Test: `tests/test_api.py` |
 | `scripts/dev_batch.py`, `batch_report.py` | Chạy một tập qua máy chủ, báo cáo + một zip |
 | `scripts/replay.py`, `erase_bench.py`, `lines_bench.py` | Máy cá nhân: dựng lại poster / đo bước gỡ chữ / đo bước đo dòng (`bench/lines_gt`) trên nháp đã lưu |
 | `docker/` | Image demo: `build.sh` (gom code + trọng số Hi-SAM / LaMa + Chromium, build), `Dockerfile`, `run.sh`, `textfix.env.example` ([docs/DOCKER.md](docs/DOCKER.md)) |
 | `scripts/golden.py` | Dấu vân tay trạm thiết kế: tái cấu trúc mã thì chạy `record` trước, `check` sau, phải "khớp hết" |
-| `flux2/` | Mã suy luận FLUX.2 của Black Forest Labs (Apache-2.0), nguyên trạng |
 | `assets/` | Font (OFL) |
 
 Tên cũ (trước 15/10, còn gặp trong `docs/TUNING.md`, `docs/ROADMAP.md`): `slots.py` → `lines/` (+ `compose/call.py`),
@@ -67,5 +67,7 @@ Tên cũ (trước 15/10, còn gặp trong `docs/TUNING.md`, `docs/ROADMAP.md`):
 
 ## Giấy phép tài nguyên
 
-- `flux2/`: Apache-2.0 (Black Forest Labs), xem `flux2/LICENSE.md`.
+- FLUX.2-klein tại chỗ (`textfix/draw/flux.py`) gọi mã suy luận FLUX.2 của Black Forest Labs (gói `flux2`, Apache-2.0,
+  [github.com/black-forest-labs/flux2](https://github.com/black-forest-labs/flux2)). Mã đó **không** nằm trong repo này: cài
+  riêng ([docs/SERVER.md](docs/SERVER.md)); FLUX ở máy khác thì không cần.
 - Font trong `assets/fonts/`: SIL Open Font License.

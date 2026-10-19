@@ -6,7 +6,8 @@ FLUX vẽ mọi chuỗi trong ngoặc kép nó đọc được và chỉ những
   3. chuỗi không thuộc danh sách: từ tả tiếng Anh thì bỏ ngoặc; chữ lạ thì bỏ (cả câu nếu câu chỉ mang chữ lạ);
   4. câu nhắc lại lần hai bỏ ngoặc; bỏ tỉ lệ / độ phân giải;
   5. câu chưa có thì chèn sau câu đầu (FLUX cắt phần cuối khi quá dài, nên không nối vào cuối);
-  6. quá giới hạn token thì bỏ dần câu tả cảnh ở cuối.
+  6. ảnh tham chiếu kho (món / trang phục Việt) chưa được nhắc "image N" thì chèn câu nhắc sau câu đầu;
+  7. quá giới hạn token thì bỏ dần câu tả cảnh ở cuối.
 """
 
 from __future__ import annotations
@@ -36,8 +37,8 @@ def unify_quotes(pe: str) -> str:
     return QUOTED.sub(lambda m: m.group(1) if IMAGE_REF.search(m.group(1)) else m.group(0), pe)
 
 
-def compose(pe: str, texts: list[dict], rewrites: list[tuple[str, str]]) -> tuple[str, Notes]:
-    """Áp hợp đồng (xem đầu tệp) lên một prompt. -> (prompt, nhật ký)."""
+def compose(pe: str, texts: list[dict], rewrites: list[tuple[str, str]], refs: list[tuple[int, str]] = ()) -> tuple[str, Notes]:
+    """Áp hợp đồng (xem đầu tệp) lên một prompt. refs: (số ảnh, tên món tiếng Anh) của ảnh kho. -> (prompt, nhật ký)."""
     notes = Notes()
     for old, new in rewrites:
         pe = pe.replace(old, new)
@@ -47,6 +48,7 @@ def compose(pe: str, texts: list[dict], rewrites: list[tuple[str, str]]) -> tupl
     pe = _quote_once(pe)
     pe = _outside_quotes(pe, lambda s: ORPHAN_PUNCT.sub("", RATIO.sub("", s)))
     pe = _insert_missing(pe, texts, notes)
+    pe = _cite_refs(pe, refs, notes)
     pe = _fit(" ".join(pe.split()), notes)
     return pe, notes
 
@@ -134,6 +136,21 @@ def _insert_missing(pe: str, texts: list[dict], notes: Notes) -> str:
     notes["quoted_added"] = miss
     s = _sentences(pe)
     add = " The poster also shows the texts " + ", ".join(f'"{t}"' for t in miss) + "."
+    if not s:
+        return add.strip()
+    head = s[0].rstrip()
+    return head + ("" if head[-1:] in ".!?" else ".") + add + "".join(s[1:])
+
+
+def _cite_refs(pe: str, refs: list[tuple[int, str]], notes: Notes) -> str:
+    """Ảnh kho FLUX nhận mà prompt không nhắc "image N" thì FLUX không biết ảnh đó là món nào: chèn câu nhắc sau câu đầu."""
+    said = {int(m.group(0)[-1]) for m in IMAGE_REF.finditer(pe)}
+    miss = [(n, name) for n, name in refs if n not in said]
+    if not miss:
+        return pe
+    notes["refs_cited"] = [f"{name} = image {n}" for n, name in miss]
+    add = "".join(f" The {name} looks exactly like the {name} from image {n}." for n, name in miss)
+    s = _sentences(pe)
     if not s:
         return add.strip()
     head = s[0].rstrip()

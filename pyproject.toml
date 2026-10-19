@@ -1,0 +1,11 @@
+# Cấu hình công cụ (thư viện cài theo requirements.txt). Kiểm: ruff check . && python -m pytest
+[tool.ruff]
+line-length = 130
+target-version = "py310"
+
+[tool.ruff.lint]
+# `l` là tên quen của một DÒNG chữ (M["L"]) trong cả dây chuyền: giữ cho mã ngắn, đọc theo docs
+ignore = ["E741"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

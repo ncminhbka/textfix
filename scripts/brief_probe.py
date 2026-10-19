@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MÁY CHỦ: chạy RIÊNG bước LLM đầu luồng (textfix/brief.py) trên các tập dev / accept -- không vẽ, không cần GPU, chỉ cần
+"""MÁY CHỦ: chạy RIÊNG bước LLM đầu luồng (textfix/brief/) trên các tập dev / accept -- không vẽ, không cần GPU, chỉ cần
 TEXTFIX_LLM_URL / TEXTFIX_MODEL như máy chủ. Mỗi ca: request -> brief (texts, prompt_en, log, số token FLUX). Gói một zip nhẹ để
 so với brief của lượt chạy trước tại máy cá nhân. Không chạy tập thi (final*).
 
@@ -30,7 +30,7 @@ def main() -> None:
     ap.add_argument("--fresh", action="store_true", help="không đọc cache LLM")
     ap.add_argument("--threads", type=int, default=8)
     a = ap.parse_args()
-    from server.app import GenerateRequest, form_of
+    from server.contract import GenerateRequest, form_of
     from textfix import config
     from textfix.tools import ship
     from textfix.brief import SCHEMA, count_tokens, make_brief

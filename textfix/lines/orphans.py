@@ -35,7 +35,7 @@ def _orphans(L: list, draft: np.ndarray, ink: np.ndarray, masks: dict) -> tuple[
         return L, []
     hm = float(np.median(hs))
     k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * int(round(0.8 * hm)) + 1, 2 * int(round(0.8 * hm)) + 1))   # mọi hướng: chữ chạy vòng
-    nb, bc, bst, _c = cv2.connectedComponentsWithStats(cv2.morphologyEx(rest.astype(np.uint8), cv2.MORPH_CLOSE, k), 8)
+    nb, bc, _st, _c = cv2.connectedComponentsWithStats(cv2.morphologyEx(rest.astype(np.uint8), cv2.MORPH_CLOSE, k), 8)
     found = []
     for i in range(1, nb):
         sel = rest & (bc == i)

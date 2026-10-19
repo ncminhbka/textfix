@@ -21,7 +21,7 @@ import time
 
 import numpy as np
 
-from . import config
+from . import config, kho
 
 
 class Engine:
@@ -82,7 +82,7 @@ def draw(flux, B: dict, W: int, H: int, seed: int, product: np.ndarray | None = 
     if draft is None:
         progress("FLUX vẽ nháp")
         t0 = time.time()
-        draft = flux.generate(B["prompt_en"], W, H, seed, refs=[product] if product is not None else None)
+        draft = flux.generate(B["prompt_en"], W, H, seed, refs=kho.refs_for_draw(B, product) or None)   # ảnh khách là image 1, rồi ảnh kho
         T["ve_nhap"] = time.time() - t0
     if B.get("mode") == "image":   # ảnh thường (không chữ khách): FLUX vẽ là xong
         return {"draft": draft, "timing": T}
@@ -126,7 +126,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     t0 = time.time()
     progress("gỡ chữ (LaMa)")
     elog = []
-    clean, mask_all = erase.erase(draft, ink, M, device=d.get("device"), log=elog)
+    clean, _ = erase.erase(draft, ink, M, device=d.get("device"), log=elog)
     T["go_chu"] = time.time() - t0
 
     def base_of(U_, log_=None):
@@ -162,7 +162,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
         U2, flog2 = render.autofix_units(U, errs, res)
         if not flog2:
             break
-        poster2, res2, rlog2 = render.render_units(page, base, U2, M)
+        poster2, res2, _ = render.render_units(page, base, U2, M)
         errs2 = render.check_units(U2, res2)
         ok = (sev(errs2), len(errs2)) < (sev(errs), len(errs))
         log += [f"-- sửa bằng code {k + 1} --"] + flog2 + [f"LỖI CÒN: {e}" for e in errs2] + \

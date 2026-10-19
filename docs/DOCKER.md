@@ -90,7 +90,8 @@ Image không phụ thuộc máy build. Cần ở máy chạy:
   Toolkit** (`docker info | grep -i runtimes` có `nvidia`). Thiếu một trong ba: container vẫn chạy, Hi-SAM + LaMa trên CPU (chậm).
   Lúc khởi động `docker logs` in sẵn: bản torch / CUDA, driver, từng card và VRAM trống, có dùng được GPU không.
   Máy driver cũ: thử thêm `-e TEXTFIX_KEEP_COMPAT=1` (giữ thư viện CUDA compat của image).
-- Gọi tới được FLUX 9B, LLM, VLM (các URL trong tệp env).
+- Gọi tới được FLUX 9B, LLM, VLM (các URL trong tệp env). LLM / VLM phải nhận `response_format` kiểu `json_schema` strict
+  (vLLM: có sẵn; VLM ghép câu chỉ gọi một lần, dựa vào khuôn này để không bỏ sót dòng) — `check_server.py` kiểm mục này.
 
 Chuyển image: qua kho nội bộ (cần quyền đẩy vào namespace đích)
 ```bash

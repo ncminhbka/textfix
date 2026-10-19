@@ -78,8 +78,9 @@ def clean_form(form: dict | None) -> dict:
 
 
 def request_message(prompt: str | None, form: dict, design: dict | None, product_image: bool, n_variants: int,
-                    aspect: str | None) -> str:
-    """Thông điệp người dùng gửi LLM: form, prompt, gợi ý thiết kế (không phải chữ), số hướng thiết kế cần."""
+                    aspect: str | None, refs: list[tuple[int, str]] = ()) -> str:
+    """Thông điệp người dùng gửi LLM: form, prompt, gợi ý thiết kế (không phải chữ), số hướng thiết kế cần.
+    refs: (số ảnh, tên tiếng Anh) của ảnh kho tham chiếu (món / trang phục / vật Tết Việt Nam) đưa kèm cho FLUX."""
     parts = []
     if form:
         parts.append("Form (JSON):\n" + json.dumps(form, ensure_ascii=False, indent=1))
@@ -96,6 +97,11 @@ def request_message(prompt: str | None, form: dict, design: dict | None, product
                      "feature exactly that product (call it the product from image 1, without quotes, in prompt_en). The product "
                      "keeps its own printed label, logo and text exactly as in the photo: never describe, quote or ask for any text "
                      "ON the product, and never place a poster text on it -- poster texts go around the product")
+    for n, name in refs:
+        hints.append(f"reference image {n} shows an authentic {name} (a Vietnamese specialty the image model may not know): "
+                     f"wherever the {name} appears, call it the {name} from image {n} (without quotes) in prompt_en and every "
+                     "variant, so it is drawn like that photo. The photo only shows how it looks: never copy any writing, "
+                     "sign or background from it")
     if aspect in ORIENT:
         hints.append(f"canvas: {ORIENT[aspect]} -- compose the whole layout for this shape and describe it with words like "
                      "horizontal / vertical / square, never as a ratio")

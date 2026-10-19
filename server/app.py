@@ -40,13 +40,12 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -69,139 +68,9 @@ JOBS: dict[str, dict] = {}
 ORDER: list[str] = []   # hàng đợi (job chưa xong), để báo vị trí
 
 # ---------------------------------------------------------------------------------------------------- form
-# trường NỘI DUNG từng loại form (khớp UI); trường chung cửa hàng gửi cho mọi loại
-CATEGORY_FIELDS = {
-    "promo": ["title", "discount", "applied_product", "date_start", "date_end"],
-    "product_intro": ["title", "product_name", "product_desc", "highlights", "price"],
-    "opening": ["title", "opening_date", "opening_promo", "booking_contact"],
-    "feedback": ["title", "feedback_target", "feedback_quote", "feedback_highlights", "special_offer"],
-    "recruitment": ["title", "job_position", "job_desc", "apply_deadline", "apply_method"],
-    "guide": ["title"],
-}
-REQUIRED = {"promo": ["discount"], "product_intro": ["product_name", "product_desc"], "opening": ["opening_date"],
-            "feedback": ["feedback_target", "feedback_quote"], "recruitment": ["job_position", "apply_deadline", "apply_method"],
-            "guide": []}   # như form của app: hướng dẫn không trường nào bắt buộc (không bước nào: LLM viết theo tiêu đề / prompt)
-MAX_IMAGES = 4
-RATIOS = ["1:1", "4:5", "9:16", "16:9"]   # 4 tỉ lệ của app (bộ vẽ có thêm 3:4, 2:3, 4:3 -- flux.SIZES -- app không dùng)
-
-
-class ApiError(Exception):
-    """Lỗi trả cho người gọi API: mã cố định (docs/API.md), bước hỏng, thông điệp."""
-
-    def __init__(self, code: str, stage: str, message: str = ""):
-        super().__init__(message or code)
-        self.code, self.stage, self.message = code, stage, message or code
-
-    def as_dict(self) -> dict:
-        return {"code": self.code, "stage": self.stage, "message": self.message}
-
-
-def failure(code: str, stage: str, e: BaseException | None = None) -> dict:
-    return {"code": code, "stage": stage, "message": f"{type(e).__name__}: {e}" if e else code}
-
-
-def draw_error(e: BaseException, stage: str) -> dict:
-    """Trạm VẼ hỏng: máy FLUX lọc nội dung -> draw_moderated (không phải lỗi của TextFix), còn lại draw_failed."""
-    from textfix.draw.remote import FluxModerated
-    return failure("draw_moderated" if isinstance(e, FluxModerated) else "draw_failed", stage, e)
-
-
-# bước thiết kế (engine.design báo qua progress) -> mã lỗi khi hỏng ở bước đó
-DESIGN_STAGES = (("đo dòng", "lines_failed"), ("gỡ chữ", "erase_failed"), ("VLM", "vlm_failed"), ("dựng", "render_failed"))
-COMMON = ["store_name", "phone", "address", "website_link"]
-
-
-class GenerateRequest(BaseModel):
-    model_config = ConfigDict(extra="allow")   # khoá lạ không làm hỏng yêu cầu: báo lại trong "ignored_fields"
-    category: str = "promo"
-    # thông tin chung theo loại
-    title: Optional[str] = ""
-    discount: Optional[str] = ""
-    applied_product: Optional[str] = ""
-    date_start: Optional[str] = ""
-    date_end: Optional[str] = ""
-    product_name: Optional[str] = ""
-    product_desc: Optional[str] = ""
-    highlights: Optional[str] = ""
-    price: Optional[str] = ""
-    opening_date: Optional[str] = ""
-    opening_promo: Optional[str] = ""
-    booking_contact: Optional[str] = ""
-    feedback_target: Optional[str] = ""
-    feedback_quote: Optional[str] = ""
-    feedback_highlights: Optional[str] = ""
-    special_offer: Optional[str] = ""
-    job_position: Optional[str] = ""
-    job_desc: Optional[str] = ""
-    apply_deadline: Optional[str] = ""
-    apply_method: Optional[str] = ""
-    guide_steps: Optional[List[str]] = None
-    prompt: Optional[str] = ""
-    image_base64: Optional[str] = None   # ảnh sản phẩm tải lên (data URI hoặc base64)
-    # cửa hàng
-    store_name: Optional[str] = ""
-    phone: Optional[str] = ""
-    address: Optional[str] = ""
-    website_link: Optional[str] = ""
-    # hiển thị / thiết kế
-    style_pref: Optional[str] = "auto"
-    primary_color: Optional[str] = None
-    aspect_ratio: str = "1:1"
-    num_images: int = 1
-    seed: Optional[int] = None
-
-
-def form_of(req: GenerateRequest) -> dict:
-    """Chỉ trường thuộc loại form đang chọn + trường cửa hàng, bỏ ô trống. Các bước hướng dẫn -> step_1, step_2..."""
-    cat = req.category if req.category in CATEGORY_FIELDS else "promo"
-    out: dict = {"category": cat}
-    for k in CATEGORY_FIELDS[cat] + COMMON:
-        v = (getattr(req, k) or "").strip()
-        if v:
-            out[k] = v
-    if cat == "guide":
-        for i, s in enumerate([s.strip() for s in req.guide_steps or [] if s and s.strip()], 1):
-            out[f"step_{i}"] = s
-    return out
-
-
-def missing_fields(req: GenerateRequest, form: dict) -> list[str]:
-    """Trường bắt buộc -- chỉ khi KHÔNG có prompt (có prompt thì prompt quyết)."""
-    if (req.prompt or "").strip():
-        return []
-    return [k for k in REQUIRED.get(form["category"], []) if k not in form]
-
-
-def ignored_fields(req: GenerateRequest) -> list[str]:
-    """Trường có giá trị nhưng không thuộc loại form đang chọn, và khoá lạ: bỏ qua, báo lại cho người gọi."""
-    own = set(CATEGORY_FIELDS.get(req.category, [])) | set(COMMON) | ({"guide_steps"} if req.category == "guide" else set())
-    content = {k for fs in CATEGORY_FIELDS.values() for k in fs} | {"guide_steps"}
-    return [k for k in sorted(content - own) if getattr(req, k, None)] + sorted((req.model_extra or {}).keys())
-
-
-def validate(req: GenerateRequest) -> None:
-    """Đầu vào sai -> 422 với mã cố định (người gọi sửa được; không tự đoán thay)."""
-    if req.category not in CATEGORY_FIELDS:
-        raise HTTPException(422, {"code": "invalid_category", "value": req.category, "allowed": sorted(CATEGORY_FIELDS)})
-    if req.aspect_ratio not in RATIOS:
-        raise HTTPException(422, {"code": "invalid_aspect_ratio", "value": req.aspect_ratio, "allowed": RATIOS})
-    if not 1 <= int(req.num_images or 0) <= MAX_IMAGES:
-        raise HTTPException(422, {"code": "invalid_num_images", "value": req.num_images, "allowed": [1, MAX_IMAGES]})
-    if req.image_base64:
-        try:
-            decode_image(req.image_base64)
-        except Exception as e:
-            raise HTTPException(422, {"code": "invalid_image", "message": f"{type(e).__name__}: {e}"})
-
-
-def decode_image(b64: str | None) -> np.ndarray | None:
-    if not b64:
-        return None
-    from PIL import Image
-    raw = base64.b64decode(b64.split(",", 1)[1] if "," in b64 else b64)
-    im = Image.open(io.BytesIO(raw)).convert("RGB")
-    im.thumbnail((1024, 1024))
-    return np.asarray(im)
+# hợp đồng API (form từng loại, kiểm đầu vào, mã lỗi): server/contract.py
+from contract import (DESIGN_STAGES, ApiError, GenerateRequest, decode_image, draw_error, failure,  # noqa: E402
+                      form_of, ignored_fields, missing_fields, validate)
 
 
 # ---------------------------------------------------------------------------------------------------- dây chuyền
@@ -361,7 +230,7 @@ def design_one(job: dict, v: dict, d: dict, Bv: dict, product: bool, vd: Path, u
         if first:
             save(r["poster_first"], vd / "poster_first.png")
         timing = {"llm": t_llm, **r["timing"]}
-        (vd / "plan.json").write_text(json.dumps(jsonable({"seed": v["seed"], "direction": v.get("direction"), "prompt_en": Bv["prompt_en"],
+        (vd / "plan.json").write_text(json.dumps(jsonable({"seed": v["seed"], "direction": v.get("direction"), "prompt_en": Bv["prompt_en"], "kho": Bv.get("kho") or [],
                                                            "timing": timing, **P}), ensure_ascii=False, indent=1), encoding="utf-8")
         v.update(status="done", stage="", poster_url=f"{url}/poster.png", steps_url=f"{url}/steps.jpg", ops_url=f"{url}/ops.jpg",
                  slots_url=f"{url}/slots.jpg", plan_url=f"{url}/plan.json", hisam_url=f"{url}/hisam.jpg", ink_url=f"{url}/ink.jpg", clean_url=f"{url}/clean.jpg", base_url=f"{url}/base.jpg", timing=timing, missing=P["missing"],
@@ -383,7 +252,7 @@ def image_one(job: dict, v: dict, d: dict, Bv: dict, vd: Path, url: str, t_llm: 
     try:
         save(d["draft"], vd / "poster.png")
         timing = {"llm": t_llm, **{k: round(x, 1) for k, x in d["timing"].items()}}
-        (vd / "plan.json").write_text(json.dumps({"mode": "image", "seed": v["seed"], "direction": v.get("direction"),
+        (vd / "plan.json").write_text(json.dumps({"mode": "image", "seed": v["seed"], "direction": v.get("direction"), "kho": Bv.get("kho") or [],
                                                   "prompt_en": Bv["prompt_en"], "timing": timing}, ensure_ascii=False, indent=1),
                                       encoding="utf-8")
         v.update(status="done", stage="", poster_url=f"{url}/poster.png", timing=timing, missing=[], errors=0, ops=0)
@@ -427,7 +296,8 @@ def run_job(job: dict, req: GenerateRequest) -> dict:
     posters = []
     job["result"] = {"status": "running", "job_id": job["id"], "run_id": run_id, "mode": B.get("mode", "poster"), "width": W, "height": H, "posters": posters,
                      "ignored_fields": ignored_fields(req), "debug_zip_url": f"api/runs/{run_id}/zip",
-                     "brief": {"prompt_en": B["prompt_en"], "texts": B["texts"], "variants": B.get("variants", []), "log": B["log"]}}
+                     "brief": {"prompt_en": B["prompt_en"], "texts": B["texts"], "variants": B.get("variants", []), "kho": B.get("kho") or [],
+                               "log": B["log"]}}
     futs = []
     for i in range(n):
         dirn = directions[i] if i < len(directions) else directions[0]   # thiếu hướng: dùng prompt chính, seed khác
@@ -511,10 +381,18 @@ def work(job: dict, req: GenerateRequest) -> None:
             JOBS.pop(k, None)
 
 
+def sync_kho() -> None:
+    """Kho ảnh tham chiếu (textfix/kho_sync.py): đồng bộ từ kho đối tượng về thư mục đệm. Không bao giờ ném lỗi."""
+    from textfix.kho_sync import sync_from_env
+    STATE["kho"] = r = sync_from_env()
+    (log.warning if r["status"] == "error" else log.info)("Kho ảnh tham chiếu: %s", r)
+
+
 # ---------------------------------------------------------------------------------------------------- HTTP
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     STATE["started"] = time.time()
+    asyncio.get_running_loop().run_in_executor(None, sync_kho)   # song song với nạp model; hỏng thì vẽ như chưa có kho
     try:
         await asyncio.get_running_loop().run_in_executor(None, init_models, STATE["args"])
     except BaseException as e:   # máy chủ vẫn lên, /api/health báo lỗi
@@ -542,7 +420,7 @@ async def health():
     return {"ready": bool(F) and STATE.get("vlm") is not None, "error": STATE["error"],
             "flux": F[0].info() if F else None, "gpus": [f.dev_dit for f in F],
             "models": {k: {"url": v["url"], "model": v["model"]} for k, v in m.items()} if m else None,
-            "queue": len(ORDER), "draw_queue": DRAW_Q.qsize(), "design_workers": DESIGN._max_workers,
+            "queue": len(ORDER), "draw_queue": DRAW_Q.qsize(), "design_workers": DESIGN._max_workers, "kho": STATE.get("kho"),
             "uptime_s": round(time.time() - (STATE["started"] or time.time()))}
 
 
@@ -600,7 +478,7 @@ def get_poster(jid: str, index: Optional[int] = None, format: str = "png"):
     return FileResponse(f, media_type="image/png", filename=f"{jid}_{p['index']}.png")
 
 
-ZIP_LIMIT = int(float(os.environ.get("TEXTFIX_ZIP_MB", "22")) * 1024 * 1024)   # < 24 MB (như textfix/ship.py)
+ZIP_LIMIT = int(float(os.environ.get("TEXTFIX_ZIP_MB", "22")) * 1024 * 1024)   # < 24 MB (như textfix/tools/ship.py)
 ZIP_JPG = ("poster.png", "poster_first.png")   # ảnh để xem -> JPG; nháp + mặt nạ nét chữ giữ PNG (đo lại được)
 
 

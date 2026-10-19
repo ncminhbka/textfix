@@ -8,7 +8,7 @@
 
 Máy chủ CHỈ pip install được (không HuggingFace, không apt, không tải Chromium của Playwright, không OpenAI): mọi thứ còn lại
 phải có sẵn trong repo hoặc ~/persistent-data. Kiểm:
-  0. thư mục (repo, ~/persistent-data có gì)                4. tài nguyên trong repo (font, icon Lucide, flux2)
+  0. thư mục (repo, ~/persistent-data có gì)                4. tài nguyên (font, icon Lucide; gói flux2 khi vẽ tại chỗ)
   1. gói pip so với requirements.txt -> in MỘT lệnh pip       5. Chromium (zip trong persistent-data, thư viện hệ thống thiếu)
   2. GPU                                                       6. OCR (RapidOCR, mô hình ONNX nằm trong gói pip)
   3. FLUX: trọng số tại chỗ, HOẶC máy FLUX ở xa (TEXTFIX_FLUX_URL)  7. LLM / VLM nội bộ: danh sách model, JSON, NHIỀU ẢNH; 8. cổng
@@ -332,7 +332,7 @@ def check_local_flux(a, data) -> None:
 
 
 def check_remote_flux(no_call: bool) -> None:
-    """FLUX ở máy khác (textfix/flux_api.py): có địa chỉ + khoá; gọi thử một ảnh nhỏ (tốn một lượt vẽ) trừ khi --no-call."""
+    """FLUX ở máy khác (textfix/draw/remote.py): có địa chỉ + khoá; gọi thử một ảnh nhỏ (tốn một lượt vẽ) trừ khi --no-call."""
     from textfix.draw import remote
     F = remote.RemoteFlux()
     extra = f"model {F.model}, {F.steps} bước" if F.api == "chat" else f"safety_tolerance {F.safety}"
@@ -439,6 +439,12 @@ def main() -> int:
         try:
             from flux2 import util  # noqa: F401
             ok("import flux2 được")
+        except ModuleNotFoundError as e:
+            if e.name != "flux2":
+                bad(f"import flux2 lỗi ({e!r})", "xem thông báo; thường do transformers cũ")
+            else:
+                from textfix.draw.flux import FLUX2_MISSING
+                bad("thiếu gói flux2 (mã BFL, không đi kèm repo)", FLUX2_MISSING)
         except BaseException as e:
             bad(f"import flux2 lỗi ({e!r})", "xem thông báo; thường do transformers cũ")
     print("5. Chromium (dựng chữ)")

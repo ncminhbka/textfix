@@ -44,6 +44,11 @@ Không xoá thư mục repo cũ rồi giải nén lại: mất `output/`.
 
 OCR (RapidOCR) có mô hình ONNX trong gói pip, không cần tải thêm.
 
+Vẽ FLUX tại chỗ cần thêm **mã suy luận FLUX.2 của Black Forest Labs** (gói `flux2`, Apache-2.0), không đi kèm repo: tải zip
+của [github.com/black-forest-labs/flux2](https://github.com/black-forest-labs/flux2) rồi chép thư mục `src/flux2` vào gốc repo
+TextFix (đã gitignore), hoặc `pip install git+https://github.com/black-forest-labs/flux2.git` ở máy ra được internet.
+`check_server.py` báo nếu thiếu. FLUX ở máy khác (`TEXTFIX_FLUX_URL`) thì bỏ qua bước này.
+
 ## 2. Thư viện
 
 `pip install -r requirements.txt`. Cảnh báo kiểu `notebook ... requires jupyterlab ...` là xung đột có sẵn của image notebook,
@@ -60,6 +65,9 @@ export TEXTFIX_LLM_API_KEY=<khoá>
 # export TEXTFIX_GPUS=0,1                          # máy chủ: card dùng để VẼ (mặc định mọi card, mỗi card một FLUX)
 # export TEXTFIX_DESIGN_WORKERS=4                  # máy chủ: số luồng THIẾT KẾ song song (mỗi luồng một Chromium)
 export PLAYWRIGHT_CHROME_PATH=/home/jovyan/persistent-data/chrome-linux64/chrome
+# kho ảnh tham chiếu món / trang phục Việt (docs/KHO.md); không đặt thì chạy không kho
+# export TEXTFIX_KHO_ENDPOINT=http://<host>:<cổng API S3>  TEXTFIX_KHO_BUCKET=<bucket>
+# export TEXTFIX_KHO_ACCESS_KEY=<khoá>  TEXTFIX_KHO_SECRET_KEY=<khoá>
 ```
 
 Máy chủ VLM phải nhận **ít nhất 12 ảnh / lời gọi** (designer gửi 6, vòng sửa tới 12) và ngữ cảnh **≥ 32k token**

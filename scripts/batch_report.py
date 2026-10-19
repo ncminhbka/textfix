@@ -3,7 +3,7 @@
 
   python scripts/batch_report.py bench/accept1.json            # sau khi dev_batch chạy xong (dev_batch tự gọi)
 
-1. IN BẢNG ra terminal: mỗi ca một dòng -- lỗi còn lại, chữ co nhỏ nhất, số câu khách mất, các cờ nghi hỏng (textfix/audit.py),
+1. IN BẢNG ra terminal: mỗi ca một dòng -- lỗi còn lại, chữ co nhỏ nhất, số câu khách mất, các cờ nghi hỏng (textfix/tools/audit.py),
    và SO VỚI LƯỢT TRƯỚC của chính ca đó (manifest cũ do `dev_batch --fresh` lưu lại): tốt lên / xấu đi / như cũ.
 2. GHI CÁC TỜ ẢNH GHÉP: output/runs/_reports/<tập>/sheets/<tập>_01.jpg ... -- mỗi tờ 3 ca, mỗi ca  nháp | poster  cạnh nhau, có
    mã ca + lỗi còn. Bấm đúp tệp .jpg trong cây thư mục JupyterLab là xem được, không cần trình duyệt mở cổng máy chủ.
@@ -208,7 +208,7 @@ def main(argv: list[str] | None = None) -> int:
             ".cap{color:#666;font-size:13px;text-align:center}.info{min-width:240px;max-width:420px}ul{margin:0 0 8px;padding-left:18px}"
             ".ok{color:#2a7}.up{color:#1a8f3c}.down{color:#c62828}.old{color:#666}</style></head><body>"
             f"<h2>{html.escape(head)}</h2><p>Lập lúc {time.strftime('%d/%m %H:%M')}. Cờ nghi hỏng là dấu hiệu để chọn poster cần xem, "
-            "không phải điểm chất lượng (xem textfix/audit.py). Bấm ảnh để phóng to / thu nhỏ.</p>" + "".join(body)
+            "không phải điểm chất lượng (xem textfix/tools/audit.py). Bấm ảnh để phóng to / thu nhỏ.</p>" + "".join(body)
             + "<script>document.addEventListener('click',e=>{if(e.target.tagName==='IMG')e.target.classList.toggle('big')})</script></body></html>")
     rep.mkdir(parents=True, exist_ok=True)
     (rep / f"{name}.html").write_text(page, encoding="utf-8")

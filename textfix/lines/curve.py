@@ -1,6 +1,7 @@
 """CHỮ CONG: chữ chạy theo cung tròn / đường lượn (tiêu đề vòm, vòng con dấu, chữ "nụ cười"). OCR chỉ cho khung thẳng,
-cắt cung thành mẩu xoay lệch; ở đây dò từ NÉT: chuỗi mảnh nét cùng cỡ nối nhau, khớp đường tròn / bậc 3 qua tâm các mảnh,
-rồi gộp các mẩu OCR của một cung thành MỘT ô L có đường chân (path). Vùng chữ của bộ dò mà OCR không trả dòng nào -> ô mới.
+cắt cung thành mẩu xoay lệch; ở đây đo từ VÙNG CHỮ của bộ dò (ocr.regions): đường tâm bậc <= 3 qua các lát cắt ngang trục
+chính, khớp đường tròn, rồi gộp các mẩu OCR của một cung thành MỘT ô L có đường chân (path). Vùng chữ của bộ dò mà OCR không
+trả dòng nào -> ô mới.
 """
 
 from __future__ import annotations
@@ -12,18 +13,11 @@ import numpy as np
 from .detect import CAP_EM, X_EM
 
 NPATH = 16           # số điểm đường chân ghi vào ô
-CHAIN_GAP = 0.8      # hai mảnh nét cùng chuỗi: khe <= 0.8 cao mảnh lớn hơn ...
-CHAIN_H = 1.8        # ... và cao lệch <= 1.8 lần
-MARK_H = 0.4         # mảnh thấp hơn 0.4 cao trung vị chuỗi = dấu thanh / chấm (không dựng chuỗi, gộp vào khung sau)
-ARC_MIN_PARTS = 5    # chuỗi >= 5 mảnh mới khớp cung
 ARC_FIT = 0.15       # lệch khớp đường tròn (trung vị khoảng cách tâm mảnh tới đường tròn) <= 0.15 cao chữ
 ARC_SAG = 0.3        # độ võng của cung (dây cung^2 / 8R) >= 0.3 cao chữ: thấp hơn là dòng thẳng / nghiêng (OCR lo)
 ARC_SPAN = 3.2       # vùng chữ của bộ dò chỉ là cung khi dài >= 3.2 cao dòng. 18 vùng võng >= 0.3 của accept1 / dev2 / dev3 (13/10):
                      # 17 cung thật dài 3.7 - 12.3 cao dòng; 1 vùng dài 2.8 là hai dòng nghiêng xếp chồng ("GIẢM" / "30%", g06)
-ARC_LINE = 0.18      # và đường thẳng khớp tệ: lệch trung vị >= 0.18 cao chữ
 ARC_BLIND = 7        # cung >= 7 mảnh mà OCR không đọc được chữ nào vẫn là chữ (OCR hay trượt hẳn chữ cong)
-
-
 BAND_MIN_H = 0.035   # DẢI CHỮ hiển thị: cao chữ >= 3.5% cạnh ngắn ảnh (chữ thân để OCR lo)
 BAND_TILT = 4.0      # dải nghiêng: >= 4 độ
 
@@ -37,193 +31,12 @@ def _circle(pts: np.ndarray) -> tuple[float, float, float]:
     return float(cx), float(cy), float(math.sqrt(max(c + cx ** 2 + cy ** 2, 1e-6)))
 
 
-def _line_res(pts: np.ndarray) -> float:
-    c = pts - pts.mean(0)
-    _, _, vt = np.linalg.svd(c, full_matrices=False)
-    return float(np.median(np.abs(c @ vt[1])))
-
-
-WAVE_DEV = 0.3       # đường cong tự do: lệch khỏi đường thẳng >= 0.3 cao chữ ...
-WAVE_FIT = 0.15      # ... và khớp đa thức bậc 3 (theo trục chính) lệch trung vị <= 0.15 cao chữ
-GROW = 1.35          # chữ TO DẦN / NHỎ DẦN: cao chữ hai đầu lệch >= 1.35 lần, đổi đều (tương quan với vị trí >= 0.8)
-
-
-def _scale(u: np.ndarray, ext: np.ndarray, uq: np.ndarray) -> list[float] | None:
-    """Hồ sơ cỡ dọc dòng (tỉ lệ so với cỡ trung vị) tại các điểm uq -- chỉ khi chữ to / nhỏ dần rõ rệt."""
-    if len(u) < 6 or np.ptp(u) <= 0:
-        return None
-    k, b0 = np.polyfit(u, ext, 1)
-    e0, e1 = k * u.min() + b0, k * u.max() + b0
-    if min(e0, e1) <= 0 or max(e0, e1) / min(e0, e1) < GROW or abs(np.corrcoef(u, ext)[0, 1]) < 0.8:
-        return None
-    med = float(np.median(ext))
-    return [round(float((k * x + b0) / med), 3) for x in uq]
-
-
 def _baseline(center: np.ndarray, half: np.ndarray) -> list[list[float]]:
     """Điểm giữa cao chữ -> điểm đường chân: dịch nửa cao chữ theo pháp tuyến "xuống" của hướng đọc (trái -> phải)."""
     t = np.gradient(center, axis=0)
     t /= np.maximum(np.linalg.norm(t, axis=1, keepdims=True), 1e-6)
     n = np.c_[-t[:, 1], t[:, 0]]
     return [[round(float(x), 1), round(float(y), 1)] for x, y in center + n * half[:, None]]
-
-
-def _fit_circle(pts, ext, hm):
-    cx, cy, r = _circle(pts)
-    res = np.abs(np.hypot(pts[:, 0] - cx, pts[:, 1] - cy) - r)
-    keep = res <= max(2 * np.median(res), 0.1 * hm)   # khớp lại không có điểm lệch (dấu dính, nét chữ Q / g thò xuống)
-    if keep.sum() >= ARC_MIN_PARTS:
-        pts, ext = pts[keep], ext[keep]
-        cx, cy, r = _circle(pts)
-        res = np.abs(np.hypot(pts[:, 0] - cx, pts[:, 1] - cy) - r)
-    chord = float(np.hypot(*(pts.max(0) - pts.min(0))))
-    sag = chord ** 2 / (8 * r) if r > 0 else 0.0
-    if np.median(res) > ARC_FIT * hm or sag < ARC_SAG * hm or _line_res(pts) < ARC_LINE * hm or r > 8 * chord:
-        return None
-    up = cy > pts[:, 1].mean()   # tâm dưới chuỗi: cung lồi phía trên
-    ang = np.degrees(np.arctan2(pts[:, 1] - cy, pts[:, 0] - cx))
-    # góc liền mạch quanh đỉnh (cung trên: 180..360) / quanh đáy (cung dưới: 0..180)
-    ang = np.where(ang < 0, ang + 360, ang) if up else np.where(ang < -90, ang + 360, ang)
-    da = math.degrees(0.5 * hm / max(r, 1))   # nới hai đầu nửa cao chữ (tâm lát đầu / cuối cách mép chữ)
-    if up:   # đi trái -> phải theo chiều kim đồng hồ quanh đỉnh
-        a0, a1 = float(ang.min()) - da, float(ang.max()) + da
-    else:    # cung dưới: trái (góc lớn) -> phải (góc nhỏ)
-        a0, a1 = float(ang.max()) + da, float(ang.min()) - da
-    # đường chân: chữ cung trên đứng ngoài đường tròn (chân phía tâm), cung dưới ngược lại
-    rb = r - hm / 2 if up else r + hm / 2
-    aq = np.linspace(a0, a1, NPATH)
-    path = [[round(float(cx + rb * math.cos(math.radians(a))), 1), round(float(cy + rb * math.sin(math.radians(a))), 1)] for a in aq]
-    u = ang if up else -ang
-    return {"geo": "arc", "path": path, "scale": _scale(u, ext, aq if up else -aq),
-            "curve": {"cx": round(cx, 1), "cy": round(cy, 1), "r": round(rb, 1), "a0": round(a0, 1), "a1": round(a1, 1),
-                      "up": bool(up)}}
-
-
-def _axis(pts):
-    c = pts.mean(0)
-    _, _, vt = np.linalg.svd(pts - c, full_matrices=False)
-    e1 = vt[0] if vt[0][0] >= 0 else -vt[0]   # hướng đọc trái -> phải
-    e2 = np.array([-e1[1], e1[0]])            # pháp tuyến "xuống" của hướng đọc
-    return c, e1, e2
-
-
-def _fit_wave(pts, ext, hm):
-    c, e1, e2 = _axis(pts)
-    u, v = (pts - c) @ e1, (pts - c) @ e2
-    if np.ptp(u) < 3 * hm or len(u) < 8:
-        return None
-    p3 = np.polyfit(u, v, 3)
-    res = np.median(np.abs(np.polyval(p3, u) - v))
-    lin = np.polyval(np.polyfit(u, v, 1), u)
-    dev = float(np.max(np.abs(np.polyval(p3, u) - lin)))
-    if res > WAVE_FIT * hm or dev < WAVE_DEV * hm:
-        return None
-    uq = np.linspace(u.min() - 0.5 * hm, u.max() + 0.5 * hm, NPATH)
-    center = c + np.outer(uq, e1) + np.outer(np.polyval(p3, uq), e2)
-    sc = _scale(u, ext, uq)
-    half = 0.5 * hm * (np.array(sc) if sc else np.ones(NPATH))
-    return {"geo": "wave", "path": _baseline(center, half), "scale": sc}
-
-
-def _fit_grow(pts, ext, hm):
-    """Dòng thẳng (thẳng / nghiêng) mà chữ to dần / nhỏ dần: đường chân thẳng qua chân các lát + hồ sơ cỡ."""
-    c, e1, e2 = _axis(pts)
-    u = (pts - c) @ e1
-    uq = np.linspace(u.min() - 0.5 * hm, u.max() + 0.5 * hm, NPATH)
-    sc = _scale(u, ext, uq)
-    if not sc:
-        return None
-    bot = pts + np.outer(ext / 2, e2)   # chân các lát
-    ub, vb = (bot - c) @ e1, (bot - c) @ e2
-    k, b0 = np.polyfit(ub, vb, 1)
-    center = c + np.outer(uq, e1) + np.outer(k * uq + b0, e2)
-    return {"geo": "grow", "path": [[round(float(x), 1), round(float(y), 1)] for x, y in center], "scale": sc}
-
-
-def _chains(comps: list[dict]) -> list[list[int]]:
-    """Nối mảnh nét thành chuỗi (khe nhỏ, cao gần nhau)."""
-    n = len(comps)
-    par = list(range(n))
-
-    def f(i):
-        while par[i] != i:
-            par[i] = par[par[i]]
-            i = par[i]
-        return i
-    for i in range(n):
-        a = comps[i]
-        for j in range(i + 1, n):
-            b = comps[j]
-            hi, lo = max(a["h"], b["h"]), min(a["h"], b["h"])
-            if hi > CHAIN_H * lo:
-                continue
-            gx = max(b["x0"] - a["x1"], a["x0"] - b["x1"], 0)
-            gy = max(b["y0"] - a["y1"], a["y0"] - b["y1"], 0)
-            # nối CẠNH nhau (cùng dòng): hai mảnh chồng nhau theo chiều dọc >= 0.3 cao mảnh thấp (cung nghiêng tới ~45 độ vẫn
-            # chồng); dòng trên / dưới sát nhau (khe dòng ~0.3 cao chữ) không chồng dọc -> không nối
-            ov = min(a["y1"], b["y1"]) - max(a["y0"], b["y0"])
-            if ov >= 0.3 * lo and math.hypot(gx, gy) <= CHAIN_GAP * hi:
-                par[f(i)] = f(j)
-    g = {}
-    for i in range(n):
-        g.setdefault(f(i), []).append(i)
-    return list(g.values())
-
-
-def arcs(ink: np.ndarray, W: int, H: int, dbg: list | None = None) -> list[dict]:
-    """Các cung chữ trong mặt nạ nét. -> [{box, curve, size, parts}]"""
-    import cv2
-    m = cv2.morphologyEx(ink.astype(np.uint8), cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
-    n, cc, st, cen = cv2.connectedComponentsWithStats(m, 8)
-    comps = []
-    for i in range(1, n):
-        x, y, w, h, a = st[i]
-        if a < 12 or h < 8 or w > 0.5 * W or h > 0.4 * H:
-            continue
-        comps.append({"i": i, "x0": x, "y0": y, "x1": x + w, "y1": y + h, "h": h, "c": cen[i], "a": a})
-    if not comps:
-        return []
-    hs = np.array([c["h"] for c in comps])
-    out = []
-    for ch in _chains(comps):
-        if len(ch) < 2:
-            continue
-        hm = float(np.median(hs[ch]))
-        body = [k for k in ch if comps[k]["h"] >= MARK_H * hm]
-        if len(body) < 2:
-            continue
-        # ĐIỂM KHỚP: tâm nét theo LÁT dọc rộng ~0.4 cao chữ trên từng mảnh (chữ đậm / có viền dính liền thành vài mảnh to)
-        pts, ext = [], []
-        for k in body:
-            c = comps[k]
-            sub = cc[c["y0"]:c["y1"], c["x0"]:c["x1"]] == c["i"]
-            step = max(3, int(0.4 * hm))
-            for x in range(0, sub.shape[1], step):
-                sl = sub[:, x:x + step]
-                ys = np.nonzero(sl.any(1))[0]
-                if len(ys) and sl.sum() >= 0.05 * step * hm:
-                    pts.append((c["x0"] + x + sl.shape[1] / 2, c["y0"] + (ys[0] + ys[-1]) / 2))
-                    ext.append(ys[-1] - ys[0] + 1)
-        pts = np.array(pts, np.float64)
-        if len(ext):   # cao chữ theo lát (mảnh dính cả từ trên cung nghiêng cao phồng)
-            hm = float(np.median(ext))
-        if len(pts) < ARC_MIN_PARTS + 1 or np.ptp(pts[:, 0]) < 3 * hm:
-            if dbg is not None and len(pts):
-                dbg.append({"box": [float(pts[:, 0].min()), float(pts[:, 1].min()), float(pts[:, 0].max()), float(pts[:, 1].max())],
-                            "why": "ít điểm / chuỗi ngắn"})
-            continue
-        ext = np.array(ext, np.float64)
-        g = _fit_circle(pts, ext, hm) or _fit_wave(pts, ext, hm) or _fit_grow(pts, ext, hm)
-        if g is None:
-            if dbg is not None:
-                dbg.append({"box": [float(pts[:, 0].min()), float(pts[:, 1].min()), float(pts[:, 0].max()), float(pts[:, 1].max())],
-                            "why": "không cong / không đổi cỡ", "line": round(_line_res(pts) / hm, 2), "n": len(pts)})
-            continue
-        sel = np.isin(cc, [comps[k]["i"] for k in ch])
-        ys, xs = np.nonzero(sel)
-        out.append({"box": [float(xs.min()), float(ys.min()), float(xs.max() + 1), float(ys.max() + 1)], **g,
-                    "h": hm, "mask": sel, "parts": len(body)})
-    return out
 
 
 def apply_arcs(L: list[dict], I: list[dict], found: list[dict], cap_em: float) -> tuple[list[dict], list[dict], list[str]]:
@@ -316,7 +129,7 @@ def apply_arcs(L: list[dict], I: list[dict], found: list[dict], cap_em: float) -
 
 
 def circle_of(cen: np.ndarray, h: float) -> dict:
-    """Đường TÂM một dòng cong (trái -> phải) có khớp đường tròn không -> {"curve": ...} cùng khuôn với `_fit_circle` (r = bán kính
+    """Đường TÂM một dòng cong (trái -> phải) có khớp đường tròn không -> {"curve": ...} cùng khuôn ô cung (r = bán kính
     đường CHÂN), hoặc {} (cong tự do: không có "phần kéo dài" để nối mẩu rời vào)."""
     cx, cy, r = _circle(cen)
     chord = float(np.hypot(*(cen[-1] - cen[0])))
@@ -372,7 +185,7 @@ def region_line(mask: np.ndarray, pad: float) -> dict | None:
             "span": float(np.sum(np.hypot(*np.diff(cen, axis=0).T))), "circle": (cx, cy, r)}
 
 
-def _geo_lines(L: list, I: list, draft: np.ndarray, A: np.ndarray, ink0: np.ndarray, shells: list,
+def _geo_lines(L: list, I: list, draft: np.ndarray, A: np.ndarray, ink0: np.ndarray,
                missed: bool = True) -> tuple[list, list, list[str], dict]:
     """CHỮ HÌNH DẠNG KHÓ từ VÙNG CHỮ của bộ dò (ocr.regions: bản đồ của chính RapidOCR trước khi bị ép khung 4 điểm). Đo trên 1307
     vùng của 162 nháp (12/10): mọi vùng hiển thị võng >= 0.3 cao dòng đều là chữ cong thật (dòng thẳng <= 0.24).

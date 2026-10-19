@@ -17,9 +17,7 @@ hưởng). Chỉ số (dòng `eval` của đáp án, loại poster + object):
 from __future__ import annotations
 
 import argparse
-import glob
 import json
-import os
 import sys
 import zipfile
 from collections import Counter

@@ -1,4 +1,4 @@
-"""FLUX ở máy khác (textfix/flux_api.py) với máy FLUX giả theo khuôn api.bfl.ai: gửi -> hỏi -> tải ảnh."""
+"""FLUX ở máy khác (textfix/draw/remote.py) với máy FLUX giả theo khuôn api.bfl.ai: gửi -> hỏi -> tải ảnh."""
 
 from __future__ import annotations
 
