@@ -8,7 +8,9 @@ vẽ đúng (không có ảnh, "bún thang" thành phở bò).
   <kho> = biến môi trường TEXTFIX_KHO_DIR, mặc định output/kho (ngoài git): thư mục đệm máy chủ đồng bộ từ kho đối tượng
           (kho_sync.py). Ảnh không vào git; cách dựng và đẩy kho: docs/KHO.md
 
-  match -> khớp ĐÚNG TỪ KHOÁ (nguyên từ, bỏ dấu), không embedding: "phở" không kéo ảnh phở bò. Nhiều món: theo thứ tự xuất hiện
+  match -> khớp ĐÚNG TỪ KHOÁ (nguyên từ), không embedding: "phở" không kéo ảnh phở bò. Nhiều món: theo thứ tự xuất hiện.
+           Từ khách gõ CÓ DẤU phải trùng cả dấu ("bánh Tết" không phải "bánh tét", "cơm" không phải "cốm"); từ gõ KHÔNG DẤU
+           so với dạng bỏ dấu của cụm ("banh tet" khớp "bánh tét")
   numbered -> số ảnh của từng mục kho trong lượt vẽ: ảnh sản phẩm khách tải (nếu có) luôn là image 1
   refs_for_draw -> ảnh sản phẩm trước rồi ảnh kho; FLUX.2 klein (4B và 9B) nhận tối đa MAX_REFS ảnh
 """
@@ -78,19 +80,35 @@ def problems(entries: list[dict], root: Path | None = None) -> list[str]:
     return out
 
 
-def _first_hit(e: dict, t: str) -> int:
-    """Vị trí sớm nhất trong text (đã chuẩn hoá) mà một cụm của mục khớp; -1 nếu không khớp."""
-    pos = [t.find(_norm(term)) for term in _terms(e)]
-    return min((p for p in pos if p >= 0), default=-1)
+def _words(s: str) -> list[str]:
+    """Từ của s: chữ thường, GIỮ dấu (NFC), tách ở mọi ký tự không phải chữ / số."""
+    return re.findall(r"\w+", unicodedata.normalize("NFC", s.casefold()))
+
+
+def _word_match(user: str, term: str) -> bool:
+    """Một từ khách gõ khớp một từ của cụm: có dấu thì phải trùng hẳn; không dấu thì so với dạng bỏ dấu của cụm."""
+    return user == term if not user.isascii() else user == _norm(term).strip()
+
+
+def _first_hit(e: dict, words: list[str]) -> int:
+    """Chỉ số từ sớm nhất trong lời khách mà một cụm của mục khớp nguyên cụm; -1 nếu không khớp."""
+    best = -1
+    for term in _terms(e):
+        tw = _words(term)
+        for i in range(len(words) - len(tw) + 1):
+            if (best < 0 or i < best) and all(_word_match(words[i + k], w) for k, w in enumerate(tw)):
+                best = i
+                break
+    return best
 
 
 def match(text: str, entries: list[dict] | None = None, root: Path | None = None) -> list[str]:
     """Id các mục có cụm khớp trong text, theo THỨ TỰ XUẤT HIỆN trong lời khách. Bỏ mục không có file ảnh."""
     root = root or kho_dir()
     entries = load(root) if entries is None else entries
-    t = _norm(text or "")
+    words = _words(text or "")
     hits = [(p, i, e["id"]) for i, e in enumerate(entries) if e.get("id") and e.get("file")
-            for p in [_first_hit(e, t)] if p >= 0 and (root / e["file"]).is_file()]
+            for p in [_first_hit(e, words)] if p >= 0 and (root / e["file"]).is_file()]
     return [cid for _, _, cid in sorted(hits)][:MAX_REFS]
 
 

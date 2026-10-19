@@ -48,6 +48,15 @@ def test_match_whole_words_only(store):
     assert kho.match("ao dai") == ["ao-dai"]
 
 
+def test_match_accented_words_need_exact_accents(store, tmp_path):
+    tet = [{"id": "banh-tet", "file": "img/bun-thang.jpg", "tags": ["banh tet"], "aliases": ["bánh tét"], "source": "x"},
+           {"id": "com", "file": "img/bun-thang.jpg", "tags": ["young green rice flakes"], "aliases": ["cốm"], "source": "x"}]
+    assert kho.match("banner đặt bánh Tết", tet, store) == []      # bánh ngày Tết, không phải bánh tét
+    assert kho.match("CƠM NHÀ MIỀN TÂY", tet, store) == []         # cơm không phải cốm
+    assert kho.match("bánh tét nhân đậu", tet, store) == ["banh-tet"]
+    assert kho.match("banh tet va com lang vong", tet, store) == ["banh-tet", "com"]   # gõ không dấu: so dạng bỏ dấu
+
+
 def test_match_follows_order_of_appearance(store):
     assert kho.match("người mặc áo dài ăn phở bò và bún thang") == ["ao-dai", "pho-bo", "bun-thang"]
 
