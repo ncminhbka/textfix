@@ -14,3 +14,4 @@ uvicorn>=0.28
 pydantic>=2.6
 packaging>=23             # scripts/check_server.py
 fonttools[woff]>=4.40
+minio>=7.2                # kho ảnh tham chiếu trên kho đối tượng S3 (docs/KHO.md)

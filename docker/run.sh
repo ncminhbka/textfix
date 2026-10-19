@@ -58,7 +58,7 @@ EOF
 "$PY" - <<'EOF' || true
 import os, socket
 from urllib.parse import urlparse
-for k in ("TEXTFIX_FLUX_URL", "TEXTFIX_LLM_URL", "TEXTFIX_VLM_URL"):
+for k in ("TEXTFIX_FLUX_URL", "TEXTFIX_LLM_URL", "TEXTFIX_VLM_URL", "TEXTFIX_KHO_ENDPOINT"):
     host = urlparse(os.environ.get(k) or "").hostname
     if not host:
         continue
@@ -74,4 +74,5 @@ if ! mkdir -p "$RUNS" 2>/dev/null || [ ! -w "$RUNS" ]; then
     echo "     (không có sudo: docker run --rm --user root --entrypoint chown -v <thư mục>:/data <image> -R 1000:100 /data)" >&2
     exit 1
 fi
+export TEXTFIX_KHO_DIR="${TEXTFIX_KHO_DIR:-/data/kho}"   # đệm kho ảnh tham chiếu (docs/KHO.md): giữ qua các lần chạy lại
 exec "$PY" server/app.py --port "${TEXTFIX_PORT:-8004}" "$@"
