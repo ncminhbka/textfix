@@ -24,23 +24,47 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from textfix import kho  # noqa: E402
 from textfix.kho_sync import s3_getter, sync  # noqa: E402
 
-PORTS = (9000, 9001, 9002, 80, 443, 8080, 8081, 8082, 8443, 9090)
+PORTS = sorted({80, 443, 7000, 9443, 10000, 19000, *range(9000, 9011), *range(8000, 8101)})
+
+
+def _open_ports(host: str, ports, timeout: float = 1.5) -> list[int]:
+    """Cổng TCP đang mở (dò song song)."""
+    import socket
+    from concurrent.futures import ThreadPoolExecutor
+
+    def ok(port):
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return port
+        except OSError:
+            return None
+    with ThreadPoolExecutor(32) as ex:
+        return [p for p in ex.map(ok, ports) if p]
 
 
 def probe(host: str) -> None:
-    """Cổng API S3 trả XML lỗi S3 (hoặc header Server: MinIO) cho GET không ký; web console trả HTML."""
-    for port in PORTS:
+    """Cổng API S3 trả XML lỗi S3 cho GET không ký. Web console MinIO cũng trả XML, nhưng với câu "S3 API Requests must be made
+    to API port" -> không phải cổng API."""
+    found = _open_ports(host, PORTS)
+    print("cổng mở:", found or "không có")
+    for port in found:
         for scheme in ("http", "https"):
             url = f"{scheme}://{host}:{port}/"
             try:
-                with urllib.request.urlopen(url, timeout=3) as r:
-                    head, body = dict(r.headers), r.read(400).decode("utf-8", "replace")
+                with urllib.request.urlopen(url, timeout=4) as r:
+                    head, body = dict(r.headers), r.read(600).decode("utf-8", "replace")
             except urllib.error.HTTPError as e:
-                head, body = dict(e.headers), e.read(400).decode("utf-8", "replace")
+                head, body = dict(e.headers), e.read(600).decode("utf-8", "replace")
             except Exception:
                 continue
-            s3 = "<Error>" in body or "AmazonS3" in body or "MinIO" in head.get("Server", "")
-            print(f"{url:32} {'API S3' if s3 else 'không phải S3 (web?)'}  Server={head.get('Server', '')}")
+            if "API port" in body:
+                kind = "web console (KHÔNG phải cổng API)"
+            elif "<Error>" in body or "AmazonS3" in body or "MinIO" in head.get("Server", ""):
+                kind = "API S3  <-- dùng cổng này"
+            else:
+                kind = "không phải S3"
+            print(f"{url:34} {kind}  Server={head.get('Server', '')}")
+            break
 
 
 def push(src: Path) -> None:
