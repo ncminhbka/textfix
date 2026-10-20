@@ -16,16 +16,16 @@ class FakePipe:
         self.with_image = with_image
 
     def __call__(self, prompt, width, height, generator=None, num_inference_steps=None, true_cfg_scale=None,
-                 negative_prompt=None, image=None):
+                 negative_prompt=None, image=None, use_kv_cache=False):
         from PIL import Image
         self.calls.append({"prompt": prompt, "width": width, "height": height, "steps": num_inference_steps,
-                           "cfg": true_cfg_scale, "image": image})
+                           "cfg": true_cfg_scale, "image": image, "kv": use_kv_cache})
         return type("R", (), {"images": [Image.new("RGB", (width + 8, height), (10, 20, 30))]})()
 
 
 def drawer(monkeypatch, with_image=True, **kw):
     from textfix.draw.qwen import QwenDraw
-    for k in ("TEXTFIX_QWEN_STEPS", "TEXTFIX_QWEN_CFG", "TEXTFIX_QWEN_MEM"):
+    for k in ("TEXTFIX_QWEN_STEPS", "TEXTFIX_QWEN_CFG", "TEXTFIX_QWEN_MEM", "TEXTFIX_QWEN_SCALE"):
         monkeypatch.delenv(k, raising=False)
     Q = QwenDraw(device="cpu", **kw)
     Q.pipe = FakePipe(with_image)
@@ -38,9 +38,19 @@ def drawer(monkeypatch, with_image=True, **kw):
 def test_defaults_are_the_pipeline_own(monkeypatch):
     Q = drawer(monkeypatch)
     img = Q.generate("a poster", 64, 48, 7)
-    assert img.shape == (48, 64, 3)   # lệch cỡ -> đưa về cỡ đã hẹn
+    assert img.shape == (48, 64, 3)   # vẽ ở 2 lần cỡ (khung gốc ~4 MP của model) rồi thu về cỡ đã hẹn
     c = Q.pipe.calls[0]
-    assert (c["steps"], c["cfg"], c["image"]) == (None, None, None)   # không đặt: để Turbo dùng mặc định của nó
+    assert (c["width"], c["height"]) == (128, 96) and c["kv"] is True   # model card: use_kv_cache=True
+    assert (c["steps"], c["cfg"], c["image"]) == (None, None, None)   # không đặt: để Turbo dùng lịch 8 bước lưu sẵn
+
+
+def test_scale_1_draws_at_pipeline_size(monkeypatch):
+    monkeypatch.setenv("TEXTFIX_QWEN_SCALE", "1")
+    from textfix.draw.qwen import QwenDraw
+    assert QwenDraw(device="cpu").scale == 1
+    monkeypatch.setenv("TEXTFIX_QWEN_SCALE", "0")
+    with pytest.raises(ValueError, match="TEXTFIX_QWEN_SCALE"):
+        QwenDraw(device="cpu")
 
 
 def test_steps_cfg_and_refs(monkeypatch):
