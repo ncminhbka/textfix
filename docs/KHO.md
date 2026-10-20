@@ -5,12 +5,19 @@ chắc chắn không biết (thịt chó, mắm tôm, bánh đúc...), không nh
 có tên một khái niệm trong kho, ảnh mẫu của khái niệm đó được đưa vào FLUX như ảnh tham chiếu, và LLM viết prompt gọi đúng
 món là "the bun thang from image 2".
 
-- Khớp **đúng từ khoá** (nguyên từ, bỏ dấu, không phân biệt hoa thường), không embedding. Vì vậy không đặt cụm chung chung
-  ("phở", "bò", "cơm", "đèn lồng"): "phở gà" không được kéo ảnh phở bò.
+- Code tìm **ứng viên** bằng **đúng từ khoá** (nguyên từ, không phân biệt hoa thường), không embedding. Khách gõ có dấu thì
+  phải trùng cả dấu ("cơm" không phải "cốm"); gõ không dấu thì so với dạng bỏ dấu. Không đặt cụm chung chung ("phở", "bò",
+  "cơm", "đèn lồng"): "phở gà" không được kéo ảnh phở bò.
+- **Code + LLM cùng quyết** (20/10, `kho.match_detail`, `brief._pick_refs`):
+  - ứng viên **chắc** (cụm >= 2 từ, khách gõ có dấu, trùng nguyên văn: "bún thang", "cốm làng Vòng"): luôn dùng; prompt không
+    nhắc "image N" (LLM quên) thì code chèn câu nhắc sau câu đầu (`brief/prompt.py`, `_cite_refs`);
+  - ứng viên **không chắc** (alias một từ: "cốm" trong "trà sữa cốm"; gõ không dấu: "com tam", "banh tet"): LLM được dặn tự
+    quyết, chỉ dùng khi prompt chính hoặc một hướng thiết kế nhắc "image N". LLM không thêm được ảnh ngoài ứng viên.
+  - bỏ ảnh thì code đánh số lại "image N" trong mọi prompt cho khớp thứ tự ảnh gửi đi (`prompt.renumber`).
 - **Một ảnh mỗi khái niệm.** Ảnh sản phẩm khách tải luôn là image 1; ảnh kho đi sau, theo **thứ tự xuất hiện** trong lời khách.
   FLUX.2 klein (4B và 9B) nhận tối đa 4 ảnh tham chiếu; khái niệm thừa bị bỏ.
-- Prompt không nhắc "image N" cho một ảnh kho (LLM quên) thì code chèn câu nhắc sau câu đầu (`brief/prompt.py`, `_cite_refs`).
-- Id kho đã dùng: `brief.json` / `plan.json` / kết quả API (`brief.kho`), `log.kho` ghi "tên = image N".
+- Id kho đã dùng: `brief.json` / `plan.json` / kết quả API (`brief.kho`), `log.kho` ghi "tên = image N"; `log.kho_sure`,
+  `log.kho_llm_kept`, `log.kho_llm_dropped` ghi ứng viên chắc / LLM giữ / LLM bỏ (kèm chữ khách gõ ở chỗ khớp).
 - Bước thiết kế không coi chữ trong ảnh kho là chữ sản phẩm (chỉ ảnh khách tải mới được "keep"): FLUX lỡ chép chữ từ ảnh kho
   thì chữ đó là chữ giun như mọi chữ thừa khác.
 
@@ -59,7 +66,9 @@ python scripts/kho_push.py kho_out                         # đẩy ảnh rồi 
  "sha1": "..."}
 ```
 
-- `aliases`: cụm tiếng Việt; chỉ cần bản có dấu (so khớp đã bỏ dấu nên "bun thang" tự khớp).
+- `aliases`: cụm tiếng Việt; chỉ cần bản có dấu (so khớp đã bỏ dấu nên "bun thang" tự khớp, ở mức không chắc). Mỗi mục nên
+  có ít nhất một cụm >= 2 từ ("cốm làng vòng") để khách viết đủ tên thì khớp chắc; `kho.problems()` cảnh báo mục chỉ có cụm
+  một từ.
 - `tags`: tên tiếng Anh; tag đầu là tên LLM dùng trong prompt ("the bun thang from image 2").
 - `source`: **bắt buộc** (giấy phép + tác giả + link). Chỉ ảnh có giấy phép cho phép dùng lại.
 - Mỗi cụm thuộc **một** mục. `kho.problems()` báo trùng id, thiếu file, thiếu source, cụm trỏ hai mục.

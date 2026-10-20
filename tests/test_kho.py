@@ -57,6 +57,29 @@ def test_match_accented_words_need_exact_accents(store, tmp_path):
     assert kho.match("banh tet va com lang vong", tet, store) == ["banh-tet", "com"]   # gõ không dấu: so dạng bỏ dấu
 
 
+COM = [{"id": "com", "file": "img/bun-thang.jpg", "tags": ["young green rice flakes"], "aliases": ["cốm làng vòng", "cốm"],
+        "source": "x"}]
+
+
+@pytest.mark.parametrize("text, want", [
+    ("quán bún thang Hà Nội", [("bun-thang", True)]),        # cụm hai từ, đủ dấu: chắc
+    ("quan BUN THANG Ha Noi", [("bun-thang", False)]),       # gõ không dấu: không chắc
+    ("người mặc áo dài", [("ao-dai", True)]),
+])
+def test_match_detail_sure(store, text, want):
+    assert [(h["id"], h["sure"]) for h in kho.match_detail(text)] == want
+
+
+@pytest.mark.parametrize("text, want", [
+    ("Poster trà sữa cốm giảm 20%", [("com", False, "cốm")]),           # alias một từ: LLM quyết
+    ("cốm làng Vòng mùa thu", [("com", True, "cốm làng vòng")]),
+    ("quan com tam Sai Gon", [("com", False, "com")]),                  # "com" không dấu khớp "cốm" bỏ dấu: không chắc
+    ("cơm tấm sườn bì", []),
+])
+def test_match_detail_single_word_and_unaccented_are_unsure(store, text, want):
+    assert [(h["id"], h["sure"], h["word"]) for h in kho.match_detail(text, COM, store)] == want
+
+
 def test_match_follows_order_of_appearance(store):
     assert kho.match("người mặc áo dài ăn phở bò và bún thang") == ["ao-dai", "pho-bo", "bun-thang"]
 
@@ -84,6 +107,8 @@ def test_problems_found(store):
     out = " | ".join(kho.problems(bad, store))
     for msg in ("trùng id", "không có file img/x.jpg", "thiếu source", "trỏ vào hai mục", "thiếu id"):
         assert msg in out
+    one = [{"id": "com", "file": "img/bun-thang.jpg", "aliases": ["cốm"], "tags": ["com"], "source": "x"}]
+    assert "chỉ có cụm một từ" in " | ".join(kho.problems(one, store))
 
 
 # ---------------------------------------------------------------- số ảnh và ảnh vẽ
@@ -209,6 +234,41 @@ def test_brief_cites_reference_llm_forgot(store):
     assert B["kho"] == ["bun-thang"]
     assert "the bun thang from image 1" in B["prompt_en"]
     assert B["prompt_en"].index("image 1") < B["prompt_en"].index("Soft morning")   # chèn sớm: FLUX đọc phần đầu
+
+
+@pytest.fixture
+def com_store(store):
+    (store / "index.json").write_text(json.dumps({"entries": E + COM}), encoding="utf-8")
+    return store
+
+
+def test_brief_unsure_ref_dropped_when_llm_does_not_cite_it(com_store):
+    llm, seen = llm_seen("A cup of green milk tea with tapioca pearls on a pastel table. Soft light.")
+    B = make_brief(llm, "Poster trà sữa cốm giảm 20%")
+    assert "MAY show an authentic young green rice flakes" in seen["msg"] and "'cốm'" in seen["msg"]
+    assert B["kho"] == [] and "image" not in B["prompt_en"]
+    assert B["log"]["kho_llm_dropped"] == ["young green rice flakes ('cốm')"] and "kho" not in B["log"]
+
+
+def test_brief_unsure_ref_kept_when_llm_cites_it(com_store):
+    llm, _ = llm_seen("A cup of milk tea topped with the young green rice flakes from image 1. Soft light.")
+    B = make_brief(llm, "Poster trà sữa cốm giảm 20%")
+    assert B["kho"] == ["com"] and B["log"]["kho_llm_kept"] == ["young green rice flakes ('cốm')"]
+
+
+def test_brief_unaccented_com_tam_dropped(com_store):
+    llm, _ = llm_seen("A plate of broken rice with grilled pork chop. Warm light.")
+    B = make_brief(llm, "poster quan com tam Sai Gon")
+    assert B["kho"] == [] and "image" not in B["prompt_en"]
+
+
+def test_brief_renumbers_after_dropping(com_store):
+    # ảnh sản phẩm = image 1; cốm (không chắc, đứng trước) = image 2, LLM không nhắc -> bỏ; bún thang (chắc) image 3 -> image 2
+    llm, _ = llm_seen("The product from image 1 next to a bowl of the bun thang from image 3. Soft light.")
+    B = make_brief(llm, "trà sữa cốm và bún thang", product_image=True)
+    assert B["kho"] == ["bun-thang"]
+    assert "the bun thang from image 2" in B["prompt_en"] and "image 3" not in B["prompt_en"]
+    assert "The product from image 1" in B["prompt_en"] and B["log"]["kho"] == ["bun thang = image 2"]
 
 
 def test_brief_without_kho_match_unchanged(store):

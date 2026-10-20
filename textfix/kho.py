@@ -8,9 +8,12 @@ vẽ đúng (không có ảnh, "bún thang" thành phở bò).
   <kho> = biến môi trường TEXTFIX_KHO_DIR, mặc định output/kho (ngoài git): thư mục đệm máy chủ đồng bộ từ kho đối tượng
           (kho_sync.py). Ảnh không vào git; cách dựng và đẩy kho: docs/KHO.md
 
-  match -> khớp ĐÚNG TỪ KHOÁ (nguyên từ), không embedding: "phở" không kéo ảnh phở bò. Nhiều món: theo thứ tự xuất hiện.
-           Từ khách gõ CÓ DẤU phải trùng cả dấu ("bánh Tết" không phải "bánh tét", "cơm" không phải "cốm"); từ gõ KHÔNG DẤU
-           so với dạng bỏ dấu của cụm ("banh tet" khớp "bánh tét")
+  match_detail -> ỨNG VIÊN: khớp ĐÚNG TỪ KHOÁ (nguyên từ), không embedding: "phở" không kéo ảnh phở bò. Nhiều món: theo thứ
+           tự xuất hiện. Từ khách gõ CÓ DẤU phải trùng cả dấu ("bánh Tết" không phải "bánh tét", "cơm" không phải "cốm"); từ gõ
+           KHÔNG DẤU so với dạng bỏ dấu của cụm ("banh tet" khớp "bánh tét").
+           Mỗi ứng viên có độ CHẮC (20/10): cụm >= 2 từ khách gõ có dấu, trùng nguyên văn kể cả dấu = chắc, code dùng luôn;
+           còn lại (alias một từ "cốm" trong "trà sữa cốm", gõ không dấu "com tam" / "banh tet") LLM đầu luồng quyết
+           (brief/__init__.py)
   numbered -> số ảnh của từng mục kho trong lượt vẽ: ảnh sản phẩm khách tải (nếu có) luôn là image 1
   refs_for_draw -> ảnh sản phẩm trước rồi ảnh kho; FLUX.2 klein (4B và 9B) nhận tối đa MAX_REFS ảnh
 """
@@ -72,6 +75,9 @@ def problems(entries: list[dict], root: Path | None = None) -> list[str]:
             out.append(f"{name}: thiếu source (giấy phép / tác giả)")
         if not _terms(e):
             out.append(f"{name}: chưa có aliases / tags, không bao giờ được khớp")
+        elif all(len(_words(t)) < SURE_WORDS for t in _terms(e)):
+            out.append(f"{name}: chỉ có cụm một từ -- không bao giờ khớp chắc (LLM quyết từng lần); thêm cụm >= 2 từ "
+                       "như 'cốm làng vòng'")
         for t in _terms(e):
             k = _norm(t).strip()
             if k in owner and owner[k] != e["id"]:
@@ -90,26 +96,42 @@ def _word_match(user: str, term: str) -> bool:
     return user == term if not user.isascii() else user == _norm(term).strip()
 
 
-def _first_hit(e: dict, words: list[str]) -> int:
-    """Chỉ số từ sớm nhất trong lời khách mà một cụm của mục khớp nguyên cụm; -1 nếu không khớp."""
-    best = -1
+SURE_WORDS = 2   # khớp CHẮC: cụm >= 2 từ, khách gõ CÓ DẤU, mọi từ trùng nguyên văn kể cả dấu ("bún thang", "cốm làng Vòng")
+
+
+def _first_hit(e: dict, words: list[str]) -> dict | None:
+    """Lần khớp của mục trong lời khách: {pos: chỉ số từ sớm nhất, sure, word: chữ khách gõ ở chỗ khớp}; None nếu không khớp.
+    Có cụm khớp chắc thì mục là chắc (vị trí vẫn là lần khớp sớm nhất)."""
+    best, sure = None, False
     for term in _terms(e):
         tw = _words(term)
         for i in range(len(words) - len(tw) + 1):
-            if (best < 0 or i < best) and all(_word_match(words[i + k], w) for k, w in enumerate(tw)):
-                best = i
+            if all(_word_match(words[i + k], w) for k, w in enumerate(tw)):
+                # chắc = trùng nguyên văn VÀ khách có gõ dấu: "banh tet" toàn ASCII vẫn mơ hồ (bánh Tết / bánh tét)
+                got = words[i:i + len(tw)]
+                exact = len(tw) >= SURE_WORDS and got == tw and not "".join(got).isascii()
+                sure = sure or exact
+                if best is None or i < best["pos"]:
+                    best = {"pos": i, "word": " ".join(words[i:i + len(tw)])}
                 break
-    return best
+    return None if best is None else {**best, "sure": sure}
 
 
-def match(text: str, entries: list[dict] | None = None, root: Path | None = None) -> list[str]:
-    """Id các mục có cụm khớp trong text, theo THỨ TỰ XUẤT HIỆN trong lời khách. Bỏ mục không có file ảnh."""
+def match_detail(text: str, entries: list[dict] | None = None, root: Path | None = None) -> list[dict]:
+    """Ứng viên kho trong text, theo THỨ TỰ XUẤT HIỆN: [{id, pos, sure, word}]. Bỏ mục không có file ảnh; cắt ở MAX_REFS.
+    sure = khớp chắc (code dùng luôn); không chắc (alias một từ "cốm" trong "trà sữa cốm", gõ không dấu "com tam") thì LLM
+    đầu luồng quyết (brief: nhắc "image N" thì dùng, không nhắc thì bỏ)."""
     root = root or kho_dir()
     entries = load(root) if entries is None else entries
     words = _words(text or "")
-    hits = [(p, i, e["id"]) for i, e in enumerate(entries) if e.get("id") and e.get("file")
-            for p in [_first_hit(e, words)] if p >= 0 and (root / e["file"]).is_file()]
-    return [cid for _, _, cid in sorted(hits)][:MAX_REFS]
+    hits = [(h["pos"], i, {"id": e["id"], **h}) for i, e in enumerate(entries) if e.get("id") and e.get("file")
+            for h in [_first_hit(e, words)] if h is not None and (root / e["file"]).is_file()]
+    return [h for _, _, h in sorted(hits, key=lambda x: x[:2])][:MAX_REFS]
+
+
+def match(text: str, entries: list[dict] | None = None, root: Path | None = None) -> list[str]:
+    """Id các ứng viên kho trong text (match_detail), theo thứ tự xuất hiện."""
+    return [h["id"] for h in match_detail(text, entries, root)]
 
 
 def numbered(ids: list[str], product: bool, entries: list[dict] | None = None) -> list[tuple[int, dict]]:

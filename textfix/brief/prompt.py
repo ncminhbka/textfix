@@ -6,7 +6,8 @@ FLUX vẽ mọi chuỗi trong ngoặc kép nó đọc được và chỉ những
   3. chuỗi không thuộc danh sách: từ tả tiếng Anh thì bỏ ngoặc; chữ lạ thì bỏ (cả câu nếu câu chỉ mang chữ lạ);
   4. câu nhắc lại lần hai bỏ ngoặc; bỏ tỉ lệ / độ phân giải;
   5. câu chưa có thì chèn sau câu đầu (FLUX cắt phần cuối khi quá dài, nên không nối vào cuối);
-  6. ảnh tham chiếu kho (món / trang phục Việt) chưa được nhắc "image N" thì chèn câu nhắc sau câu đầu;
+  6. ảnh tham chiếu kho khớp CHẮC (kho.match_detail) chưa được nhắc "image N" thì chèn câu nhắc sau câu đầu (ảnh không chắc
+     LLM không nhắc thì brief bỏ hẳn, rồi đánh số lại bằng `renumber` trước bước này);
   7. quá giới hạn token thì bỏ dần câu tả cảnh ở cuối.
 """
 
@@ -142,9 +143,23 @@ def _insert_missing(pe: str, texts: list[dict], notes: Notes) -> str:
     return head + ("" if head[-1:] in ".!?" else ".") + add + "".join(s[1:])
 
 
+def cited(pe: str) -> set[int]:
+    """Số các ảnh tham chiếu prompt nhắc tới ("image 2", "images 3")."""
+    return {int(m.group(0)[-1]) for m in IMAGE_REF.finditer(pe)}
+
+
+def renumber(pe: str, mapping: dict[int, int]) -> str:
+    """Đổi số ảnh tham chiếu theo mapping (cũ -> mới) trong MỘT lượt: bỏ một ảnh kho thì các ảnh sau lùi số, để số trong prompt
+    khớp thứ tự ảnh gửi cho model vẽ. Số không có trong mapping (ảnh sản phẩm image 1) giữ nguyên."""
+    def one(m):
+        k = int(m.group(0)[-1])
+        return m.group(0)[:-1] + str(mapping.get(k, k))
+    return IMAGE_REF.sub(one, pe)
+
+
 def _cite_refs(pe: str, refs: list[tuple[int, str]], notes: Notes) -> str:
     """Ảnh kho FLUX nhận mà prompt không nhắc "image N" thì FLUX không biết ảnh đó là món nào: chèn câu nhắc sau câu đầu."""
-    said = {int(m.group(0)[-1]) for m in IMAGE_REF.finditer(pe)}
+    said = cited(pe)
     miss = [(n, name) for n, name in refs if n not in said]
     if not miss:
         return pe
