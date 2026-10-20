@@ -109,6 +109,7 @@ def draw_devices() -> list[str]:
 
 def gpu_worker(dev: str, args, ready: threading.Event) -> None:
     """Một luồng VẼ trên thiết bị dev: có FLUX (tại chỗ: nạp lên card; ở xa: bộ gọi API) + Hi-SAM, lấy việc từ hàng đợi chung."""
+    from textfix import config
     from textfix.draw import remote, hisam
     from textfix.engine import draw
     try:
@@ -118,15 +119,20 @@ def gpu_worker(dev: str, args, ready: threading.Event) -> None:
                 hisam.load(dev)   # nét chữ: nạp sẵn để lỗi thiếu tệp lộ ra lúc khởi động
         else:
             import torch
-            from textfix.draw.flux import Flux
             torch.cuda.set_device(dev)
             # NẠP LẦN LƯỢT từng card: transformers đổi kiểu số mặc định của torch (toàn cục, không theo luồng) khi nạp bộ mã
             # hoá chữ -> hai card nạp cùng lúc giẫm nhau, một bản lẫn float32 (Flux.load còn ép bf16 lần nữa). Vẽ vẫn song song.
             with LOAD_LOCK:
                 t0 = time.time()
-                F = Flux(args.model, steps=args.steps, weights_dir=args.weights_dir, device=dev).load()
+                if config.draw_profile() == "qwen":   # start_server.sh --draw qwen: Qwen-Image tại chỗ thay FLUX
+                    from textfix.draw.qwen import QwenDraw
+                    F = QwenDraw(device=dev).load()
+                else:
+                    from textfix.draw.flux import Flux
+                    F = Flux(args.model, steps=args.steps, weights_dir=args.weights_dir, device=dev).load()
                 hisam.load(dev)
-            log.info("FLUX %s sẵn sàng (%.0fs, %.1f GB)", dev, time.time() - t0, torch.cuda.memory_allocated(dev) / 2 ** 30)
+            log.info("%s %s sẵn sàng (%.0fs, %.1f GB)", F.info()["model"], dev, time.time() - t0,
+                     torch.cuda.memory_allocated(dev) / 2 ** 30)
         STATE["flux"].append(F)
     except BaseException as e:   # gồm SystemExit của flux2.util khi thiếu trọng số
         STATE["error"] = f"{dev}: {type(e).__name__}: {e}"
@@ -175,7 +181,7 @@ def init_models(args) -> None:
         ev.wait()
     if not STATE["flux"]:
         raise RuntimeError(STATE["error"] or "không nạp được luồng vẽ nào")
-    log.info("Sẵn sàng: %d luồng vẽ %s (FLUX %s), %d luồng thiết kế; LLM %s | VLM %s", len(STATE["flux"]), devs,
+    log.info("Sẵn sàng: %d luồng vẽ %s (model vẽ %s), %d luồng thiết kế; LLM %s | VLM %s", len(STATE["flux"]), devs,
              STATE["flux"][0].info()["model"], DESIGN._max_workers, m["llm"]["model"], m["vlm"]["model"])
 
 
