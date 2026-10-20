@@ -123,11 +123,3 @@ def test_no_ornament_no_trim():
     ink, g = group_of(mask)
     x0 = float(np.nonzero(mask)[1].min())
     assert lead(g, ink, box_x0=x0 - 2) == ([], None)
-
-
-def test_line_with_a_word_not_on_the_product_is_poster_text():
-    # final3 h17: tiêu đề "Bia Sapppro" giống "SAPPORO" trên lon, nhưng "Bia" không có trên lon -> chữ poster, không giữ
-    from textfix.lines.printed import mark_printed
-    M = {"L": [{"id": "L1", "ocr": "Bia Sapppro"}, {"id": "L7", "ocr": "SAPPORO"}, {"id": "L8", "ocr": "PRLMIUM BEER"},
-               {"id": "L9", "ocr": "For Dsmsigrd HEitr"}]}
-    assert mark_printed(M, ["SINCE", "SAPPORO", "1876", "PREMIUM BEER", "For Damaged Hair"]) == ["L7", "L8", "L9"]

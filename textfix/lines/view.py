@@ -44,8 +44,6 @@ def _typo_notes(L: list, logs: list[str]) -> None:
             notes.append({"kind": "trang trí đầu dòng", "how": "mảnh nét đầu dòng nhỏ, giữa chiều cao, cách chữ (lines.lead): không thuộc chữ, giữ nguyên điểm ảnh nháp"})
         if l.get("lead_icon"):
             notes.append({"kind": "khung dời khỏi icon", "how": "khung bộ dò ôm cả thứ đứng trước chữ -> mép trái dời tới nét chữ đầu tiên"})
-        if l.get("printed"):
-            notes.append({"kind": "chữ in trên sản phẩm", "how": "chữ OCR khớp chữ đọc được trên ảnh sản phẩm khách tải"})
         if notes:
             l["typo"] = notes
         else:
@@ -54,7 +52,7 @@ def _typo_notes(L: list, logs: list[str]) -> None:
 
 def public(M: dict) -> dict:
     """Ô để ghi JSON."""
-    return {"L": [{k: m[k] for k in ("id", "box", "ocr_box", "ocr", "size", "color", "angle", "curve", "runs", "geo", "path", "scale", "missed", "orphan", "printed", "lead_icon", "vertical", "shape", "row", "angle_ocr", "ink", "sag", "merged", "typo", "poly") if k in m}
+    return {"L": [{k: m[k] for k in ("id", "box", "ocr_box", "ocr", "size", "color", "angle", "curve", "runs", "geo", "path", "scale", "missed", "orphan", "lead_icon", "vertical", "shape", "row", "angle_ocr", "ink", "sag", "merged", "typo", "poly") if k in m}
                   for m in M["L"]]}
 
 

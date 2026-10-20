@@ -3,7 +3,7 @@
   M = build(draft, ink)        # {"L": [dòng], "size": [W, H], "by": {id: dòng}, "geo_log": [...]}
 
 Các phần: detect.py (dòng OCR + số đo nét), split.py (tách mục trong dòng), curve.py (chữ cong), orphans.py (nét OCR
-không thấy), order.py (đánh số), view.py (ảnh đánh dấu, JSON, ghi chú chữ khó), printed.py (chữ in trên sản phẩm).
+không thấy), order.py (đánh số), view.py (ảnh đánh dấu, JSON, ghi chú chữ khó), fold.py (so chữ bỏ dấu).
 VLM không đưa toạ độ: chỉ trỏ id dòng.
 """
 

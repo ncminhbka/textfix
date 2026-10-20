@@ -25,7 +25,7 @@ from textfix.compose.layout import layout, public  # noqa: E402
 from textfix.draw import hisam  # noqa: E402
 from textfix.lines.detect import reorient  # noqa: E402
 from textfix.lines.glyph import measure  # noqa: E402
-from textfix.lines.printed import _flat  # noqa: E402
+from textfix.lines.fold import _flat  # noqa: E402
 from textfix.render.browser import Browser  # noqa: E402
 
 _EM = {}   # font -> (cao chữ H, cao chữ x) theo em

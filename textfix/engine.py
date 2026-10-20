@@ -93,12 +93,6 @@ def draw(flux, B: dict, W: int, H: int, seed: int, product: np.ndarray | None = 
         T["net_chu"] = time.time() - t0
     out = {"draft": draft, "ink": np.asarray(ink, bool), "timing": T,
            "device": getattr(flux, "dev_dit", None)}   # card của luồng vẽ: LaMa ở trạm thiết kế chạy cùng card (chia tải hai card)
-    if product is not None:   # chữ in trên sản phẩm khách tải: để bước thiết kế nhận ra các dòng đó trong nháp và GIỮ nguyên
-        from .lines.ocr import read_lines
-        try:
-            out["product_ocr"] = [l["text"] for l in read_lines(product) if sum(ch.isalnum() for ch in l["text"]) >= 2]
-        except Exception:   # OCR ảnh sản phẩm hỏng: vẫn còn lời dặn + lựa chọn keep của VLM
-            out["product_ocr"] = []
     return out
 
 
@@ -111,15 +105,11 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     from .compose import vlm as cvlm
     from .compose.assign import resolve
     from .compose.layout import layout, public
-    from .lines.view import _typo_notes
     draft, ink, T = d["draft"], d["ink"], dict(d["timing"])
     texts = B["texts"]
     t0 = time.time()
     progress("đo dòng (OCR + nét chữ)")
     M0 = lines.build(draft, ink, product=product)
-    printed = lines.mark_printed(M0, d.get("product_ocr")) if product else []
-    if printed:
-        _typo_notes(M0["L"], M0.get("geo_log") or [])   # ghi lại phần "chữ khó" cho dòng in trên sản phẩm
     geo_log = list(M0.get("geo_log") or [])
     M = cvlm.view(M0)
     T["dong"] = time.time() - t0
@@ -136,7 +126,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     progress("VLM ghép câu")
     # MỘT lời gọi, khuôn JSON bắt buộc mỗi dòng một mục (compose.vlm.schema): không hỏi lại dòng bỏ sót / dòng không còn chữ /
     # ghép rỗng (người dùng chốt 16/10). Ghép rỗng -> lỗi nặng "empty_plan".
-    A = cvlm.ask(draft, M, B["prompt_en"], texts, vlm, product=product, base=clean)
+    A = cvlm.ask(draft, M, B["prompt_en"], texts, vlm, product=product)
     wrote = any(u["kind"] == "text" and (u["clients"] or u["text_vlm"]) for u in A.get("assign") or [])
     empty = bool(M["L"] and texts) and not wrote
     llog = []
@@ -145,8 +135,6 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     U, rlog0, miss_i = resolve(A, M, texts)
     U, llay = layout(U, M, ink, A["styles"], A["accent"], texts, base=clean)
     log = geo_log + llog + rlog0 + llay
-    if product:
-        log.insert(0, f"ảnh sản phẩm khách tải: chữ đọc được {d.get('product_ocr') or []} -> dòng nháp là chữ in trên sản phẩm {printed}")
     T["vlm"] = time.time() - t0
     t0 = time.time()
     progress("dựng + kiểm")

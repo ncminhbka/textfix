@@ -49,18 +49,18 @@ def _texts(texts: list[dict]) -> str:
 PRODUCT_NOTE = ("The client uploaded a photo of their product and the image model copied it into the draft. Text, logos and "
                 "graphics printed on that product (label, package, screen) are part of the photo and MUST stay exactly as they "
                 "are: give every slot on the product kind \"keep\" -- never rewrite, correct, translate, redraw or skip it, "
-                "and never write a client text there, even when the product's name is one of the client texts. Lines the list "
-                "marks PRINTED ON THE CLIENT'S PRODUCT were recognised by code as product text: they are always \"keep\".")
+                "and never write a client text there, even when the product's name is one of the client texts.")
 
 
-def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, system: str, desc: str, base: np.ndarray,
+def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, system: str, desc: str,
          product: bool = False, meta: dict | None = None, schema: dict | None = None) -> dict:
-    """Một lời gọi VLM: lời dặn (system), PROMPT của FLUX, câu khách, bảng mô tả dòng (desc), ba ảnh DRAFT / SLOTS / BASE.
+    """Một lời gọi VLM: lời dặn (system), PROMPT của FLUX, câu khách, bảng mô tả dòng (desc), hai ảnh DRAFT / SLOTS.
+    Không gửi nền đã gỡ chữ (20/10): VLM chỉ đọc và trỏ id dòng; nền đó gỡ cả chữ trên sản phẩm khách tải, nhìn như nhãn trống
+    để viết vào (dev2 d13).
     meta: nhận số token / thời gian (llm.json_call); schema: khuôn JSON của lời gọi. -> câu trả lời JSON (compose.parse đọc)."""
     mk = marked_image(draft, M)
     W, H = mk.size
-    imgs = ["DRAFT:", _png(draft), "SLOTS (marked):", _png(mk),
-            "BASE (the draft with the old letters wiped; your text is drawn on it):", _png(base)]
+    imgs = ["DRAFT:", _png(draft), "SLOTS (marked):", _png(mk)]
     user = (f"PROMPT given to the image model:\n{prompt}\n\nClient texts (exact words):\n{_texts(texts)}\n\nPoster size: {W}x{H}px.\n\n"
             + (PRODUCT_NOTE + "\n\n" if product else "") + desc)
     kw = {"schema": schema} if schema else {}

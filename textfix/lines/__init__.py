@@ -24,11 +24,10 @@ from .ink import Ink, own
 from .lead import lead
 from .measure import CAP_EM, measure
 from .page import build  # noqa: F401
-from .printed import mark_printed  # noqa: F401
 from .runs import rows
 from .view import marked_image, public  # noqa: F401
 
-__all__ = ["CAP_EM", "Ink", "SNAP", "VERTICAL", "build", "lines", "mark_printed", "marked_image", "measure_lines", "public", "reorient", "rows", "wrap"]
+__all__ = ["CAP_EM", "Ink", "SNAP", "VERTICAL", "build", "lines", "marked_image", "measure_lines", "public", "reorient", "rows", "wrap"]
 
 NONE = {"ornament": [], "x0": None, "h_cap": None, "h_x": None, "base": None, "color": None, "stroke": None, "stroke_contrast": None}
 

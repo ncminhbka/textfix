@@ -3,9 +3,9 @@ lý do (plan.json "fates").
 
 Luật, theo thứ tự (người dùng chốt 15/10; 16/10: không hỏi lại VLM):
   1. VLM ghép câu khách / chữ lấp vào dòng -> text (đơn vị do bước ghép, compose.assign.resolve, quyết);
-  2. chữ in trên sản phẩm khách tải (lines.mark_printed) -> keep, trừ khi VLM ghép câu khách (compose.assign.resolve);
-     mẩu nằm trong khung một dòng khác theo số phận dòng đó (compose.assign.inside);
-  3. VLM nói keep / skip -> theo VLM: TIN VLM khi nó xoá;
+  2. mẩu nằm trong khung một dòng khác theo số phận dòng đó (compose.assign.inside);
+  3. VLM nói keep / skip -> theo VLM: TIN VLM khi nó xoá -- kể cả chữ trên sản phẩm khách tải (20/10: bỏ phép so chữ OCR với
+     ảnh sản phẩm: chỉ bắt được tên thương hiệu, không bắt chữ nhỏ / logo -- những dòng đó VLM nhìn ảnh vẫn nhận ra);
   4. VLM CÓ nhắc dòng mà không còn chữ cho nó -> skip: chữ giun không được ở lại. BÁM NHÁP (16/10): hiếm -- dòng FLUX vẽ thừa
      có chữ VLM đoán, câu FLUX vẽ lặp được viết lặp (compose.assign.resolve); còn lại là mảnh split VLM nói không mang chữ;
   5. VLM KHÔNG nhắc dòng (khuôn JSON bắt buộc đủ dòng nên chỉ còn khi VLM không theo khuôn) -> keep: không biết dòng là gì thì
@@ -28,10 +28,7 @@ def leftovers(U: list[dict], M: dict, seen: set) -> tuple[list[dict], list[str]]
         if l["id"] in have:
             continue
         base = {"id": f"g_{l['id']}", "marks": [l["id"]], "clients": [], "split": None, "text_vlm": "", "role_vlm": None}
-        if l.get("printed"):
-            why = "chữ in trên sản phẩm khách tải"
-            out.append({**base, "kind": "keep", "why": why})
-        elif l["id"] in seen:
+        if l["id"] in seen:
             why = "VLM có nhắc nhưng không còn chữ cho dòng (câu đã có chỗ khác / chữ lấp bị bỏ)"
             out.append({**base, "kind": "skip", "why": why, "no_words": True})
         else:

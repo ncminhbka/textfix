@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 
-from ..lines.printed import _flat
+from ..lines.fold import _flat
 from . import rows
 from .geometry import SPLIT_RATIO, _reading, _stacked
 
@@ -43,16 +43,6 @@ def resolve(A: dict, M: dict, texts: list[dict]) -> tuple[list[dict], list[str],
         if lost:
             log.append(f"{u['id']}: dòng {lost} đã thuộc đơn vị khác -> bỏ khỏi đơn vị này")
             u["marks"] = [m for m in u["marks"] if owner[m] == i]
-    U = [u for u in U if u["marks"]]
-    # CHỮ IN TRÊN SẢN PHẨM KHÁCH TẢI (mark_printed: chữ OCR trùng chữ đọc trên ảnh sản phẩm) giữ nguyên điểm ảnh -- trừ khi VLM
-    # ghép dòng đó vào một CÂU KHÁCH: VLM nhìn ảnh thấy đó là chữ poster (14/10 dev2 d39 / d14: tiêu đề "Cà phê hoà tan Classic"
-    # vẽ hai dòng, dòng "Classic" trùng chữ trên gói -> bị giữ dạng giun, câu dồn vào một dòng)
-    for u in list(U):
-        pr = [m for m in u["marks"] if by[m].get("printed")]
-        if pr and u["kind"] != "keep" and not u["clients"]:
-            log.append(f"{u['id']}: {pr} là chữ in trên sản phẩm khách tải -> giữ nguyên")
-            U.append({**u, "id": u["id"] + "p", "kind": "keep", "marks": pr, "clients": [], "split": None, "text_vlm": ""})
-            u["marks"] = [m for m in u["marks"] if m not in pr]
     U = [u for u in U if u["marks"]]
     # MỘT CÂU CHIA Ở NHIỀU ĐƠN VỊ (VLM ghi mỗi mẩu một mục: "Du lịch Mây Ngàn -" | "0283 777 8899", 14/10 mix1 m04): các mẩu nối
     # lại theo thứ tự đọc ra đúng câu -> gộp thành một đơn vị nhiều dòng, mỗi dòng một mẩu
@@ -182,7 +172,7 @@ def _paired(u: dict, k: int, U: list[dict], rof: dict) -> bool:
 
 def inside(U: list[dict], M: dict) -> list[str]:
     """MẨU CỦA DÒNG KHÁC: dòng không mang câu khách nằm >= INSIDE trong khung một dòng thẳng lớn hơn (mẩu logo Hi-SAM tách ra
-    thành cụm nét riêng, OCR đọc trùng một mẩu) theo số phận dòng đó: dòng kia giữ (chữ in trên sản phẩm, logo) -> giữ; không ->
+    thành cụm nét riêng, OCR đọc trùng một mẩu) theo số phận dòng đó: dòng kia giữ (chữ trên sản phẩm, logo) -> giữ; không ->
     gỡ (chữ của dòng kia viết lại ở khung của nó). -> nhật ký."""
     log = []
     owner = {m: u for u in U for m in u["marks"]}
@@ -198,7 +188,7 @@ def inside(U: list[dict], M: dict) -> list[str]:
             continue
         p = max(par, key=lambda p: area(p["box"]))
         pu = owner.get(p["id"])
-        kind = "keep" if p.get("printed") or (pu is not None and pu["kind"] == "keep") else "skip"
+        kind = "keep" if pu is not None and pu["kind"] == "keep" else "skip"
         if u is not None and u["kind"] == kind and len(u["marks"]) == 1:
             continue
         if u is not None:

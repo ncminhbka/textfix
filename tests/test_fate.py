@@ -57,12 +57,6 @@ def test_repeated_text_is_written_twice_as_drawn():
     assert sorted(u["text_vlm"] or TEXTS[u["clients"][0]]["text"] for u in U if u["kind"] == "text") == ["Khai trương", "Khai trương"]
 
 
-def test_printed_line_is_kept_unless_client_text():
-    M = page(line(1, 100, printed=True), line(2, 200, printed=True))
-    t = fates(M, [entry(["L1"], kind="skip"), entry(["L2"], client="T0")])
-    assert t["L1"]["fate"] == "keep" and t["L2"]["fate"] == "text"
-
-
 def test_ask_is_one_call_with_a_schema_requiring_every_line(monkeypatch):
     calls = []
 
@@ -73,7 +67,7 @@ def test_ask_is_one_call_with_a_schema_requiring_every_line(monkeypatch):
     monkeypatch.setattr("textfix.compose.call.marked_image", lambda img, M: __import__("PIL.Image").Image.fromarray(img))
     M = page(line(1, 100), line(2, 200))
     img = np.zeros((64, 64, 3), np.uint8)
-    A = vlm.ask(img, M, "prompt", TEXTS, call, base=img)
+    A = vlm.ask(img, M, "prompt", TEXTS, call)
     S = calls[0]["properties"]
     assert len(calls) == 1 and S["lines"]["required"] == ["L1", "L2"]
     assert S["lines"]["properties"]["L1"]["properties"]["client"]["items"]["enum"] == ["T0", "T1"]
@@ -120,7 +114,7 @@ def test_filler_becomes_a_missing_client_text_else_is_written(filler, want):
 
 def test_fragment_inside_a_kept_logo_is_kept():
     # final2 d63e: Hi-SAM tách mẩu logo trên lon (OCR không đọc) thành dòng riêng; VLM ghép chữ lấp -> theo dòng logo: giữ
-    M = page({**line(7, 0), "box": [469, 394, 576, 748], "printed": True, "angle": -85.0},
+    M = page({**line(7, 0), "box": [469, 394, 576, 748], "angle": -85.0},
              {**line(6, 0), "box": [477, 553, 494, 576], "orphan": True, "ocr": ""}, line(1, 100))
     t = fates(M, [entry(["L1"], client="T0"), entry(["L7"], kind="keep"), entry(["L6"], text="Hàng thật")])
     assert t["L6"]["fate"] == "keep" and t["L7"]["fate"] == "keep"

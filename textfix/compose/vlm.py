@@ -1,6 +1,6 @@
 """BƯỚC 4b: VLM ĐỌC nháp -- dòng nào là câu khách nào, dòng nào giữ / xoá, mỗi vai trông thế nào.
 
-  A = ask(draft, M, prompt, texts, call, base=clean)   # MỘT lời gọi cho mọi dòng, khuôn JSON bắt buộc mỗi L# một mục
+  A = ask(draft, M, prompt, texts, call)   # MỘT lời gọi cho mọi dòng, khuôn JSON bắt buộc mỗi L# một mục
 VLM không đưa toạ độ, chỉ trỏ id dòng; mọi thứ ngoài dòng chữ (vỏ, icon, hoạ tiết) là điểm ảnh của nháp. Số phận cuối cùng của
 mỗi dòng: compose/fate.py. Lời dặn có ba số phận: text (chữ poster), keep (chữ trên vật trong ảnh), skip (rác đứng riêng).
 """
@@ -22,8 +22,7 @@ def view(M: dict) -> dict:
 def describe(M: dict) -> str:
     note = lambda m: (_curve_note(m) if m.get("path") else f", drawn at {m['angle']:.0f} degrees" if abs(m.get("angle") or 0) >= 2   # noqa: E731
                       else "") + (", found by the stroke detector (big decorated lettering)" if m.get("missed") and not m.get("orphan") else "") \
-        + (", STRAY LETTERING (letter shapes that may be junk, a logo or decoration)" if m.get("orphan") else "") \
-        + (", PRINTED ON THE CLIENT'S PRODUCT: kind \"keep\"" if m.get("printed") else "")
+        + (", STRAY LETTERING (letter shapes that may be junk, a logo or decoration)" if m.get("orphan") else "")
     # CHỮ OCR GỬI LẠI làm NEO (người dùng 14/10 tối: "đưa OCR hint quay lại nếu thấy performance giảm"; mix1 v03: thiếu chữ OCR,
     # VLM ghép ngày vào mẩu 21px và xoá dòng OCR đọc đúng "01/12 - 07/12"). Chỉ để VLM biết L# nào là dòng nào -- code không
     # dùng chữ này để viết.
@@ -34,7 +33,7 @@ def describe(M: dict) -> str:
 
 SYSTEM = """You are a senior graphic designer finishing a poster. An image model drew the DRAFT from the PROMPT below. Everything in it \
 is good except its lettering, which is garbled and misspelt. Code measured every TEXT LINE of the draft (red L# on SLOTS), \
-wiped the old letters (BASE) and will set the CLIENT TEXTS there itself, word for word, at the size, place and alignment the \
+will wipe the old letters and set the CLIENT TEXTS there itself, word for word, at the size, place and alignment the \
 draft shows. YOUR JOB IS TO READ, NOT TO WRITE: say which client text each drawn line was meant to be, and how each kind of \
 text looks in the draft.
 
@@ -53,7 +52,7 @@ own lettering of a depicted product or object -- brand and label on a package, l
 garbled: its pixels stay as drawn; never the poster's message. "skip": only junk standing alone, neither poster lettering nor \
 on an object: it is wiped. Unsure between "keep" and "skip": "keep".
 5. Client texts the model drew no line for go in "missing". Never cram them into another line.
-6. Bullets, ticks, icons, numbers and pictures before a line stay on the BASE as drawn: never mention them.
+6. Bullets, ticks, icons, numbers and pictures before a line stay as drawn: never mention them.
 
 STYLES -- one entry per client-text ROLE (the role is written after each T#): how that kind of text looks in the DRAFT. Every \
 text of the role is set exactly alike, so describe what the role looks like, not one line: "font" (a key from the catalog \
@@ -67,8 +66,8 @@ outline are "#ffffff" with the outline in "effect").
 ACCENT (optional): a word or number the draft draws in another color inside one client text ("50%" in "Giảm 50% hôm nay"): \
 {"client": "T#", "text": "<exact substring>", "color": "#hex"}. Sizes come from the draft: never give one.
 
-IMAGES: DRAFT = what the model drew. SLOTS = the draft with every text line marked (red L#). BASE = the draft with the old \
-letters wiped. The list after the images gives each line's machine reading of the garbled letters (often wrong, but numbers, \
+IMAGES: DRAFT = what the model drew. SLOTS = the draft with every text line marked (red L#). The list \
+after the images gives each line's machine reading of the garbled letters (often wrong, but numbers, \
 dates and short words usually come out right -- use it to tell which L# is which line), measured size, color and look.
 
 OUTPUT: one JSON object, "lines" with an entry for EVERY L#
@@ -80,11 +79,11 @@ OUTPUT: one JSON object, "lines" with an entry for EVERY L#
 FONT CATALOG (key: family, class): {fonts}"""
 
 
-def ask(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, product: bool = False, base: np.ndarray | None = None,
+def ask(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, product: bool = False,
         meta: dict | None = None) -> dict:
     """MỘT lời gọi cho mọi dòng, ép theo khuôn của poster này (schema: mỗi L# một mục bắt buộc -- VLM không bỏ sót dòng được,
     không cần hỏi lại; người dùng chốt 16/10) -> câu trả lời đã đọc (parse)."""
-    raw = plan(draft, M, prompt, texts, call, _system(SYSTEM), describe(M), base, product=product, meta=meta,
+    raw = plan(draft, M, prompt, texts, call, _system(SYSTEM), describe(M), product=product, meta=meta,
                schema=schema(M, texts))
     return parse(raw, M)
 

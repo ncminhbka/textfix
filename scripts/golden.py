@@ -91,7 +91,6 @@ def cases(specs: list[str], only: set):
 
 
 def run(specs: list[str], only: set) -> dict:
-    from textfix.lines.ocr import read_lines
     out = {}
     with Browser() as B:
         for key, r, P, image in cases(specs, only):
@@ -100,9 +99,6 @@ def run(specs: list[str], only: set) -> dict:
             Bf = json.load(open(r + "brief.json", encoding="utf-8"))
             Bf["prompt_en"] = P.get("prompt_en") or Bf["prompt_en"]
             d = {"draft": draft, "ink": ink, "timing": {}, "device": "cpu"}
-            if image and os.path.exists(image):
-                d["product_ocr"] = [l["text"] for l in read_lines(np.asarray(Image.open(image).convert("RGB")))
-                                    if sum(ch.isalnum() for ch in l["text"]) >= 2]
             res = design(d, Bf, fake_vlm(P), B.page, product=bool(image))
             plan = json.dumps(res["plan"], ensure_ascii=False, sort_keys=True, default=str)
             out[key] = {"plan": hashlib.sha256(plan.encode()).hexdigest()[:16], "poster": digest(res["poster"]),
