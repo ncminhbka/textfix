@@ -145,20 +145,19 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
         errs.append({"type": "empty_plan", "ops": []})
     log += rlog + [f"LỖI: {e}" for e in errs]
     poster_first, errs_first = poster, errs   # bản lượt đầu (debug: so trước / sau khi mã sửa lỗi)
-    sev = lambda E: sum(e["type"] in render.SEVERE for e in E)   # noqa: E731
-    for k in range(render.FIX_ROUNDS if sev(errs) else 0):   # SỬA BẰNG CODE: lỗi nặng đo được -> sửa, dựng lại, giữ khi bớt lỗi
+    for k in range(render.FIX_ROUNDS if render.score(errs)[0] else 0):   # SỬA BẰNG CODE: lỗi nặng đo được -> sửa, dựng lại, giữ khi bớt lỗi
         U2, flog2 = render.autofix_units(U, errs, res)
         if not flog2:
             break
         poster2, res2, _ = render.render_units(page, base, U2, M)
         errs2 = render.check_units(U2, res2)
-        ok = (sev(errs2), len(errs2)) < (sev(errs), len(errs))
+        ok = render.score(errs2) < render.score(errs)
         log += [f"-- sửa bằng code {k + 1} --"] + flog2 + [f"LỖI CÒN: {e}" for e in errs2] + \
             ["-> giữ bản sửa" if ok else "-> bản sửa không bớt lỗi, giữ bản trước"]
         if not ok:
             break
         poster, U, errs, res = poster2, U2, errs2, res2
-        if not sev(errs):
+        if not render.score(errs)[0]:
             break
     T["dung"] = time.time() - t0
     vlm_miss = [k for k in A.get("missing") or [] if 0 <= k < len(texts)]

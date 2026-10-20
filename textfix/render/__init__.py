@@ -13,10 +13,10 @@ style.py (font theo khoá), js.py (mã dựng trong trang), view.py (ảnh debug
 
 from __future__ import annotations
 
-from .check import SEVERE, check_units  # noqa: F401
+from .check import SEVERE, check_units, score  # noqa: F401
 from .fix import FIX_ROUNDS, autofix_units  # noqa: F401
 from .geometry import ROT_MIN, op_box, op_geom, path_of  # noqa: F401
 from .page import CONDENSE, render_units  # noqa: F401
 from .view import ops_image  # noqa: F401
 
-__all__ = ["CONDENSE", "FIX_ROUNDS", "ROT_MIN", "SEVERE", "autofix_units", "check_units", "op_box", "op_geom", "ops_image", "path_of", "render_units"]
+__all__ = ["CONDENSE", "FIX_ROUNDS", "ROT_MIN", "SEVERE", "autofix_units", "check_units", "op_box", "op_geom", "ops_image", "path_of", "render_units", "score"]

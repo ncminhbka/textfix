@@ -109,15 +109,40 @@ def _recolor(r: dict, bg: np.ndarray, draft_color: str | None, pal: list | None 
 
 
 SEVERE = ("empty_plan", "content_overlap", "overflow", "low_contrast")
+INFO = ("touching",)   # chỉ báo: không tính khi so bản sửa với bản trước
+
+
+def score(errs: list[dict]) -> tuple[int, int]:
+    """(số lỗi nặng, số lỗi tính) -- vòng sửa giữ bản sửa khi cặp này giảm."""
+    return sum(e["type"] in SEVERE for e in errs), sum(e["type"] not in INFO for e in errs)
+
+
+TOUCH_GAP = 0.3   # hai phần tử cùng hàng cách nhau < 0,3 cỡ chữ (hẹp hơn một dấu cách) = chữ dính nhau ("333123", "Giảm20%")
+
+
+def touch_gap(a: dict, b: dict) -> float | None:
+    """Khe ngang giữa nét chữ hai phần tử CÙNG HÀNG (hộp nét chồng dọc >= nửa hộp thấp hơn), tính theo cỡ chữ nhỏ hơn; âm là
+    chồng ngang. None: không cùng hàng, phần tử xoay / theo đường cong, hoặc rỗng."""
+    if a.get("empty") or b.get("empty") or a.get("angle") or b.get("angle") or a.get("polys") or b.get("polys"):
+        return None
+    A, B = a["ink"], b["ink"]
+    if min(A[3], B[3]) - max(A[1], B[1]) < 0.5 * min(A[3] - A[1], B[3] - B[1]):
+        return None
+    sz = min(float(a.get("size") or 0), float(b.get("size") or 0))
+    return max(B[0] - A[2], A[0] - B[2]) / sz if sz > 0 else None
 
 
 def check_units(U: list[dict], res: list | None, shrink_min: float | None = 0.7) -> list[dict]:
     """LỖI KHÁCH QUAN sau khi dựng (không cần mắt): nội dung hai đơn vị chồng nhau, tràn khung dù đã co tới sàn, phải co dưới
-    shrink_min (chữ dài so với chỗ nháp vẽ; mục của tập kéo theo không tính), chữ chìm nền."""
+    shrink_min (chữ dài so với chỗ nháp vẽ; mục của tập kéo theo không tính), chữ chìm nền, hai phần tử cùng hàng dính nhau
+    (touching: chỉ báo, không vào vòng sửa)."""
     errs = []
     res = res or []
     for i, a in enumerate(res):
         for b in res[i + 1:]:
+            g = touch_gap(a, b)
+            if g is not None and -0.5 < g < TOUCH_GAP:   # chồng sâu hơn là content_overlap
+                errs.append({"type": "touching", "ops": [a["id"], b["id"]], "gap": round(g, 2)})
             if a.get("empty") or b.get("empty") or a["unit"] == b["unit"]:
                 continue
             if a.get("polys") or b.get("polys"):

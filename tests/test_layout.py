@@ -26,6 +26,18 @@ def test_room_grows_into_free_background_only():
     assert c[0] == 80 and c[2] == 280                          # đều hai bên, mỗi bên 20
 
 
+def test_room_stops_short_of_a_neighbor_cut_from_the_same_line():
+    # 20/10 run 5b98 v3: "0322 111 333" | "123 Hoàng Hoa Thám" cắt từ CÙNG một dòng nháp -- vùng dòng không chặn nhau; ô SĐT nới
+    # giữa vào khe "|" tới sát ô địa chỉ
+    import numpy as np
+    from textfix.compose.size import NEIGHBOR_GAP, neighbors, room
+    lab = np.zeros((100, 600, 3))
+    phone = {"box": [100, 40, 260, 60], "size": 20.0}
+    addr = {"box": [272, 40, 560, 60], "size": 20.0}
+    nb = room(phone["box"], "center", lab, neighbors(phone, [phone, addr], 100, 600))
+    assert addr["box"][0] - nb[2] >= NEIGHBOR_GAP * 20
+
+
 @pytest.mark.parametrize("glyph, ink, vlm, want", [
     ("#e8d9a0", "#e0d4a2", "#000000", "#e8d9a0"),   # chữ vàng trên đen, VLM ghi màu vai "đen": hai số đo đồng ý
     ("#fdfdfd", "#8a8a8a", "#ffffff", "#fdfdfd"),   # chữ trắng mảnh: lõi nét lẫn nền, đo khung + VLM đồng ý

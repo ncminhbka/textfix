@@ -109,11 +109,28 @@ def _blocker(l: dict, H: int, W: int, line_region) -> np.ndarray:
     return m
 
 
+NEIGHBOR_GAP = 0.3   # khung nới không tới gần khung PHẦN TỬ khác hơn 0,3 cỡ chữ (một dấu cách) -- render.check.TOUCH_GAP
+
+
+def neighbors(e: dict, E: list[dict], H: int, W: int) -> np.ndarray:
+    """Vùng cấm của phần tử e do các PHẦN TỬ KHÁC (kể cả cùng đơn vị, kể cả các câu cắt từ cùng một dòng nháp -- chúng chung id dòng
+    nên vùng dòng không chặn nhau, 20/10 run 5b98: ô SĐT nới vào khe "|" tới sát ô địa chỉ, "333123"): khung hiện tại của chúng
+    nới ngang NEIGHBOR_GAP cỡ chữ."""
+    m = np.zeros((H, W), bool)
+    for f in E:
+        if f is e:
+            continue
+        x0, y0, x1, y1 = f["box"]
+        g = NEIGHBOR_GAP * max(float(e["size"]), float(f["size"]))
+        m[max(0, int(y0)):min(H, int(np.ceil(y1))), max(0, int(x0 - g)):min(W, int(np.ceil(x1 + g)))] = True
+    return m
+
+
 def _rooms(T: list[dict], M: dict, base: np.ndarray, log: list[str], gone: set = frozenset()) -> None:
     """Nới khung các phần tử ngang (room) trên nền đã gỡ chữ; vùng cấm = vùng mọi dòng KHÁC của poster còn chữ (dòng gỡ trống --
-    `gone`: rác, hàng thừa -- không còn gì để chạm). Phần tử của tập nới tới bề rộng cột chung (column_want). Nới LẦN LƯỢT: phần
-    đã nới của đơn vị trước thành vùng cấm của đơn vị sau (tên món và giá cùng hàng không nới vào chung một khoảng trống tới
-    chạm nhau)."""
+    `gone`: rác, hàng thừa -- không còn gì để chạm) + khung mọi phần tử khác (neighbors). Phần tử của tập nới tới bề rộng cột
+    chung (column_want). Nới LẦN LƯỢT: khung đã nới của phần tử trước chặn phần tử sau (tên món và giá cùng hàng không nới vào
+    chung một khoảng trống tới chạm nhau)."""
     from ..color import lab as to_lab
     from ..erase.mask import line_region
     H, W = base.shape[:2]
@@ -123,22 +140,17 @@ def _rooms(T: list[dict], M: dict, base: np.ndarray, log: list[str], gone: set =
     for r in reg.values():
         allm += r
     want = column_want(T)
-    grown = np.zeros((H, W), bool)   # phần khung đã nới của các đơn vị trước (nới thêm khe ROOM_GAP cao dòng)
+    E = [e for u in T for e in u.get("els") or []]
     for u in T:
         own = np.zeros((H, W), np.uint8)
         for m in u["marks"]:
             if m in reg:
                 own += reg[m]
-        blocked = ((allm - own) > 0) | grown
-        mine = []
+        lines = (allm - own) > 0
         for e in u.get("els") or []:
             if e["path"] or abs(e["angle"]) >= 2:
                 continue
-            nb = room(e["box"], u["align"], L, blocked, want.get(e["id"], 0.0))
+            nb = room(e["box"], u["align"], L, lines | neighbors(e, E, H, W), want.get(e["id"], 0.0))
             if nb[2] - nb[0] > e["box"][2] - e["box"][0] + 1:
                 log.append(f"{e['id']}: khung nới {nb[2] - nb[0] - (e['box'][2] - e['box'][0]):.0f}px vào nền trống ({u['align']})")
                 e["box"] = nb
-                mine.append(nb)
-        for b in mine:
-            g = ROOM_GAP * (b[3] - b[1])
-            grown[max(0, int(b[1])):min(H, int(np.ceil(b[3]))), max(0, int(b[0] - g)):min(W, int(np.ceil(b[2] + g)))] = True

@@ -58,6 +58,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("out")
 ap.add_argument("sets", nargs="+")
 ap.add_argument("--only", default="")
+ap.add_argument("--all-versions", action="store_true", help="dựng lại mọi phiên bản v0, v1, ... (mặc định chỉ v0)")
 a = ap.parse_args()
 only = {x for x in a.only.split(",") if x}
 os.makedirs(f"{a.out}/cache", exist_ok=True)
@@ -67,105 +68,107 @@ with Browser() as B:
         setn, mfn = spec.split(":") if ":" in spec else (spec, spec)
         M0 = json.load(open(f"output/{setn}/{mfn}_manifest.json", encoding="utf-8"))
         cases = {c["id"]: c for c in json.load(open(f"bench/{mfn}.json", encoding="utf-8"))} if os.path.exists(f"bench/{mfn}.json") else {}
-        for cid, m in sorted(M0.items()):
-            if not m.get("run_id") or (only and cid not in only):
+        for cid0, m in sorted(M0.items()):
+            if not m.get("run_id") or (only and cid0 not in only):
                 continue
-            r = f"output/{setn}/{m['run_id']}/v0/"
-            dr = next(iter(glob.glob(r + "draft.*")), None)
-            if not (os.path.exists(r + "plan.json") and dr):
-                continue
-            P = json.load(open(r + "plan.json", encoding="utf-8"))
-            if not (P.get("slots") or {}).get("L") or not P.get("assign"):   # plan trước 14/10 (lệnh html): không dựng lại
-                continue
-            T = json.load(open(f"output/{setn}/{m['run_id']}/brief.json", encoding="utf-8"))["texts"]
-            D = np.asarray(Image.open(dr).convert("RGB"))
-            H, W = D.shape[:2]
-            if os.path.exists(r + "ink.png"):
-                ink = hisam.from_png(r + "ink.png", (W, H))
-            else:
-                ink = hisam.strokes(D)
-                hisam.to_png(ink, r + "ink.png")
-            L = P["slots"]["L"]
-            for l in L:
-                if l.get("ocr_box"):
-                    l["box"] = list(l["ocr_box"])
-                l.pop("mark", None)
-            reorient(D, ink, L)
-            for l in L:
-                if l.get("vertical"):   # cỡ lưu trong plan đo theo dòng ngang
-                    l["size"] = 0.8 * min(l["box"][2] - l["box"][0], l["box"][3] - l["box"][1])
-                if not l.get("path") and abs(l.get("angle") or 0) < 2 and not l.get("stroke"):
-                    g = measure(D, l["box"], l.get("ocr") or "", [o["box"] for o in L if o is not l])
-                    if g:
-                        l["stroke"] = float(g["stroke"])
-            M = cvlm.view({"L": L, "size": [W, H]})
-            glog = []
-            prod = bool((cases.get(cid) or {}).get("image"))
-            cpath = f"{a.out}/cache/{setn.replace('/', '_')}_{cid}_clean.png"
-            if os.path.exists(cpath):
-                clean = np.asarray(Image.open(cpath).convert("RGB"))
-            else:
-                clean = erase.erase(D, ink, M)[0]
-                Image.fromarray(clean).save(cpath)
-            A = {"assign": P["assign"], "styles": P.get("style") or {}, "accent": P.get("accent") or []}
-            U, rlog, miss = resolve(A, M, T)
-            U, llog = layout(U, M, ink, A["styles"], A["accent"], T, base=clean)
-            elog = []
-            base, mask = erase.settle(D, clean, ink, M, {"ops": U}, elog)
-            poster, res, dlog = render.render_units(B.page, base, U, M)
-            errs = render.check_units(U, res)
-            sev = lambda E: sum(e["type"] in render.SEVERE for e in E)   # noqa: E731
-            flog = []
-            for k in range(render.FIX_ROUNDS if sev(errs) else 0):
-                U2, f2 = render.autofix_units(U, errs, res)
-                if not f2:
-                    break
-                p2, res2, _ = render.render_units(B.page, base, U2, M)
-                e2 = render.check_units(U2, res2)
-                flog += f2
-                if (sev(e2), len(e2)) >= (sev(errs), len(errs)):
-                    break
-                poster, U, errs, res = p2, U2, e2, res2
-            old = Image.open(next(iter(glob.glob(r + "poster.*")))).convert("RGB")
-            pub = {**P, "ops": public(U)}
-            tiles = [Image.fromarray(D), old, render.ops_image(D, M, pub), Image.fromarray(np.asarray(poster))]
-            h = 720
-            tiles = [t.resize((round(t.width * h / t.height), h)) for t in tiles]
-            sheet = Image.new("RGB", (sum(t.width for t in tiles) + 8 * (len(tiles) - 1), h), (30, 30, 30))
-            x = 0
-            for t in tiles:
-                sheet.paste(t, (x, 0))
-                x += t.width + 8
-            sheet.save(f"{a.out}/{setn.replace('/', '_')}_{cid}.jpg", quality=82)
-            Image.fromarray(np.asarray(poster)).save(f"{a.out}/{setn.replace('/', '_')}_{cid}_poster.jpg", quality=90)
-            # SỐ ĐO: chữ đặt khác câu khách (phải 0 ngoài dòng lấp), tập dựng lệch cỡ (phải 0), phần tử co < 0,6, câu khách thiếu
-            import re   # số bước / ngoặc kép do mã đặt lại không tính là lệch
-            placed = lambda u: re.sub(r"^\d{1,2}\.\s+", "", "".join(x for e in u.get("els") or [] for x in e["lines"]).strip().strip("“”"))  # noqa: E731
-            off = [u["id"] for u in U if u["kind"] == "text" and u["clients"]
-                   and _flat(placed(u)) != _flat("".join(T[k]["text"] for k in u["clients"]))]
-            fs = {}
-            for rr in res:
-                u = next((u for u in U if u["id"] == rr["unit"]), None)
-                if u and u.get("set"):
-                    fs.setdefault(u["set"], []).append(round(rr["fs"] * (rr.get("sx") or 1), 1))
-            uneven = {k: v for k, v in fs.items() if max(v) / max(0.1, min(v)) > 1.03}
-            small = [(rr["id"], round(rr["shrink"], 2)) for rr in res if rr.get("shrink", 1) < 0.6]
-            # CỠ GIỐNG NHÁP: cao chữ dựng (cỡ cuối x cao chữ của font) / cao nét nháp đo được (lines: h_cap) -- 1 là đúng cỡ nháp
-            fit = []
-            for rr in res:
-                u = next((u for u in U if u["id"] == rr["unit"]), None)
-                hs = [(l.get("ink") or {}).get("h_cap") for l in (u or {}).get("Ls") or [] if not (l.get("path") or l.get("vertical"))]
-                if u and hs and all(hs) and rr.get("size"):
-                    em = letter_em(u["font"], " ".join(u["text"]), "text-transform:uppercase" in u.get("css", ""))
-                    fit.append(round(rr["size"] * em / float(np.median(hs)), 3))
-            rows.append({"set": setn, "id": cid, "errors": [e["type"] for e in errs], "errs": errs, "sets": sorted(fs), "uneven": uneven,
-                         "small": small, "fit": fit, "off": off, "missing": [T[k]["text"] for k in miss], "fill": [u["id"] for u in U if u["kind"] == "text" and not u["clients"]],
-                         "log": glog + rlog + llog + dlog + flog})
-            print(f"{setn} {cid}: tập {len(fs)}, lệch {uneven or '-'}, co<0.6 {small or '-'}, chữ lệch câu {off or '-'}, thiếu {rows[-1]['missing'] or '-'}, "
-                  f"lỗi {rows[-1]['errors'] or '-'}", flush=True)
+            vs = sorted(os.path.basename(v) for v in glob.glob(f"output/{setn}/{m['run_id']}/v[0-9]*")) if a.all_versions else ["v0"]
+            for vn in vs:
+                cid = cid0 if vn == "v0" else f"{cid0}_{vn}"
+                r = f"output/{setn}/{m['run_id']}/{vn}/"
+                dr = next(iter(glob.glob(r + "draft.*")), None)
+                if not (os.path.exists(r + "plan.json") and dr):
+                    continue
+                P = json.load(open(r + "plan.json", encoding="utf-8"))
+                if not (P.get("slots") or {}).get("L") or not P.get("assign"):   # plan trước 14/10 (lệnh html): không dựng lại
+                    continue
+                T = json.load(open(f"output/{setn}/{m['run_id']}/brief.json", encoding="utf-8"))["texts"]
+                D = np.asarray(Image.open(dr).convert("RGB"))
+                H, W = D.shape[:2]
+                if os.path.exists(r + "ink.png"):
+                    ink = hisam.from_png(r + "ink.png", (W, H))
+                else:
+                    ink = hisam.strokes(D)
+                    hisam.to_png(ink, r + "ink.png")
+                L = P["slots"]["L"]
+                for l in L:
+                    if l.get("ocr_box"):
+                        l["box"] = list(l["ocr_box"])
+                    l.pop("mark", None)
+                reorient(D, ink, L)
+                for l in L:
+                    if l.get("vertical"):   # cỡ lưu trong plan đo theo dòng ngang
+                        l["size"] = 0.8 * min(l["box"][2] - l["box"][0], l["box"][3] - l["box"][1])
+                    if not l.get("path") and abs(l.get("angle") or 0) < 2 and not l.get("stroke"):
+                        g = measure(D, l["box"], l.get("ocr") or "", [o["box"] for o in L if o is not l])
+                        if g:
+                            l["stroke"] = float(g["stroke"])
+                M = cvlm.view({"L": L, "size": [W, H]})
+                glog = []
+                prod = bool((cases.get(cid0) or {}).get("image"))
+                cpath = f"{a.out}/cache/{setn.replace('/', '_')}_{cid}_clean.png"
+                if os.path.exists(cpath):
+                    clean = np.asarray(Image.open(cpath).convert("RGB"))
+                else:
+                    clean = erase.erase(D, ink, M)[0]
+                    Image.fromarray(clean).save(cpath)
+                A = {"assign": P["assign"], "styles": P.get("style") or {}, "accent": P.get("accent") or []}
+                U, rlog, miss = resolve(A, M, T)
+                U, llog = layout(U, M, ink, A["styles"], A["accent"], T, base=clean)
+                elog = []
+                base, mask = erase.settle(D, clean, ink, M, {"ops": U}, elog)
+                poster, res, dlog = render.render_units(B.page, base, U, M)
+                errs = render.check_units(U, res)
+                flog = []
+                for k in range(render.FIX_ROUNDS if render.score(errs)[0] else 0):
+                    U2, f2 = render.autofix_units(U, errs, res)
+                    if not f2:
+                        break
+                    p2, res2, _ = render.render_units(B.page, base, U2, M)
+                    e2 = render.check_units(U2, res2)
+                    flog += f2
+                    if render.score(e2) >= render.score(errs):
+                        break
+                    poster, U, errs, res = p2, U2, e2, res2
+                old = Image.open(next(iter(glob.glob(r + "poster.*")))).convert("RGB")
+                pub = {**P, "ops": public(U)}
+                tiles = [Image.fromarray(D), old, render.ops_image(D, M, pub), Image.fromarray(np.asarray(poster))]
+                h = 720
+                tiles = [t.resize((round(t.width * h / t.height), h)) for t in tiles]
+                sheet = Image.new("RGB", (sum(t.width for t in tiles) + 8 * (len(tiles) - 1), h), (30, 30, 30))
+                x = 0
+                for t in tiles:
+                    sheet.paste(t, (x, 0))
+                    x += t.width + 8
+                sheet.save(f"{a.out}/{setn.replace('/', '_')}_{cid}.jpg", quality=82)
+                Image.fromarray(np.asarray(poster)).save(f"{a.out}/{setn.replace('/', '_')}_{cid}_poster.jpg", quality=90)
+                # SỐ ĐO: chữ đặt khác câu khách (phải 0 ngoài dòng lấp), tập dựng lệch cỡ (phải 0), phần tử co < 0,6, câu khách thiếu
+                import re   # số bước / ngoặc kép do mã đặt lại không tính là lệch
+                placed = lambda u: re.sub(r"^\d{1,2}\.\s+", "", "".join(x for e in u.get("els") or [] for x in e["lines"]).strip().strip("“”"))  # noqa: E731
+                off = [u["id"] for u in U if u["kind"] == "text" and u["clients"]
+                       and _flat(placed(u)) != _flat("".join(T[k]["text"] for k in u["clients"]))]
+                fs = {}
+                for rr in res:
+                    u = next((u for u in U if u["id"] == rr["unit"]), None)
+                    if u and u.get("set"):
+                        fs.setdefault(u["set"], []).append(round(rr["fs"] * (rr.get("sx") or 1), 1))
+                uneven = {k: v for k, v in fs.items() if max(v) / max(0.1, min(v)) > 1.03}
+                small = [(rr["id"], round(rr["shrink"], 2)) for rr in res if rr.get("shrink", 1) < 0.6]
+                # CỠ GIỐNG NHÁP: cao chữ dựng (cỡ cuối x cao chữ của font) / cao nét nháp đo được (lines: h_cap) -- 1 là đúng cỡ nháp
+                fit = []
+                for rr in res:
+                    u = next((u for u in U if u["id"] == rr["unit"]), None)
+                    hs = [(l.get("ink") or {}).get("h_cap") for l in (u or {}).get("Ls") or [] if not (l.get("path") or l.get("vertical"))]
+                    if u and hs and all(hs) and rr.get("size"):
+                        em = letter_em(u["font"], " ".join(u["text"]), "text-transform:uppercase" in u.get("css", ""))
+                        fit.append(round(rr["size"] * em / float(np.median(hs)), 3))
+                rows.append({"set": setn, "id": cid, "errors": [e["type"] for e in errs], "errs": errs, "sets": sorted(fs), "uneven": uneven,
+                             "small": small, "fit": fit, "off": off, "missing": [T[k]["text"] for k in miss], "fill": [u["id"] for u in U if u["kind"] == "text" and not u["clients"]],
+                             "log": glog + rlog + llog + dlog + flog})
+                print(f"{setn} {cid}: tập {len(fs)}, lệch {uneven or '-'}, co<0.6 {small or '-'}, chữ lệch câu {off or '-'}, thiếu {rows[-1]['missing'] or '-'}, "
+                      f"lỗi {rows[-1]['errors'] or '-'}", flush=True)
 json.dump(rows, open(f"{a.out}/rows.json", "w", encoding="utf-8"), ensure_ascii=False, indent=0)
 print(f"{len(rows)} poster; tập lệch cỡ: {sum(bool(r['uneven']) for r in rows)}; chữ lệch câu khách: {sum(len(r['off']) for r in rows)}; "
-      f"phần tử co < 0,6: {sum(len(r['small']) for r in rows)}; còn lỗi bộ kiểm: {sum(bool(r['errors']) for r in rows)}")
+      f"phần tử co < 0,6: {sum(len(r['small']) for r in rows)}; cặp chữ dính: {sum(r['errors'].count('touching') for r in rows)}; còn lỗi bộ kiểm: {sum(bool(r['errors']) for r in rows)}")
 fits = np.array([x for r in rows for x in r["fit"]])
 if len(fits):
     print(f"cỡ so với nháp ({len(fits)} phần tử): trung vị {np.median(fits):.2f}, lệch |log| trung vị {np.median(np.abs(np.log(fits))):.3f}, "
